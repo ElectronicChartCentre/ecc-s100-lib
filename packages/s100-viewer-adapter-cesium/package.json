@@ -1,0 +1,48 @@
+{
+  "name": "@ecc/s100-viewer-adapter-cesium",
+  "version": "0.1.0-alpha.0",
+  "private": false,
+  "type": "module",
+  "description": "Cesium adapter package for @ecc/s100-viewer.",
+  "keywords": [
+    "s-100",
+    "cesium",
+    "3d-tiles",
+    "geospatial",
+    "adapter"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@ecc/s100-viewer": "0.1.0-alpha.0",
+    "proj4": "^2.20.8"
+  },
+  "peerDependencies": {
+    "cesium": ">=1.120.0"
+  },
+  "peerDependenciesMeta": {
+    "cesium": {
+      "optional": true
+    }
+  },
+  "license": "MIT"
+}

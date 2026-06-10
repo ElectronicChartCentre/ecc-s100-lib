@@ -1,0 +1,1017 @@
+import {
+  DoubleSide,
+  Float32BufferAttribute,
+  Group,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  MathUtils,
+  Mesh,
+  Sphere,
+  ShaderMaterial,
+  StreamDrawUsage,
+  Vector3,
+  type Scene,
+} from "three";
+
+export type SurfaceCurrentDatasetLike = {
+  id?: string;
+  timeRecordInterval?: number;
+  dateTimeOfFirstRecord?: string;
+  dateTimeOfLastRecord?: string;
+  numberOfTimes?: number;
+  positions?: unknown;
+  data?: unknown;
+  [key: string]: unknown;
+};
+
+export type ParsedSurfaceCurrentDataset = {
+  readonly id: string;
+  readonly positions: readonly SurfaceCurrentPosition[];
+  readonly records: readonly SurfaceCurrentRecord[];
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly intervalSeconds: number;
+  readonly gridSize: number;
+  readonly minSpeed: number;
+  readonly maxSpeed: number;
+  readonly speedKnotsScale: number;
+};
+
+type SurfaceCurrentPosition = readonly [number, number];
+
+type SurfaceCurrentRecord = {
+  readonly speed: Float32Array;
+  readonly direction: Float32Array;
+};
+
+type SeaCurrentsOverlayOptions = {
+  currentTimeMs?: number;
+  customScale?: number;
+  zOffset?: number;
+};
+
+const DEFAULT_INTERVAL_SECONDS = 1;
+const DEFAULT_Z_OFFSET = 0.5;
+const CENTIMETERS_PER_SECOND_TO_KNOTS = 0.019438444924406;
+const SPEED_LEGEND_MAX_KNOTS = 99;
+const ARROW_MIN_SPEED_SCALE = 0.2;
+const ARROW_MAX_SPEED_SCALE = 1;
+const ARROW_EXPLICIT_MAX_SPEED_SCALE = 0.65;
+const ARROW_EXPLICIT_REFERENCE_SPEED_KNOTS = 10;
+const ARROW_MAX_LOCAL_SPACING_FACTOR = 1;
+const ARROW_OUTLINE_WIDTH = 0.0105;
+const ARROW_FILL_Z_OFFSET = 0.02;
+const ARROW_POLYGON: readonly (readonly [number, number])[] = [
+  [0.5, 0],
+  [0.15, 0.2],
+  [0.15, 0.1],
+  [-0.5, 0.05],
+  [-0.5, -0.05],
+  [0.15, -0.1],
+  [0.15, -0.2],
+];
+const ARROW_OUTLINE_POLYGON = offsetClosedPolygon(ARROW_POLYGON, ARROW_OUTLINE_WIDTH);
+const ARROW_FILL_INDICES = [0, 1, 6, 2, 3, 4, 2, 4, 5] as const;
+const SPEED_COLOR_BANDS: readonly (readonly [number, number, number, number])[] =
+  [
+    [0.5, 0x76 / 255, 0x52 / 255, 0xe2 / 255],
+    [1, 0x48 / 255, 0x98 / 255, 0xd3 / 255],
+    [2, 0x61 / 255, 0xcb / 255, 0xe5 / 255],
+    [3, 0x6d / 255, 0xbc / 255, 0x45 / 255],
+    [5, 0xb4 / 255, 0xdc / 255, 0x00 / 255],
+    [7, 0xcd / 255, 0xc1 / 255, 0x00 / 255],
+    [10, 0xf8 / 255, 0xa7 / 255, 0x18 / 255],
+    [13, 0xf7 / 255, 0xa2 / 255, 0x9d / 255],
+    [SPEED_LEGEND_MAX_KNOTS, 0xff / 255, 0x1e / 255, 0x1e / 255],
+  ];
+
+export class SeaCurrentsOverlay {
+  readonly group = new Group();
+  readonly parsedDataset: ParsedSurfaceCurrentDataset;
+
+  private readonly scene: Scene;
+  private readonly fillGeometry: InstancedBufferGeometry;
+  private readonly outlineGeometry: InstancedBufferGeometry;
+  private readonly fillMaterial: ShaderMaterial;
+  private readonly outlineMaterial: ShaderMaterial;
+  private readonly fillMesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
+  private readonly outlineMesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
+  private readonly fillInstancePositionScaleAngle: InstancedBufferAttribute;
+  private readonly outlineInstancePositionScaleAngle: InstancedBufferAttribute;
+  private readonly fillInstanceColor: InstancedBufferAttribute;
+  private readonly outlineInstanceColor: InstancedBufferAttribute;
+  private readonly origin: SurfaceCurrentPosition;
+  private currentTimeMs: number;
+  private customScale: number;
+  private zOffset: number;
+  private currentRecordIndex = -1;
+  private disposed = false;
+
+  constructor(
+    dataset: SurfaceCurrentDatasetLike,
+    scene: Scene,
+    options: SeaCurrentsOverlayOptions = {},
+  ) {
+    this.scene = scene;
+    this.parsedDataset = parseSurfaceCurrentDataset(dataset);
+    this.currentTimeMs =
+      normalizeFiniteNumber(options.currentTimeMs) ??
+      this.parsedDataset.startTime;
+    this.customScale = normalizePositiveScale(options.customScale);
+    this.zOffset = normalizeFiniteNumber(options.zOffset) ?? DEFAULT_Z_OFFSET;
+    this.group.name = `s100-s111:${this.parsedDataset.id}`;
+    this.group.renderOrder = 1300;
+    this.group.frustumCulled = false;
+    this.origin = getSurfaceCurrentOrigin(this.parsedDataset.positions);
+    this.group.position.set(this.origin[0], this.origin[1], 0);
+
+    this.outlineGeometry = createArrowGeometry(
+      this.parsedDataset.positions.length,
+      ARROW_OUTLINE_POLYGON,
+    );
+    this.fillGeometry = createArrowGeometry(
+      this.parsedDataset.positions.length,
+      ARROW_POLYGON,
+    );
+    this.outlineInstancePositionScaleAngle = this.outlineGeometry.getAttribute(
+      "instancePosition",
+    ) as InstancedBufferAttribute;
+    this.fillInstancePositionScaleAngle = this.fillGeometry.getAttribute(
+      "instancePosition",
+    ) as InstancedBufferAttribute;
+    this.outlineInstanceColor = this.outlineGeometry.getAttribute(
+      "instanceColor",
+    ) as InstancedBufferAttribute;
+    this.fillInstanceColor = this.fillGeometry.getAttribute(
+      "instanceColor",
+    ) as InstancedBufferAttribute;
+    this.outlineMaterial = createSeaCurrentsMaterial(this.zOffset, true);
+    this.fillMaterial = createSeaCurrentsMaterial(
+      this.zOffset + ARROW_FILL_Z_OFFSET,
+      false,
+    );
+    this.outlineMesh = new Mesh(this.outlineGeometry, this.outlineMaterial);
+    this.outlineMesh.name = `s100-s111-arrow-outlines:${this.parsedDataset.id}`;
+    this.outlineMesh.renderOrder = this.group.renderOrder;
+    this.outlineMesh.frustumCulled = false;
+    this.fillMesh = new Mesh(this.fillGeometry, this.fillMaterial);
+    this.fillMesh.name = `s100-s111-arrows:${this.parsedDataset.id}`;
+    this.fillMesh.renderOrder = this.group.renderOrder + 1;
+    this.fillMesh.frustumCulled = false;
+    const boundingSphere = createSurfaceCurrentBoundingSphere(
+      this.parsedDataset.positions,
+      this.origin,
+    );
+    this.outlineGeometry.boundingSphere = boundingSphere.clone();
+    this.fillGeometry.boundingSphere = boundingSphere.clone();
+    this.group.add(this.outlineMesh);
+    this.group.add(this.fillMesh);
+    this.scene.add(this.group);
+    this.updateInstances(true);
+  }
+
+  setVisible(visible: boolean): void {
+    this.group.visible = visible;
+    if (visible) {
+      this.updateInstances(false);
+    }
+  }
+
+  setCustomScale(scale: number): void {
+    const nextScale = normalizePositiveScale(scale, this.customScale);
+    if (nextScale === this.customScale) {
+      return;
+    }
+    this.customScale = nextScale;
+    this.updateInstances(true);
+  }
+
+  setCurrentTime(currentTimeMs: number): void {
+    const nextTime =
+      normalizeFiniteNumber(currentTimeMs) ?? this.parsedDataset.startTime;
+    if (nextTime === this.currentTimeMs) {
+      return;
+    }
+    this.currentTimeMs = nextTime;
+    if (!this.group.visible) {
+      this.currentRecordIndex = -1;
+      return;
+    }
+    this.updateInstances(false);
+  }
+
+  setZOffset(zOffset: number): void {
+    const nextZOffset = normalizeFiniteNumber(zOffset) ?? DEFAULT_Z_OFFSET;
+    if (nextZOffset === this.zOffset) {
+      return;
+    }
+    this.zOffset = nextZOffset;
+    const outlineUniform = this.outlineMaterial.uniforms.uZOffset;
+    if (outlineUniform) {
+      outlineUniform.value = nextZOffset;
+    }
+    const fillUniform = this.fillMaterial.uniforms.uZOffset;
+    if (fillUniform) {
+      fillUniform.value = nextZOffset + ARROW_FILL_Z_OFFSET;
+    }
+  }
+
+  dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.disposed = true;
+    this.scene.remove(this.group);
+    this.outlineGeometry.dispose();
+    this.fillGeometry.dispose();
+    this.outlineMaterial.dispose();
+    this.fillMaterial.dispose();
+  }
+
+  private updateInstances(force: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const recordIndex = getRecordIndex(
+      this.parsedDataset,
+      this.currentTimeMs,
+    );
+    if (!force && recordIndex === this.currentRecordIndex) {
+      return;
+    }
+
+    this.currentRecordIndex = recordIndex;
+    const record = this.parsedDataset.records[recordIndex];
+    const positions = this.parsedDataset.positions;
+    if (!record) {
+      this.outlineGeometry.instanceCount = 0;
+      this.fillGeometry.instanceCount = 0;
+      return;
+    }
+
+    this.outlineGeometry.instanceCount = positions.length;
+    this.fillGeometry.instanceCount = positions.length;
+    for (let index = 0; index < positions.length; index += 1) {
+      const position = positions[index];
+      const speed = record.speed[index];
+      const direction = record.direction[index];
+      if (
+        !position ||
+        speed === undefined ||
+        direction === undefined ||
+        !isValidCurrentValue(speed, direction)
+      ) {
+        setCurrentInstance(
+          this.outlineInstancePositionScaleAngle,
+          this.outlineInstanceColor,
+          index,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        );
+        setCurrentInstance(
+          this.fillInstancePositionScaleAngle,
+          this.fillInstanceColor,
+          index,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        );
+        continue;
+      }
+
+      const speedKnots = speed * this.parsedDataset.speedKnotsScale;
+      const scale =
+        getArrowScale(
+          speedKnots,
+          this.customScale,
+          this.parsedDataset,
+        );
+      const angle = MathUtils.degToRad(90 - direction);
+      const color = getSpeedColor(speedKnots);
+      setCurrentInstance(
+        this.outlineInstancePositionScaleAngle,
+        this.outlineInstanceColor,
+        index,
+        position[0] - this.origin[0],
+        position[1] - this.origin[1],
+        scale,
+        angle,
+        0,
+        0,
+        0,
+        1,
+      );
+      setCurrentInstance(
+        this.fillInstancePositionScaleAngle,
+        this.fillInstanceColor,
+        index,
+        position[0] - this.origin[0],
+        position[1] - this.origin[1],
+        scale,
+        angle,
+        color[0],
+        color[1],
+        color[2],
+        1,
+      );
+    }
+
+    this.outlineInstancePositionScaleAngle.needsUpdate = true;
+    this.outlineInstanceColor.needsUpdate = true;
+    this.fillInstancePositionScaleAngle.needsUpdate = true;
+    this.fillInstanceColor.needsUpdate = true;
+  }
+}
+
+export function parseSurfaceCurrentDataset(
+  dataset: SurfaceCurrentDatasetLike,
+): ParsedSurfaceCurrentDataset {
+  const positions = parsePositions(dataset.positions);
+  const records = parseRecords(dataset.data, positions.length);
+  const intervalSeconds = normalizeIntervalSeconds(dataset.timeRecordInterval);
+  const startTime = parseSurfaceCurrentTime(dataset.dateTimeOfFirstRecord) ?? 0;
+  const rawSpeedRange = getRawSpeedRange(records);
+  const speedKnotsScale = inferSpeedKnotsScale(rawSpeedRange.max);
+  const endTime =
+    parseSurfaceCurrentTime(dataset.dateTimeOfLastRecord) ??
+    startTime +
+      intervalSeconds *
+        1000 *
+        Math.max(0, getSurfaceCurrentRecordCount(dataset) - 1);
+  return {
+    id: normalizeDatasetId(dataset.id),
+    positions,
+    records,
+    startTime,
+    endTime,
+    intervalSeconds,
+    gridSize: getGridSize(dataset, positions),
+    minSpeed: rawSpeedRange.min * speedKnotsScale,
+    maxSpeed: rawSpeedRange.max * speedKnotsScale,
+    speedKnotsScale,
+  };
+}
+
+export function parseSurfaceCurrentTime(value: unknown): number | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const parsed = Date.parse(value);
+  if (!Number.isNaN(parsed)) {
+    return parsed;
+  }
+
+  const compact = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(
+    value,
+  );
+  if (!compact) {
+    return undefined;
+  }
+
+  const [, year, month, day, hour, minute, second] = compact;
+  return Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
+}
+
+export function getSurfaceCurrentRecordCount(
+  dataset: SurfaceCurrentDatasetLike,
+): number {
+  const explicitCount = normalizeFiniteNumber(dataset.numberOfTimes);
+  if (explicitCount !== undefined && explicitCount > 0) {
+    return Math.floor(explicitCount);
+  }
+
+  if (Array.isArray(dataset.data)) {
+    return dataset.data.length;
+  }
+
+  return 1;
+}
+
+function createArrowGeometry(
+  instanceCount: number,
+  polygon: readonly (readonly [number, number])[],
+): InstancedBufferGeometry {
+  const geometry = new InstancedBufferGeometry();
+  const positions = polygon.flatMap(([x, y]) => [x, y, 0]);
+  const instancePositionScaleAngle = new InstancedBufferAttribute(
+    new Float32Array(Math.max(0, instanceCount) * 4),
+    4,
+  );
+  const instanceColor = new InstancedBufferAttribute(
+    new Float32Array(Math.max(0, instanceCount) * 4),
+    4,
+  );
+
+  instancePositionScaleAngle.setUsage(StreamDrawUsage);
+  instanceColor.setUsage(StreamDrawUsage);
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setIndex([...ARROW_FILL_INDICES]);
+  geometry.setAttribute("instancePosition", instancePositionScaleAngle);
+  geometry.setAttribute("instanceColor", instanceColor);
+  geometry.instanceCount = instanceCount;
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function getSurfaceCurrentOrigin(
+  positions: readonly SurfaceCurrentPosition[],
+): SurfaceCurrentPosition {
+  if (positions.length === 0) {
+    return [0, 0];
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const position of positions) {
+    minX = Math.min(minX, position[0]);
+    minY = Math.min(minY, position[1]);
+    maxX = Math.max(maxX, position[0]);
+    maxY = Math.max(maxY, position[1]);
+  }
+
+  return Number.isFinite(minX) &&
+    Number.isFinite(minY) &&
+    Number.isFinite(maxX) &&
+    Number.isFinite(maxY)
+    ? [(minX + maxX) / 2, (minY + maxY) / 2]
+    : [0, 0];
+}
+
+function createSurfaceCurrentBoundingSphere(
+  positions: readonly SurfaceCurrentPosition[],
+  origin: SurfaceCurrentPosition,
+): Sphere {
+  let radius = 1;
+  for (const position of positions) {
+    radius = Math.max(
+      radius,
+      Math.hypot(position[0] - origin[0], position[1] - origin[1]) +
+        ARROW_MAX_LOCAL_SPACING_FACTOR,
+    );
+  }
+
+  return new Sphere(new Vector3(0, 0, DEFAULT_Z_OFFSET), radius);
+}
+
+function createSeaCurrentsMaterial(
+  zOffset: number,
+  outline: boolean,
+): ShaderMaterial {
+  const material = new ShaderMaterial({
+    uniforms: {
+      uZOffset: { value: zOffset },
+    },
+    vertexShader: `
+      uniform float uZOffset;
+
+      attribute vec4 instancePosition;
+      attribute vec4 instanceColor;
+
+      varying vec4 vColor;
+
+      void main() {
+        vec2 localPosition = position.xy * instancePosition.z;
+        float angle = instancePosition.w;
+        float s = sin(angle);
+        float c = cos(angle);
+        vec2 rotatedPosition = vec2(
+          localPosition.x * c - localPosition.y * s,
+          localPosition.x * s + localPosition.y * c
+        );
+        vec3 localPosition3 = vec3(
+          rotatedPosition + instancePosition.xy,
+          position.z + uZOffset
+        );
+
+        vColor = instanceColor;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(localPosition3, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec4 vColor;
+
+      void main() {
+        if (vColor.a <= 0.0) {
+          discard;
+        }
+
+        gl_FragColor = vec4(${outline ? "vec3(0.0)" : "vColor.rgb"}, vColor.a);
+      }
+    `,
+    depthTest: true,
+    depthWrite: false,
+    side: DoubleSide,
+    transparent: true,
+  });
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = -2;
+  material.polygonOffsetUnits = -2;
+  return material;
+}
+
+function parsePositions(value: unknown): readonly SurfaceCurrentPosition[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  if (value.every((entry) => typeof entry === "number")) {
+    const positions: SurfaceCurrentPosition[] = [];
+    for (let index = 0; index < value.length - 1; index += 2) {
+      const x = normalizeFiniteNumber(value[index]);
+      const y = normalizeFiniteNumber(value[index + 1]);
+      if (x !== undefined && y !== undefined) {
+        positions.push([x, y]);
+      }
+    }
+    return positions;
+  }
+
+  const positions: SurfaceCurrentPosition[] = [];
+  for (const entry of value) {
+    const position = parsePosition(entry);
+    if (position) {
+      positions.push(position);
+    }
+  }
+  return positions;
+}
+
+function parsePosition(value: unknown): SurfaceCurrentPosition | null {
+  if (Array.isArray(value)) {
+    const x = normalizeFiniteNumber(value[0]);
+    const y = normalizeFiniteNumber(value[1]);
+    return x !== undefined && y !== undefined ? [x, y] : null;
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const x =
+    normalizeFiniteNumber(record.x) ??
+    normalizeFiniteNumber(record.easting) ??
+    normalizeFiniteNumber(record.Easting);
+  const y =
+    normalizeFiniteNumber(record.y) ??
+    normalizeFiniteNumber(record.northing) ??
+    normalizeFiniteNumber(record.Northing);
+  return x !== undefined && y !== undefined ? [x, y] : null;
+}
+
+function parseRecords(
+  value: unknown,
+  positionCount: number,
+): readonly SurfaceCurrentRecord[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const records: SurfaceCurrentRecord[] = [];
+  for (const record of value) {
+    const parsedRecord = parseRecord(record, positionCount);
+    if (parsedRecord) {
+      records.push(parsedRecord);
+    }
+  }
+  return records;
+}
+
+function parseRecord(
+  value: unknown,
+  positionCount: number,
+): SurfaceCurrentRecord | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const speed = parseNumericArray(
+    record.speed ??
+      record.surfaceCurrentSpeed ??
+      record.surface_current_speed ??
+      record.surfaceCurrentSpeedValues,
+    positionCount,
+  );
+  const direction = parseNumericArray(
+    record.direction ??
+      record.surfaceCurrentDirection ??
+      record.surface_current_direction ??
+      record.surfaceCurrentDirectionValues,
+    positionCount,
+  );
+  return speed && direction ? { speed, direction } : null;
+}
+
+function parseNumericArray(
+  value: unknown,
+  count: number,
+): Float32Array | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const output = new Float32Array(count);
+  output.fill(Number.NaN);
+  const limit = Math.min(count, value.length);
+  for (let index = 0; index < limit; index += 1) {
+    const parsed = normalizeFiniteNumber(value[index]);
+    output[index] = parsed ?? Number.NaN;
+  }
+  return output;
+}
+
+function getRecordIndex(
+  dataset: ParsedSurfaceCurrentDataset,
+  currentTimeMs: number,
+): number {
+  if (dataset.records.length <= 1) {
+    return 0;
+  }
+
+  const intervalMs = Math.max(1, dataset.intervalSeconds * 1000);
+  return MathUtils.clamp(
+    Math.round((currentTimeMs - dataset.startTime) / intervalMs),
+    0,
+    dataset.records.length - 1,
+  );
+}
+
+function getRawSpeedRange(records: readonly SurfaceCurrentRecord[]): {
+  min: number;
+  max: number;
+} {
+  let minSpeed = Number.POSITIVE_INFINITY;
+  let maxSpeed = 0;
+  for (const record of records) {
+    for (const speed of record.speed) {
+      if (!Number.isFinite(speed) || speed < 0) {
+        continue;
+      }
+      minSpeed = Math.min(minSpeed, speed);
+      maxSpeed = Math.max(maxSpeed, speed);
+    }
+  }
+
+  return {
+    min: Number.isFinite(minSpeed) ? minSpeed : 0,
+    max: maxSpeed,
+  };
+}
+
+function inferSpeedKnotsScale(rawMaxSpeed: number): number {
+  if (!Number.isFinite(rawMaxSpeed) || rawMaxSpeed <= 0) {
+    return 1;
+  }
+
+  // The PRIMAR web-adapted S-111 JSON used by the viewer exposes normal
+  // surface current speeds in knots, matching the S-111 legend. Some older
+  // sample payloads encode speed as centimetres per second, which shows up
+  // outside the legend's valid knot range.
+  return rawMaxSpeed > SPEED_LEGEND_MAX_KNOTS
+    ? CENTIMETERS_PER_SECOND_TO_KNOTS
+    : 1;
+}
+
+function getGridSize(
+  dataset: SurfaceCurrentDatasetLike,
+  positions: readonly SurfaceCurrentPosition[],
+): number {
+  const explicitGridSize = normalizeFiniteNumber(dataset.gridSize);
+  if (explicitGridSize !== undefined && explicitGridSize > 0) {
+    return explicitGridSize;
+  }
+
+  if (positions.length < 2) {
+    return 0;
+  }
+
+  const nearestDistances: number[] = [];
+  const sampledCount = Math.min(positions.length, 128);
+  const stride = Math.max(1, Math.floor(positions.length / sampledCount));
+  for (
+    let positionIndex = 0;
+    positionIndex < positions.length && nearestDistances.length < sampledCount;
+    positionIndex += stride
+  ) {
+    const position = positions[positionIndex];
+    if (!position) {
+      continue;
+    }
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (let candidateIndex = 0; candidateIndex < positions.length; candidateIndex += 1) {
+      if (candidateIndex === positionIndex) {
+        continue;
+      }
+      const candidate = positions[candidateIndex];
+      if (!candidate) {
+        continue;
+      }
+      const distance = Math.hypot(
+        position[0] - candidate[0],
+        position[1] - candidate[1],
+      );
+      if (distance > 0 && distance < nearestDistance) {
+        nearestDistance = distance;
+      }
+    }
+    if (Number.isFinite(nearestDistance)) {
+      nearestDistances.push(nearestDistance);
+    }
+  }
+
+  if (nearestDistances.length === 0) {
+    const first = positions[0];
+    const second = positions[1];
+    return first && second
+      ? Math.hypot(first[0] - second[0], first[1] - second[1])
+      : 0;
+  }
+
+  nearestDistances.sort((a, b) => a - b);
+  return nearestDistances[Math.floor(nearestDistances.length / 2)] ?? 0;
+}
+
+function getBaseArrowScale(customScale: number, gridSize: number): number {
+  if (!Number.isFinite(gridSize) || gridSize <= 0) {
+    return customScale;
+  }
+
+  return Math.min(customScale, gridSize * ARROW_MAX_LOCAL_SPACING_FACTOR);
+}
+
+function getArrowScale(
+  speedKnots: number,
+  customScale: number,
+  dataset: ParsedSurfaceCurrentDataset,
+): number {
+  if (customScale > 1) {
+    return getExplicitArrowScale(speedKnots, customScale);
+  }
+
+  return getBaseArrowScale(customScale, dataset.gridSize) *
+    getSpeedScaleFactor(speedKnots, dataset);
+}
+
+function getExplicitArrowScale(speedKnots: number, maxScaleMeters: number): number {
+  if (!Number.isFinite(speedKnots) || speedKnots < 0) {
+    return 0;
+  }
+
+  return maxScaleMeters * getExplicitSpeedScaleFactor(speedKnots);
+}
+
+function getExplicitSpeedScaleFactor(speedKnots: number): number {
+  const normalized = MathUtils.clamp(
+    speedKnots / ARROW_EXPLICIT_REFERENCE_SPEED_KNOTS,
+    0,
+    1,
+  );
+  return MathUtils.lerp(
+    ARROW_MIN_SPEED_SCALE,
+    ARROW_EXPLICIT_MAX_SPEED_SCALE,
+    normalized,
+  );
+}
+
+function getSpeedScaleFactor(
+  speedKnots: number,
+  dataset: ParsedSurfaceCurrentDataset,
+): number {
+  if (!Number.isFinite(speedKnots) || speedKnots < 0) {
+    return 0;
+  }
+
+  if (dataset.maxSpeed <= dataset.minSpeed) {
+    return ARROW_MAX_SPEED_SCALE;
+  }
+
+  const normalized = MathUtils.clamp(
+    (speedKnots - dataset.minSpeed) /
+      (dataset.maxSpeed - dataset.minSpeed),
+    0,
+    1,
+  );
+  return MathUtils.lerp(
+    ARROW_MIN_SPEED_SCALE,
+    ARROW_MAX_SPEED_SCALE,
+    normalized,
+  );
+}
+
+function getSpeedColor(speedKnots: number): readonly [number, number, number] {
+  const lastBand = SPEED_COLOR_BANDS[SPEED_COLOR_BANDS.length - 1];
+  for (const band of SPEED_COLOR_BANDS) {
+    if (!band || speedKnots > band[0]) {
+      continue;
+    }
+
+    return [band[1], band[2], band[3]];
+  }
+
+  return [
+    lastBand?.[1] ?? 1,
+    lastBand?.[2] ?? 1,
+    lastBand?.[3] ?? 1,
+  ];
+}
+
+function isValidCurrentValue(
+  speed: number | undefined,
+  direction: number | undefined,
+): speed is number {
+  return (
+    speed !== undefined &&
+    direction !== undefined &&
+    Number.isFinite(speed) &&
+    Number.isFinite(direction) &&
+    speed >= 0 &&
+    direction >= 0
+  );
+}
+
+function normalizeDatasetId(id: unknown): string {
+  if (typeof id === "string" && id.trim()) {
+    return id.trim();
+  }
+  return "surface-currents";
+}
+
+function normalizeIntervalSeconds(value: unknown): number {
+  const interval = normalizeFiniteNumber(value);
+  return interval !== undefined && interval > 0
+    ? interval
+    : DEFAULT_INTERVAL_SECONDS;
+}
+
+function normalizePositiveScale(value: unknown, fallback = 1): number {
+  const scale = normalizeFiniteNumber(value);
+  return scale !== undefined && scale > 0 ? scale : fallback;
+}
+
+function normalizeFiniteNumber(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function setCurrentInstance(
+  positionAttribute: InstancedBufferAttribute,
+  colorAttribute: InstancedBufferAttribute,
+  index: number,
+  x: number,
+  y: number,
+  scale: number,
+  angle: number,
+  red: number,
+  green: number,
+  blue: number,
+  alpha: number,
+): void {
+  setInstancePosition(positionAttribute, index, x, y, scale, angle);
+  setInstanceColor(colorAttribute, index, red, green, blue, alpha);
+}
+
+function setInstancePosition(
+  attribute: InstancedBufferAttribute,
+  index: number,
+  x: number,
+  y: number,
+  scale: number,
+  angle: number,
+): void {
+  attribute.setXYZW(index, x, y, scale, angle);
+}
+
+function setInstanceColor(
+  attribute: InstancedBufferAttribute,
+  index: number,
+  red: number,
+  green: number,
+  blue: number,
+  alpha: number,
+): void {
+  attribute.setXYZW(index, red, green, blue, alpha);
+}
+
+type LocalPoint2D = readonly [number, number];
+
+function offsetClosedPolygon(
+  points: readonly LocalPoint2D[],
+  distance: number,
+): LocalPoint2D[] {
+  if (points.length < 3 || !Number.isFinite(distance) || distance <= 0) {
+    return [...points];
+  }
+
+  const orientation = signedPolygonArea(points) >= 0 ? 1 : -1;
+  return points.map((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length] ?? point;
+    const next = points[(index + 1) % points.length] ?? point;
+    const previousEdge = subtractLocalPoint(point, previous);
+    const nextEdge = subtractLocalPoint(next, point);
+    const previousNormal = outwardEdgeNormal(previousEdge, orientation);
+    const nextNormal = outwardEdgeNormal(nextEdge, orientation);
+    const previousOffsetStart = addScaledLocalPoint(previous, previousNormal, distance);
+    const nextOffsetStart = addScaledLocalPoint(point, nextNormal, distance);
+    const intersection = intersectLocalLines(
+      previousOffsetStart,
+      previousEdge,
+      nextOffsetStart,
+      nextEdge,
+    );
+    if (intersection) {
+      return intersection;
+    }
+
+    const averageNormal = normalizeLocalPoint([
+      previousNormal[0] + nextNormal[0],
+      previousNormal[1] + nextNormal[1],
+    ]);
+    return addScaledLocalPoint(point, averageNormal, distance);
+  });
+}
+
+function signedPolygonArea(points: readonly LocalPoint2D[]): number {
+  let area = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index] ?? [0, 0];
+    const next = points[(index + 1) % points.length] ?? current;
+    area += current[0] * next[1] - next[0] * current[1];
+  }
+  return area / 2;
+}
+
+function subtractLocalPoint(
+  left: LocalPoint2D,
+  right: LocalPoint2D,
+): LocalPoint2D {
+  return [left[0] - right[0], left[1] - right[1]];
+}
+
+function addScaledLocalPoint(
+  point: LocalPoint2D,
+  vector: LocalPoint2D,
+  scale: number,
+): LocalPoint2D {
+  return [point[0] + vector[0] * scale, point[1] + vector[1] * scale];
+}
+
+function outwardEdgeNormal(
+  edge: LocalPoint2D,
+  orientation: 1 | -1,
+): LocalPoint2D {
+  const length = Math.hypot(edge[0], edge[1]) || 1;
+  return orientation > 0
+    ? [edge[1] / length, -edge[0] / length]
+    : [-edge[1] / length, edge[0] / length];
+}
+
+function normalizeLocalPoint(point: LocalPoint2D): LocalPoint2D {
+  const length = Math.hypot(point[0], point[1]);
+  return length > 1e-9 ? [point[0] / length, point[1] / length] : [0, 0];
+}
+
+function intersectLocalLines(
+  firstPoint: LocalPoint2D,
+  firstDirection: LocalPoint2D,
+  secondPoint: LocalPoint2D,
+  secondDirection: LocalPoint2D,
+): LocalPoint2D | null {
+  const cross =
+    firstDirection[0] * secondDirection[1] -
+    firstDirection[1] * secondDirection[0];
+  if (Math.abs(cross) < 1e-9) {
+    return null;
+  }
+  const delta = subtractLocalPoint(secondPoint, firstPoint);
+  const t =
+    (delta[0] * secondDirection[1] - delta[1] * secondDirection[0]) /
+    cross;
+  return [
+    firstPoint[0] + firstDirection[0] * t,
+    firstPoint[1] + firstDirection[1] * t,
+  ];
+}

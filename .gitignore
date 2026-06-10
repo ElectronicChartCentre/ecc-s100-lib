@@ -1,0 +1,17 @@
+.DS_Store
+**/.DS_Store
+
+REFERENCE EXAMPLES/
+
+node_modules/
+**/node_modules/
+
+dist/
+build/
+coverage/
+.vite/
+.turbo/
+
+.env
+.env.*
+!.env.example

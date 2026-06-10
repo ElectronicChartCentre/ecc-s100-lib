@@ -1,0 +1,37 @@
+{
+  "name": "@ecc/s100-viewer-compat",
+  "version": "0.1.0-alpha.0",
+  "private": false,
+  "type": "module",
+  "description": "Temporary legacy compatibility facade for @ecc/s100-viewer.",
+  "deprecated": "Temporary migration facade. New integrations should use @ecc/s100-viewer directly.",
+  "keywords": [
+    "s-100",
+    "compatibility",
+    "migration",
+    "viewer"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@ecc/s100-viewer": "0.1.0-alpha.0",
+    "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.0"
+  },
+  "license": "MIT"
+}

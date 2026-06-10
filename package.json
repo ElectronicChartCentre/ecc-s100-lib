@@ -1,0 +1,26 @@
+{
+  "name": "ecc-s100-lib",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Integration workspace for S-100 Interoperability Project viewer packages.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @ecc/s100-viewer && npm run build -w @ecc/s100-viewer-products && npm run build -w @ecc/s100-viewer-adapter-nasa-ammos && npm run build -w @ecc/s100-viewer-adapter-cesium && npm run build -w @ecc/s100-viewer-compat",
+    "build:release-target": "npm run build -w @ecc/s100-viewer && npm run build -w @ecc/s100-viewer-products && npm run build -w @ecc/s100-viewer-adapter-nasa-ammos && npm run build -w @ecc/s100-viewer-adapter-cesium && npm run build -w @ecc/s100-viewer-compat",
+    "check": "npm run check -w @ecc/s100-viewer && npm run check -w @ecc/s100-viewer-products && npm run check -w @ecc/s100-viewer-adapter-nasa-ammos && npm run check -w @ecc/s100-viewer-adapter-cesium && npm run check -w @ecc/s100-viewer-compat",
+    "check:release-target": "npm run check -w @ecc/s100-viewer && npm run check -w @ecc/s100-viewer-products && npm run check -w @ecc/s100-viewer-adapter-nasa-ammos && npm run check -w @ecc/s100-viewer-adapter-cesium && npm run check -w @ecc/s100-viewer-compat",
+    "test": "npm run test -w @ecc/s100-viewer && npm run test -w @ecc/s100-viewer-products && npm run test -w @ecc/s100-viewer-adapter-nasa-ammos && npm run test -w @ecc/s100-viewer-adapter-cesium && npm run test -w @ecc/s100-viewer-compat",
+    "test:release-target": "npm run test -w @ecc/s100-viewer && npm run test -w @ecc/s100-viewer-products && npm run test -w @ecc/s100-viewer-adapter-nasa-ammos && npm run test -w @ecc/s100-viewer-adapter-cesium && npm run test -w @ecc/s100-viewer-compat",
+    "pack:release-target:dry-run": "npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-products && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-adapter-nasa-ammos && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-adapter-cesium && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-compat",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.0.15"
+  },
+  "license": "MIT"
+}

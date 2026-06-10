@@ -1,0 +1,41 @@
+{
+  "name": "@ecc/s100-viewer-products",
+  "version": "0.1.0-alpha.0",
+  "private": false,
+  "type": "module",
+  "description": "Deprecated facade for S-100 product helpers now exported by @ecc/s100-viewer.",
+  "keywords": [
+    "s-100",
+    "s-101",
+    "s-102",
+    "s-104",
+    "s-111",
+    "geospatial"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@ecc/s100-viewer": "0.1.0-alpha.0"
+  },
+  "deprecated": "Product specs and builders now export from @ecc/s100-viewer. This package is retained as a migration facade.",
+  "license": "MIT"
+}
