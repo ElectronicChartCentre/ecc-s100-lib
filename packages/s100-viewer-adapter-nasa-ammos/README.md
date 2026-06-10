@@ -21,6 +21,8 @@ const viewer = await createS100Viewer({
     environmentMapURL:
       "/textures/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
     showEnvironmentBackground: true,
+    backgroundRotationX: -Math.PI / 2,
+    environmentRotationX: -Math.PI / 2,
   }),
 });
 ```

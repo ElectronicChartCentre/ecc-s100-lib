@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createInMemoryAdapter, S100ProductType } from "@ecc/s100-viewer";
+import {
+  createInMemoryAdapter,
+  S100ProductType,
+  type EngineCameraChangeListener,
+} from "@ecc/s100-viewer";
 import {
   createLegacyS100ViewerFacade,
   MapDiscardMode,
@@ -50,6 +54,38 @@ describe("@ecc/s100-viewer-compat facade", () => {
     expect(scene.cameraNavigation.getCameraPos()).toEqual([1, 2, 3]);
 
     await viewer.destroy();
+  });
+
+  it("forwards native adapter camera changes to the legacy cameraChanged emitter", async () => {
+    let emitNativeCameraChange: EngineCameraChangeListener | null = null;
+    const viewer = await Viewer.create(null, {
+      adapter: createInMemoryAdapter({
+        onCameraChangeListener: (listener) => {
+          emitNativeCameraChange = listener;
+        },
+      }),
+    });
+    const scene = await viewer.createScene();
+    const cameraEvents: string[] = [];
+
+    scene.cameraChanged.subscribe((pose) => {
+      cameraEvents.push(
+        `${pose.position.join(",")}:${pose.rotation.join(",")}:${pose.focalDistance}`,
+      );
+    });
+
+    expect(typeof emitNativeCameraChange).toBe("function");
+    const emitCameraChange = emitNativeCameraChange as unknown as EngineCameraChangeListener;
+    emitCameraChange({
+      position: { x: 7, y: 8, z: 9 },
+      rotation: { x: 0, y: 0, z: 0.25, w: 0.75 },
+      focalDistance: 30,
+    });
+
+    expect(cameraEvents).toEqual(["7,8,9:0,0,0.25,0.75:30"]);
+
+    await viewer.destroy();
+    expect(emitNativeCameraChange).toBeNull();
   });
 
   it("forwards legacy hover prism calls to the engine scene", async () => {

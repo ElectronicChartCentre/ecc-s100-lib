@@ -6,6 +6,7 @@ import {
 } from "../camera/types.js";
 import type {
   AdapterCapabilities,
+  EngineCameraChangeListener,
   EngineLayerHandle,
   EngineLayerPatchListener,
   EnginePrismCorners2D,
@@ -37,6 +38,7 @@ export type InMemoryAdapterOptions = {
   ) => void;
   onClearHoverPrism?: () => void;
   onLayerPatchListener?: (listener: EngineLayerPatchListener | null) => void;
+  onCameraChangeListener?: (listener: EngineCameraChangeListener | null) => void;
 };
 
 const defaultCameraPose = (): CameraPose => ({
@@ -79,6 +81,7 @@ export const createInMemoryAdapter = (options: InMemoryAdapterOptions = {}): S10
             options.onHoverPrism,
             options.onClearHoverPrism,
             options.onLayerPatchListener,
+            options.onCameraChangeListener,
           );
         },
         destroy(): void {
@@ -118,6 +121,9 @@ class InMemoryEngineScene implements EngineScene {
     private readonly onLayerPatchListener:
       | ((listener: EngineLayerPatchListener | null) => void)
       | undefined,
+    private readonly onCameraChangeListener:
+      | ((listener: EngineCameraChangeListener | null) => void)
+      | undefined,
   ) {}
 
   setCamera(pose: CameraPose): void {
@@ -137,6 +143,10 @@ class InMemoryEngineScene implements EngineScene {
 
   setCameraControls(config: CameraControlConfig): void {
     this.cameraControls = cloneCameraControlConfig(config);
+  }
+
+  setCameraChangeListener(listener: EngineCameraChangeListener | null): void {
+    this.onCameraChangeListener?.(listener);
   }
 
   setTime(time: Date): void {

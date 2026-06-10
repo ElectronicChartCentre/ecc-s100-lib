@@ -5,6 +5,7 @@ export type {
   AdapterPrecisionStrategy,
   AdapterVisualCapabilities,
   AdapterVisualFeatureCapability,
+  EngineCameraChangeListener,
   EngineLayerHandle,
   EngineLayerPatchEvent,
   EngineLayerPatchListener,

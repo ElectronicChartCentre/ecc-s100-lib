@@ -5,10 +5,21 @@ import type { S100EventBus, S100Unsubscribe } from "../events/S100EventBus.js";
 import { S100Error } from "../errors/S100Error.js";
 
 export class CoreCameraController implements CameraController {
+  private readonly clearEngineCameraChangeListener: (() => void) | null = null;
+
   constructor(
     private readonly engineScene: EngineScene,
     private readonly events: S100EventBus<S100SceneEvents>,
-  ) {}
+  ) {
+    if (engineScene.setCameraChangeListener) {
+      engineScene.setCameraChangeListener((pose) => {
+        this.events.emit("camera.changed", pose);
+      });
+      this.clearEngineCameraChangeListener = () => {
+        engineScene.setCameraChangeListener?.(null);
+      };
+    }
+  }
 
   getPose(): CameraPose {
     return this.engineScene.getCamera();
@@ -35,5 +46,9 @@ export class CoreCameraController implements CameraController {
 
   onChanged(listener: (pose: CameraPose) => void): S100Unsubscribe {
     return this.events.on("camera.changed", listener);
+  }
+
+  destroy(): void {
+    this.clearEngineCameraChangeListener?.();
   }
 }

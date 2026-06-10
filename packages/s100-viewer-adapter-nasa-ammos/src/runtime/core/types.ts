@@ -31,6 +31,10 @@ export type S100NasaViewerConfig = {
   showEnvironmentBackground?: boolean;
   backgroundIntensity?: number;
   environmentIntensity?: number;
+  backgroundRotationX?: number;
+  backgroundRotationZ?: number;
+  environmentRotationX?: number;
+  environmentRotationZ?: number;
   ambientLightIntensity?: number;
   directionalLightIntensity?: number;
   logger?: LoggerLike;

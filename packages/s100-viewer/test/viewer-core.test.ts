@@ -8,6 +8,7 @@ import {
   S100ProductSpecificationVersions,
   S100ProductType,
   type BaseLayerSpec,
+  type EngineCameraChangeListener,
   type EngineLayerHandle,
   type EngineLayerPatchListener,
 } from "../src/index.js";
@@ -224,6 +225,38 @@ describe("createS100Viewer", () => {
     expect(pick?.depthMeters).toBe(-12);
 
     await viewer.destroy();
+  });
+
+  it("forwards native adapter camera changes through the scene camera event", async () => {
+    let emitNativeCameraChange: EngineCameraChangeListener | null = null;
+    const viewer = await createS100Viewer({
+      adapter: createInMemoryAdapter({
+        onCameraChangeListener: (listener) => {
+          emitNativeCameraChange = listener;
+        },
+      }),
+    });
+    const scene = await viewer.createScene({ id: "native-camera-event-scene" });
+    const cameraEvents: Array<string> = [];
+
+    scene.camera.onChanged((pose) => {
+      cameraEvents.push(
+        `${pose.position.x},${pose.position.y},${pose.position.z}:${pose.rotation.z}:${pose.focalDistance}`,
+      );
+    });
+
+    expect(typeof emitNativeCameraChange).toBe("function");
+    const emitCameraChange = emitNativeCameraChange as unknown as EngineCameraChangeListener;
+    emitCameraChange({
+      position: { x: 4, y: 5, z: 6 },
+      rotation: { x: 0, y: 0, z: 0.5, w: 0.5 },
+      focalDistance: 25,
+    });
+
+    expect(cameraEvents).toEqual(["4,5,6:0.5:25"]);
+
+    await viewer.destroy();
+    expect(emitNativeCameraChange).toBeNull();
   });
 
   it("applies optional viewer-level camera controls to engine scenes", async () => {

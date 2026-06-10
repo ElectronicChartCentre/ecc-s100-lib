@@ -7,6 +7,7 @@ import {
   type CameraLookAt,
   type CameraPose,
   type Coordinate,
+  type EngineCameraChangeListener,
   type EngineLayerHandle,
   type EnginePrismCorners2D,
   type EngineRgba,
@@ -170,11 +171,17 @@ class NasaAmmosEngineScene implements EngineScene {
   private readonly layers = new Map<EngineLayerHandle, NasaLayerNative>();
   private currentTime = new Date(0);
   private livePickingSubscription: SubscriptionLike | null = null;
+  private cameraChangeListener: EngineCameraChangeListener | null = null;
+  private cameraChangeSubscription: SubscriptionLike | null = null;
 
   constructor(
     private readonly scene: ViewerScene,
     private readonly options: NasaAmmosAdapterOptions,
-  ) {}
+  ) {
+    this.cameraChangeSubscription = this.scene.cameraChanged.subscribe((pose) => {
+      this.cameraChangeListener?.(tupleCameraPoseToObjectPose(pose));
+    });
+  }
 
   setCamera(pose: CameraPose): void {
     const cameraPose: {
@@ -220,6 +227,10 @@ class NasaAmmosEngineScene implements EngineScene {
       view.headingDegrees ?? 0,
       view.pitchDegrees ?? 45,
     );
+  }
+
+  setCameraChangeListener(listener: EngineCameraChangeListener | null): void {
+    this.cameraChangeListener = listener;
   }
 
   setCameraControls(config: CameraControlConfig): void {
@@ -370,6 +381,9 @@ class NasaAmmosEngineScene implements EngineScene {
   }
 
   dispose(): void {
+    this.cameraChangeSubscription?.unsubscribe();
+    this.cameraChangeSubscription = null;
+    this.cameraChangeListener = null;
     this.livePickingSubscription?.unsubscribe();
     this.livePickingSubscription = null;
     this.scene.PickingRay.enabled = false;
@@ -546,6 +560,29 @@ class NasaAmmosEngineScene implements EngineScene {
 
 function isNasaLayerNative(value: unknown): value is NasaLayerNative {
   return Boolean(value && typeof value === "object" && "kind" in value && "spec" in value);
+}
+
+function tupleCameraPoseToObjectPose(pose: {
+  position: [number, number, number];
+  rotation: [number, number, number, number];
+  focalDistance?: number;
+}): CameraPose {
+  return {
+    position: {
+      x: pose.position[0],
+      y: pose.position[1],
+      z: pose.position[2],
+    },
+    rotation: {
+      x: pose.rotation[0],
+      y: pose.rotation[1],
+      z: pose.rotation[2],
+      w: pose.rotation[3],
+    },
+    ...(pose.focalDistance !== undefined
+      ? { focalDistance: pose.focalDistance }
+      : {}),
+  };
 }
 
 function getHtmlElement(container: unknown): HTMLElement | null {

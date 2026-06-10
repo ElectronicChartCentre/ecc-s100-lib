@@ -30,7 +30,7 @@ const DEFAULT_AMBIENT_LIGHT_INTENSITY = 0.042;
 const DEFAULT_DIRECTIONAL_LIGHT_INTENSITY = 0.108;
 const DEFAULT_ENVIRONMENT_INTENSITY = 0.2025;
 const DEFAULT_BACKGROUND_INTENSITY = 1;
-const Z_UP_BACKGROUND_ROTATION_X = 0;
+const Z_UP_BACKGROUND_ROTATION_X = -Math.PI / 2;
 const Z_UP_BACKGROUND_ROTATION_Z = -MathUtils.degToRad(75);
 const Z_UP_ENVIRONMENT_ROTATION_X = Z_UP_BACKGROUND_ROTATION_X;
 const Z_UP_ENVIRONMENT_ROTATION_Z = Z_UP_BACKGROUND_ROTATION_Z;
@@ -207,15 +207,31 @@ async function createRenderContext(
       config.environmentIntensity,
       DEFAULT_ENVIRONMENT_INTENSITY,
     );
-    scene.backgroundRotation.set(
+    const backgroundRotationX = normalizeFiniteNumber(
+      config.backgroundRotationX,
       Z_UP_BACKGROUND_ROTATION_X,
-      0,
+    );
+    const backgroundRotationZ = normalizeFiniteNumber(
+      config.backgroundRotationZ,
       Z_UP_BACKGROUND_ROTATION_Z,
     );
-    scene.environmentRotation.set(
+    const environmentRotationX = normalizeFiniteNumber(
+      config.environmentRotationX,
       Z_UP_ENVIRONMENT_ROTATION_X,
-      0,
+    );
+    const environmentRotationZ = normalizeFiniteNumber(
+      config.environmentRotationZ,
       Z_UP_ENVIRONMENT_ROTATION_Z,
+    );
+    scene.backgroundRotation.set(
+      backgroundRotationX,
+      0,
+      backgroundRotationZ,
+    );
+    scene.environmentRotation.set(
+      environmentRotationX,
+      0,
+      environmentRotationZ,
     );
     scene.add(
       new AmbientLight(
@@ -374,4 +390,8 @@ function normalizePositiveNumber(
   return value === undefined || !Number.isFinite(value) || value < 0
     ? fallback
     : value;
+}
+
+function normalizeFiniteNumber(value: number | undefined, fallback: number): number {
+  return value === undefined || !Number.isFinite(value) ? fallback : value;
 }

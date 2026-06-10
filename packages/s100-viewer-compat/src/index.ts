@@ -3,6 +3,7 @@ import {
   S100ProductType,
   type BaseLayerSpec,
   type CameraControlConfig,
+  type CameraPose as CoreCameraPose,
   type Coordinate,
   type CreateS100ViewerOptions,
   type EngineScene,
@@ -12,6 +13,7 @@ import {
   type S100EngineAdapter,
   type S100Layer,
   type S100Scene,
+  type S100Unsubscribe,
   type S100Viewer,
   type SceneOptions,
   type MapOverlayLayerSpec,
@@ -346,6 +348,7 @@ export class ViewerScene {
   readonly Lighting: LightingFeature;
   readonly Debug: DebugFeature;
   readonly cameraNavigation: CameraNavigation;
+  private readonly cameraChangedUnsubscribe: S100Unsubscribe;
 
   constructor(readonly coreScene: S100Scene, readonly config: ViewerConfig = {}) {
     this.Terrain = new TerrainFeature(this);
@@ -361,7 +364,10 @@ export class ViewerScene {
     this.CameraConstraint = new PlaceholderFeature("CameraConstraint");
     this.Lighting = new LightingFeature(this.coreScene, this.config);
     this.Debug = new DebugFeature();
-    this.cameraNavigation = new CameraNavigation(this.coreScene, this.cameraChanged);
+    this.cameraNavigation = new CameraNavigation(this.coreScene);
+    this.cameraChangedUnsubscribe = this.coreScene.camera.onChanged((pose) => {
+      this.cameraChanged.emit(coreCameraPoseToCameraUpdate(pose));
+    });
   }
 
   initialized(): Promise<boolean> {
@@ -369,6 +375,7 @@ export class ViewerScene {
   }
 
   async destroy(): Promise<void> {
+    this.cameraChangedUnsubscribe();
     this.cameraChanged.clear();
     this.Picking.destroy();
     await this.coreScene.destroy();
@@ -386,10 +393,7 @@ export class ViewerScene {
 export class CameraNavigation {
   navigationEnabled = true;
 
-  constructor(
-    private readonly scene: S100Scene,
-    private readonly cameraChanged: EventEmitter<CameraUpdate>,
-  ) {}
+  constructor(private readonly scene: S100Scene) {}
 
   lookAt(
     target: Vec3Tuple,
@@ -403,7 +407,6 @@ export class CameraNavigation {
       headingDegrees: horizontalAngle,
       pitchDegrees: verticalAngle,
     });
-    this.cameraChanged.emit(this.getCameraPose());
   }
 
   getCameraPose(): CameraPose {
@@ -433,7 +436,6 @@ export class CameraNavigation {
         ? cameraPose
         : { ...cameraPose, focalDistance: pose.focalDistance },
     );
-    this.cameraChanged.emit(this.getCameraPose());
   }
 
   getCameraPos(): Vec3Tuple {
@@ -1485,6 +1487,16 @@ function tupleToVec3(value: Vec3Tuple): { x: number; y: number; z: number } {
     x: value[0],
     y: value[1],
     z: value[2],
+  };
+}
+
+function coreCameraPoseToCameraUpdate(pose: CoreCameraPose): CameraUpdate {
+  return {
+    position: [pose.position.x, pose.position.y, pose.position.z],
+    rotation: [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
+    ...(pose.focalDistance !== undefined
+      ? { focalDistance: pose.focalDistance }
+      : {}),
   };
 }
 

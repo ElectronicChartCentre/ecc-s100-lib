@@ -74,6 +74,7 @@ export type EngineLayerPatchEvent<TSpec extends BaseLayerSpec = BaseLayerSpec> =
 };
 
 export type EngineLayerPatchListener = (event: EngineLayerPatchEvent) => void;
+export type EngineCameraChangeListener = (pose: CameraPose) => void;
 
 export type EnginePrismVec2Tuple = [number, number];
 
@@ -95,6 +96,7 @@ export interface EngineScene {
   setCamera(pose: CameraPose): void;
   getCamera(): CameraPose;
   lookAt?(view: CameraLookAt): void;
+  setCameraChangeListener?(listener: EngineCameraChangeListener | null): void;
   setCameraControls?(config: CameraControlConfig): void;
   setTime(time: Date): void;
   setSeaLevel(value: number): void;
