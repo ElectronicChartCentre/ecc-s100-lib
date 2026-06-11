@@ -84,6 +84,27 @@ export type {
   PickResult,
   PickResultSource,
 } from "./picking/types.js";
+export {
+  createBoundingBox,
+  createPrismGeometry,
+  createQuatIdentity,
+  createVec2,
+  createVec3,
+  crossVec3,
+  normalizeVec3,
+  subtractVec3,
+} from "./math.js";
+export type {
+  BoundingBoxTuple,
+  Corners2D,
+  DVec3Tuple,
+  PrismGeometryBuffers,
+  QuatTuple,
+  RGBA,
+  Rgba,
+  Vec2Tuple,
+  Vec3Tuple,
+} from "./math.js";
 export type {
   EnvironmentController,
   EnvironmentState,

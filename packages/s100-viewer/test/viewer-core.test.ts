@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   createInMemoryAdapter,
   createS100Viewer,
+  createBoundingBox,
+  createPrismGeometry,
+  createQuatIdentity,
   CameraControlPresets,
   SceneBuilder,
   S100Error,
@@ -14,6 +17,30 @@ import {
 } from "../src/index.js";
 
 describe("createS100Viewer", () => {
+  it("provides engine-neutral tuple and prism geometry helpers", () => {
+    expect(createQuatIdentity()).toEqual([0, 0, 0, 1]);
+    expect(createBoundingBox([-1, -2, -3], [1, 2, 3])).toEqual({
+      min: [-1, -2, -3],
+      max: [1, 2, 3],
+    });
+
+    const prism = createPrismGeometry(
+      {
+        topLeft: [0, 1],
+        topRight: [1, 1],
+        bottomLeft: [0, 0],
+        bottomRight: [1, 0],
+      },
+      -1,
+      2,
+    );
+
+    expect(prism.vertices).toHaveLength(36);
+    expect(prism.normals).toHaveLength(36);
+    expect(prism.texCoords).toHaveLength(36);
+    expect(prism.indices).toHaveLength(36);
+  });
+
   it("builds projected-local scene georeferences without coordinate boilerplate", () => {
     expect(
       SceneBuilder.projectedLocal({

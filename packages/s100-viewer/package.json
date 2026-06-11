@@ -24,6 +24,10 @@
     "./compat": {
       "types": "./dist/compat.d.ts",
       "import": "./dist/compat.js"
+    },
+    "./math": {
+      "types": "./dist/math.d.ts",
+      "import": "./dist/math.js"
     }
   },
   "files": [
