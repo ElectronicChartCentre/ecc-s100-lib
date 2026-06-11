@@ -55,10 +55,11 @@ publication.
    Recommended improvement: migrate adapter internals from the compatibility
    surface to direct NASA-AMMOS primitives before public release.
 
-6. `@ecc/s100-viewer-compat` is still widely used by S-100 Explorer.
+6. The temporary `@ecc/s100-viewer/compat` subpath is still widely used by
+   S-100 Explorer.
 
-   Recommended improvement: deprecate it now, keep it local while needed, and
-   remove it only after Explorer handlers use the core API directly.
+   Recommended improvement: keep it local while needed, then remove it after
+   Explorer handlers use the core API directly.
 
 ## Low-Boilerplate Target
 
@@ -92,10 +93,10 @@ common product layers.
    migration code.
 2. Replace NASA-AMMOS adapter internals that still use the compatibility
    surface.
-3. Migrate S-100 Explorer handlers from `@ecc/s100-viewer-compat` to direct core
+3. Migrate S-100 Explorer handlers from `@ecc/s100-viewer/compat` to direct core
    and product specs.
 4. Add standardized `S100Error` coverage for data source, CRS, capability, and
    time errors.
 5. Add real generated API docs once a docs generator is selected.
-6. Decide whether the deprecated compat package is internal-only or temporarily
-   published.
+6. Remove the temporary compat subpath once Explorer handlers use direct core
+   and product specs.

@@ -13,8 +13,9 @@ Release-target packages for the current phase:
   integration target.
 - `@ecc/s100-viewer-products`: deprecated migration facade re-exporting product
   helpers from `@ecc/s100-viewer`.
-- `@ecc/s100-viewer-compat`: deprecated migration facade while S-100 Explorer
-  still uses legacy-shaped handlers.
+
+`@ecc/s100-viewer` also exposes a temporary `@ecc/s100-viewer/compat` subpath
+for legacy-shaped S-100 Explorer handlers. It is not a separate release package.
 
 The CogsEngine adapter remains in this workspace for now, but Phase 8 planning
 treats it as a separate local interoperability repo. It is not part of the

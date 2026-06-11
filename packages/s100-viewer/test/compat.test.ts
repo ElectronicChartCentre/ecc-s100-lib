@@ -14,13 +14,13 @@ import {
   type S102BathymetryLayerSpec,
   type S111SurfaceCurrentLayerSpec,
   type VesselLayerSpec,
-} from "../src/index.js";
+} from "../src/compat.js";
 
 type NativeSpec<TSpec> = {
   spec: TSpec;
 };
 
-describe("@ecc/s100-viewer-compat facade", () => {
+describe("@ecc/s100-viewer/compat facade", () => {
   it("keeps the simple lifecycle wrapper available", async () => {
     const facade = await createLegacyS100ViewerFacade({
       adapter: createInMemoryAdapter(),

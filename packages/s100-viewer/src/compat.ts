@@ -22,8 +22,8 @@ import {
   type S111SurfaceCurrentLayerSpec,
   type VesselLayerSpec,
   type EnvironmentState,
-} from "@ecc/s100-viewer";
-import { createNasaAmmosAdapter, type NasaAmmosAdapterOptions } from "@ecc/s100-viewer-adapter-nasa-ammos";
+  type LoggerLike,
+} from "./index.js";
 
 export type {
   MapOverlayLayerSpec,
@@ -31,7 +31,7 @@ export type {
   S102BathymetryLayerSpec,
   S111SurfaceCurrentLayerSpec,
   VesselLayerSpec,
-} from "@ecc/s100-viewer";
+} from "./index.js";
 
 export type Subscription = {
   unsubscribe(): void;
@@ -267,11 +267,25 @@ export type PickedInfo = {
   selected?: unknown;
 };
 
-export type ViewerConfig = NasaAmmosAdapterOptions & {
+export type ViewerConfig = {
   adapter?: S100EngineAdapter;
   cameraControls?: CameraControlConfig;
   logSettings?: LogSettings;
   sceneOptions?: SceneOptions;
+  logger?: LoggerLike;
+  staticFiles?: string;
+  fetchHandler?: typeof fetch;
+  fieldOfViewDegrees?: number;
+  environmentMapURL?: string;
+  showEnvironmentBackground?: boolean;
+  backgroundIntensity?: number;
+  environmentIntensity?: number;
+  backgroundRotationX?: number;
+  backgroundRotationZ?: number;
+  environmentRotationX?: number;
+  environmentRotationZ?: number;
+  ambientLightIntensity?: number;
+  directionalLightIntensity?: number;
 };
 
 export type LegacyS100ViewerFacade = {
@@ -300,10 +314,13 @@ export class Viewer {
     private readonly config: ViewerConfig,
   ) {}
 
-  static async create(parent: HTMLElement | null, config: ViewerConfig = {}): Promise<Viewer> {
-    const adapter = config.adapter ?? createNasaAmmosAdapter(config);
+  static async create(parent: unknown | null, config: ViewerConfig = {}): Promise<Viewer> {
+    if (config.adapter === undefined) {
+      throw new Error("Viewer.create requires an explicit S-100 engine adapter.");
+    }
+
     const options: CreateS100ViewerOptions = {
-      adapter,
+      adapter: config.adapter,
       container: parent,
     };
     if (config.cameraControls !== undefined) {

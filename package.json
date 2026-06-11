@@ -8,13 +8,13 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @ecc/s100-viewer && npm run build -w @ecc/s100-viewer-products && npm run build -w @ecc/s100-viewer-adapter-nasa-ammos && npm run build -w @ecc/s100-viewer-adapter-cesium && npm run build -w @ecc/s100-viewer-compat",
-    "build:release-target": "npm run build -w @ecc/s100-viewer && npm run build -w @ecc/s100-viewer-products && npm run build -w @ecc/s100-viewer-adapter-nasa-ammos && npm run build -w @ecc/s100-viewer-adapter-cesium && npm run build -w @ecc/s100-viewer-compat",
-    "check": "npm run check -w @ecc/s100-viewer && npm run check -w @ecc/s100-viewer-products && npm run check -w @ecc/s100-viewer-adapter-nasa-ammos && npm run check -w @ecc/s100-viewer-adapter-cesium && npm run check -w @ecc/s100-viewer-compat",
-    "check:release-target": "npm run check -w @ecc/s100-viewer && npm run check -w @ecc/s100-viewer-products && npm run check -w @ecc/s100-viewer-adapter-nasa-ammos && npm run check -w @ecc/s100-viewer-adapter-cesium && npm run check -w @ecc/s100-viewer-compat",
-    "test": "npm run test -w @ecc/s100-viewer && npm run test -w @ecc/s100-viewer-products && npm run test -w @ecc/s100-viewer-adapter-nasa-ammos && npm run test -w @ecc/s100-viewer-adapter-cesium && npm run test -w @ecc/s100-viewer-compat",
-    "test:release-target": "npm run test -w @ecc/s100-viewer && npm run test -w @ecc/s100-viewer-products && npm run test -w @ecc/s100-viewer-adapter-nasa-ammos && npm run test -w @ecc/s100-viewer-adapter-cesium && npm run test -w @ecc/s100-viewer-compat",
-    "pack:release-target:dry-run": "npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-products && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-adapter-nasa-ammos && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-adapter-cesium && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-compat",
+    "build": "npm run build -w @ecc/s100-viewer && npm run build -w @ecc/s100-viewer-products && npm run build -w @ecc/s100-viewer-adapter-nasa-ammos && npm run build -w @ecc/s100-viewer-adapter-cesium",
+    "build:release-target": "npm run build -w @ecc/s100-viewer && npm run build -w @ecc/s100-viewer-products && npm run build -w @ecc/s100-viewer-adapter-nasa-ammos && npm run build -w @ecc/s100-viewer-adapter-cesium",
+    "check": "npm run check -w @ecc/s100-viewer && npm run check -w @ecc/s100-viewer-products && npm run check -w @ecc/s100-viewer-adapter-nasa-ammos && npm run check -w @ecc/s100-viewer-adapter-cesium",
+    "check:release-target": "npm run check -w @ecc/s100-viewer && npm run check -w @ecc/s100-viewer-products && npm run check -w @ecc/s100-viewer-adapter-nasa-ammos && npm run check -w @ecc/s100-viewer-adapter-cesium",
+    "test": "npm run test -w @ecc/s100-viewer && npm run test -w @ecc/s100-viewer-products && npm run test -w @ecc/s100-viewer-adapter-nasa-ammos && npm run test -w @ecc/s100-viewer-adapter-cesium",
+    "test:release-target": "npm run test -w @ecc/s100-viewer && npm run test -w @ecc/s100-viewer-products && npm run test -w @ecc/s100-viewer-adapter-nasa-ammos && npm run test -w @ecc/s100-viewer-adapter-cesium",
+    "pack:release-target:dry-run": "npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-products && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-adapter-nasa-ammos && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-adapter-cesium",
     "clean": "npm run clean --workspaces --if-present"
   },
   "devDependencies": {

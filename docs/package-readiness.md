@@ -9,12 +9,14 @@ The current npm-readiness target is:
 - `@ecc/s100-viewer-adapter-cesium`
 - `@ecc/s100-viewer-products`, deprecated migration facade for older product
   imports
-- `@ecc/s100-viewer-compat`, deprecated and only kept while S-100 Explorer still
-  depends on legacy-shaped handlers
 
 The Cogs adapter is intentionally excluded from this set. It should move toward
 a separate local interoperability repo with `@ecc/s100-viewer` as a peer
 dependency. Public repo and public npm status are undecided.
+
+`@ecc/s100-viewer` includes a temporary `@ecc/s100-viewer/compat` subpath while
+S-100 Explorer still depends on legacy-shaped handlers. It is not published as a
+separate package.
 
 ## Readiness Checks
 
@@ -39,8 +41,6 @@ npm run pack:release-target:dry-run
 
 - Confirm `@ecc` npm scope ownership.
 - Confirm MIT license approval for public packages.
-- Decide whether `@ecc/s100-viewer-compat` is published temporarily or kept
-  internal to S-100 Explorer migration.
 - Add generated API docs if a generator such as TypeDoc is adopted.
 - Add CI jobs for clean install, typecheck, tests, build, and package dry run.
 - Add changelog and release notes before any npm publication.
@@ -59,7 +59,7 @@ Temporary migration code may also depend on:
 
 ```text
 @ecc/s100-viewer-products
-@ecc/s100-viewer-compat
+@ecc/s100-viewer/compat
 ```
 
 Application code should not depend on NASA-AMMOS internals, Cogs classes, Three.js
