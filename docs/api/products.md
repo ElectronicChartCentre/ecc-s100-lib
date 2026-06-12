@@ -81,9 +81,6 @@ LayerBuilder.MapOverlayStyles.DEFAULT;
 `defineS100LayerSpec(...)` remains available as a low-level helper when an
 application wants to spell out a complete spec object.
 
-`@ecc/s100-viewer-products` remains as a deprecated migration facade that
-re-exports these APIs for older imports.
-
 ## Core Product Specs
 
 - `S101EncLayerSpec`

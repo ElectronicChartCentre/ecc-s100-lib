@@ -19,7 +19,6 @@
     "paths": {
       "@ecc/s100-viewer": ["packages/s100-viewer/src/index.ts"],
       "@ecc/s100-viewer/compat": ["packages/s100-viewer/src/compat.ts"],
-      "@ecc/s100-viewer-products": ["packages/s100-viewer-products/src/index.ts"],
       "@ecc/s100-viewer-adapter-nasa-ammos": [
         "packages/s100-viewer-adapter-nasa-ammos/src/index.ts"
       ],

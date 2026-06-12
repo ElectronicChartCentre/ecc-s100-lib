@@ -7,8 +7,6 @@ The current npm-readiness target is:
 - `@ecc/s100-viewer`
 - `@ecc/s100-viewer-adapter-nasa-ammos`
 - `@ecc/s100-viewer-adapter-cesium`
-- `@ecc/s100-viewer-products`, deprecated migration facade for older product
-  imports
 
 The Cogs adapter is intentionally excluded from this set. It should move toward
 a separate local interoperability repo with `@ecc/s100-viewer` as a peer
@@ -39,9 +37,20 @@ npm run pack:release-target:dry-run
 
 ## Consumer Dependency References
 
-During alpha integration, S-100 Explorer may use local `file:` dependencies for
-fast cross-repository development. Those references are not the intended
-long-term consumption shape for the release-target packages.
+During the current private alpha integration, S-100 Explorer should use local
+`file:` dependencies that point at the parent repo's pinned `libs/ecc-s100-lib`
+submodule:
+
+```json
+{
+  "@ecc/s100-viewer": "file:../../../libs/ecc-s100-lib/packages/s100-viewer",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "file:../../../libs/ecc-s100-lib/packages/s100-viewer-adapter-nasa-ammos",
+  "@ecc/s100-viewer-adapter-cesium": "file:../../../libs/ecc-s100-lib/packages/s100-viewer-adapter-cesium"
+}
+```
+
+Those references are intentionally local for now. They are not the intended
+long-term consumption shape once the packages are public.
 
 The source repo already exists at
 `https://github.com/ElectronicChartCentre/ecc-s100-lib`, and each package
@@ -51,8 +60,8 @@ installable from a dependency entry. A plain dependency such as
 `github:ElectronicChartCentre/ecc-s100-lib` makes npm install the repository
 root, not an individual workspace package under `packages/*`.
 
-Before public npm publication, the URL-based consumption shape should use
-package tarballs attached to immutable GitHub releases:
+If the packages need to be consumed outside this parent checkout before public
+npm publication, use package tarballs attached to immutable GitHub releases:
 
 ```json
 {
@@ -93,7 +102,6 @@ Normal application code should depend on:
 Temporary migration code may also depend on:
 
 ```text
-@ecc/s100-viewer-products
 @ecc/s100-viewer/compat
 ```
 

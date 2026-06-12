@@ -11,8 +11,6 @@ Release-target packages for the current phase:
 - `@ecc/s100-viewer-adapter-nasa-ammos`: NASA-AMMOS/Three.js adapter.
 - `@ecc/s100-viewer-adapter-cesium`: Cesium adapter and initial globe-native
   integration target.
-- `@ecc/s100-viewer-products`: deprecated migration facade re-exporting product
-  helpers from `@ecc/s100-viewer`.
 
 `@ecc/s100-viewer` also exposes a temporary `@ecc/s100-viewer/compat` subpath
 for legacy-shaped S-100 Explorer handlers. It is not a separate release package.
