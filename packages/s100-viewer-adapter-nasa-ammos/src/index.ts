@@ -8,6 +8,7 @@ import {
   type CameraPose,
   type Coordinate,
   type EngineCameraChangeListener,
+  type EngineHandleBundle,
   type EngineLayerHandle,
   type EnginePrismCorners2D,
   type EngineRgba,
@@ -55,13 +56,15 @@ import {
   type VesselDimensions,
   type VesselView,
 } from "./runtime/compat/s100-viewer.js";
-import { Raycaster, Vector2, Vector3, type Camera, type Object3D, type Scene } from "three";
+import * as THREE from "three";
+import { Raycaster, Vector2, Vector3, type Camera, type Object3D, type Scene, type WebGLRenderer } from "three";
 
 type FetchLike = typeof fetch;
 
 type NasaRenderContext = {
   canvas: HTMLCanvasElement;
   camera: Camera;
+  renderer: WebGLRenderer;
   scene: Scene;
 };
 
@@ -139,6 +142,26 @@ class NasaAmmosViewerHost implements EngineViewerHost {
     private readonly options: NasaAmmosAdapterOptions,
   ) {}
 
+  getEngineHandles(): EngineHandleBundle {
+    return {
+      adapterId: "nasa-ammos",
+      engineName: "NASA-AMMOS / Three.js",
+      engineVersion: `three r${THREE.REVISION}`,
+      engineInstance: this.viewer,
+      instances: {
+        viewer: this.viewer,
+        canvas: this.viewer.element,
+      },
+      staticObjects: {
+        THREE,
+      },
+      resources: {
+        threeDocs: "https://threejs.org/docs/",
+        tilesRendererDocs: "https://github.com/NASA-AMMOS/3DTilesRendererJS",
+      },
+    };
+  }
+
   async createScene(options: SceneOptions): Promise<EngineScene> {
     if (options.georeference?.mode === "ellipsoid-ecef") {
       throw new S100Error(
@@ -181,6 +204,34 @@ class NasaAmmosEngineScene implements EngineScene {
     this.cameraChangeSubscription = this.scene.cameraChanged.subscribe((pose) => {
       this.cameraChangeListener?.(tupleCameraPoseToObjectPose(pose));
     });
+  }
+
+  getEngineHandles(): EngineHandleBundle {
+    const renderContext = getRenderContext(this.scene);
+    return {
+      adapterId: "nasa-ammos",
+      engineName: "NASA-AMMOS / Three.js",
+      engineVersion: `three r${THREE.REVISION}`,
+      engineInstance: this.scene,
+      instances: {
+        viewerScene: this.scene,
+        cameraNavigation: this.scene.cameraNavigation,
+        picking: this.scene.Picking,
+        pickingRay: this.scene.PickingRay,
+        hoverPrism: this.scene.HoverPrism,
+        renderer: renderContext?.renderer,
+        scene: renderContext?.scene,
+        camera: renderContext?.camera,
+        canvas: renderContext?.canvas,
+      },
+      staticObjects: {
+        THREE,
+      },
+      resources: {
+        threeDocs: "https://threejs.org/docs/",
+        tilesRendererDocs: "https://github.com/NASA-AMMOS/3DTilesRendererJS",
+      },
+    };
   }
 
   setCamera(pose: CameraPose): void {

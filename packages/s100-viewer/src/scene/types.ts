@@ -1,5 +1,6 @@
 import type {
   AdapterCapabilities,
+  EngineHandleBundle,
   EnginePrismCorners2D,
   EngineRgba,
 } from "../adapters/types.js";
@@ -76,6 +77,7 @@ export interface S100Scene {
   readonly events: S100EventBus<S100SceneEvents>;
   readonly crs: string | null;
   getCapabilities(): AdapterCapabilities;
+  getEngineHandles(): EngineHandleBundle;
   setSeaLevel(value: number): void;
   getSeaLevel(): number;
   showHoverPrism(

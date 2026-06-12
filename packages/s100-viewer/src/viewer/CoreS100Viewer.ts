@@ -1,4 +1,9 @@
-import type { AdapterCapabilities, EngineViewerHost, S100EngineAdapter } from "../adapters/types.js";
+import type {
+  AdapterCapabilities,
+  EngineHandleBundle,
+  EngineViewerHost,
+  S100EngineAdapter,
+} from "../adapters/types.js";
 import {
   cloneCameraControlConfig,
   normalizeCameraControlConfig,
@@ -47,6 +52,17 @@ export class CoreS100Viewer implements S100Viewer {
     return this.adapterCapabilities;
   }
 
+  getEngineHandles(): EngineHandleBundle {
+    if (this.destroyed) {
+      throw new S100Error("viewer-destroyed", "Cannot access engine handles after viewer destruction.");
+    }
+
+    return this.host.getEngineHandles?.() ?? {
+      adapterId: this.adapter.id,
+      engineName: this.adapter.displayName,
+    };
+  }
+
   getCameraControls(): CameraControlConfig {
     return cloneCameraControlConfig(this.cameraControls);
   }
@@ -71,6 +87,8 @@ export class CoreS100Viewer implements S100Viewer {
     const scene = new CoreS100Scene({
       id: normalizedOptions.id,
       georeference: normalizedOptions.georeference,
+      adapterId: this.adapter.id,
+      adapterDisplayName: this.adapter.displayName,
       adapterCapabilities: this.adapterCapabilities,
       engineScene,
     });

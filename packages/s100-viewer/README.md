@@ -84,6 +84,29 @@ The library-level product/version matrix is exported as
 - `S100EngineAdapter`: contract third-party engines implement to work with this
   API.
 
+## Native Engine Handles
+
+`viewer.getEngineHandles()` and `scene.getEngineHandles()` return borrowed
+adapter-native references for advanced integrations. The stable top-level shape
+is `EngineHandleBundle`:
+
+```ts
+type EngineHandleBundle = {
+  adapterId: string;
+  engineName?: string;
+  engineVersion?: string;
+  engineInstance?: unknown;
+  instances?: Record<string, unknown>;
+  staticObjects?: Record<string, unknown>;
+  resources?: Record<string, unknown>;
+};
+```
+
+Native handles are optional, adapter-specific, and invalid after
+`scene.destroy()` or `viewer.destroy()`. Portable S-100 product workflows should
+continue to use the scene, layer, camera, time, picking, and environment APIs.
+Use `layer.getNativeHandle()` for layer-specific native objects.
+
 ## Status
 
 This package is the future public API. It is still `0.x` alpha and the exact

@@ -21,6 +21,7 @@ An `S100Viewer` exposes:
 - `adapterId`
 - `adapterDisplayName`
 - `capabilities`
+- `getEngineHandles()`
 - `createScene(options?)`
 - `destroy()`
 
@@ -34,6 +35,7 @@ An `S100Scene` exposes:
 - `picking`
 - `environment`
 - `events`
+- `getEngineHandles()`
 - `setSeaLevel(value)`
 - `getSeaLevel()`
 - `showHoverPrism(...)`
@@ -49,6 +51,30 @@ adapter-native handle.
 The core library publishes product/version support through
 `S100SupportedProductVersions`. Each adapter publishes the product versions it
 can render through `viewer.capabilities.supportedProductVersions`.
+
+## Native Engine Handles
+
+`viewer.getEngineHandles()` and `scene.getEngineHandles()` return
+`EngineHandleBundle` objects for integrations that need engine-native escape
+hatches:
+
+```ts
+type EngineHandleBundle = {
+  adapterId: string;
+  engineName?: string;
+  engineVersion?: string;
+  engineInstance?: unknown;
+  instances?: Record<string, unknown>;
+  staticObjects?: Record<string, unknown>;
+  resources?: Record<string, unknown>;
+};
+```
+
+The returned values are borrowed references. Applications must not destroy or
+replace them and must treat them as invalid after `scene.destroy()` or
+`viewer.destroy()`. Normal product workflows should not require native handles.
+Layer-specific engine objects remain available through
+`layer.getNativeHandle<T>()`.
 
 ## Picking
 
@@ -103,3 +129,12 @@ export const createMyEngineAdapter = (): S100EngineAdapter => ({
 
 Applications should only depend on the adapter contract. Engine-specific objects
 belong behind `EngineLayerHandle.native` or another documented escape hatch.
+
+When implementing native handle bundles, use predictable key names:
+
+- `engineInstance`: the primary engine viewer or scene object.
+- `instances`: adapter-created runtime objects such as `viewer`, `scene`,
+  `camera`, `renderer`, `canvas`, or `pickingHandler`.
+- `staticObjects`: imported engine namespaces, constructors, enums, or constants
+  such as `THREE`, `Cesium`, `Color`, or `Cartesian3`.
+- `resources`: stable links to upstream engine documentation or adapter notes.

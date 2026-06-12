@@ -55,6 +55,16 @@ export type AdapterCapabilities = {
   extensions?: Record<string, unknown>;
 };
 
+export type EngineHandleBundle = {
+  adapterId: string;
+  engineName?: string;
+  engineVersion?: string;
+  engineInstance?: unknown;
+  instances?: Record<string, unknown>;
+  staticObjects?: Record<string, unknown>;
+  resources?: Record<string, unknown>;
+};
+
 export type ViewerHostOptions = {
   container?: unknown;
   logger?: LoggerLike;
@@ -93,6 +103,7 @@ export type EngineRgba = {
 };
 
 export interface EngineScene {
+  getEngineHandles?(): EngineHandleBundle;
   setCamera(pose: CameraPose): void;
   getCamera(): CameraPose;
   lookAt?(view: CameraLookAt): void;
@@ -122,6 +133,7 @@ export interface EngineScene {
 }
 
 export interface EngineViewerHost {
+  getEngineHandles?(): EngineHandleBundle;
   createScene(options: SceneOptions): Promise<EngineScene>;
   destroy(): void | Promise<void>;
 }

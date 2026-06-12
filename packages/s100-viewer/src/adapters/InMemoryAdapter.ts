@@ -7,6 +7,7 @@ import {
 import type {
   AdapterCapabilities,
   EngineCameraChangeListener,
+  EngineHandleBundle,
   EngineLayerHandle,
   EngineLayerPatchListener,
   EnginePrismCorners2D,
@@ -48,6 +49,8 @@ const defaultCameraPose = (): CameraPose => ({
 });
 
 export const createInMemoryAdapter = (options: InMemoryAdapterOptions = {}): S100EngineAdapter => {
+  const adapterId = options.id ?? "in-memory";
+  const displayName = options.displayName ?? "In-memory test adapter";
   const capabilities: AdapterCapabilities = {
     sceneGeoreferences: ["projected-local", "ellipsoid-ecef"],
     layerProducts: ["*"],
@@ -67,14 +70,33 @@ export const createInMemoryAdapter = (options: InMemoryAdapterOptions = {}): S10
   };
 
   return {
-    id: options.id ?? "in-memory",
-    displayName: options.displayName ?? "In-memory test adapter",
+    id: adapterId,
+    displayName,
     capabilities,
     getCapabilities: () => capabilities,
-    async createViewerHost(_hostOptions: ViewerHostOptions): Promise<EngineViewerHost> {
+    async createViewerHost(hostOptions: ViewerHostOptions): Promise<EngineViewerHost> {
+      let destroyed = false;
       return {
+        getEngineHandles(): EngineHandleBundle {
+          return {
+            adapterId,
+            engineName: displayName,
+            engineInstance: {
+              kind: "in-memory-viewer-host",
+              destroyed,
+            },
+            instances: {
+              hostOptions,
+            },
+            resources: {
+              docs: "memory://s100-viewer/in-memory-adapter",
+            },
+          };
+        },
         async createScene(sceneOptions: SceneOptions): Promise<EngineScene> {
           return new InMemoryEngineScene(
+            adapterId,
+            displayName,
             sceneOptions,
             options.pickResult ?? null,
             options.onLivePickingMode,
@@ -85,6 +107,7 @@ export const createInMemoryAdapter = (options: InMemoryAdapterOptions = {}): S10
           );
         },
         destroy(): void {
+          destroyed = true;
           return undefined;
         },
       };
@@ -101,6 +124,8 @@ class InMemoryEngineScene implements EngineScene {
   private readonly layers = new Map<EngineLayerHandle, BaseLayerSpec>();
 
   constructor(
+    private readonly adapterId: string,
+    private readonly displayName: string,
     readonly sceneOptions: SceneOptions,
     private readonly pickResult: PickResult | null,
     private readonly onLivePickingMode:
@@ -125,6 +150,22 @@ class InMemoryEngineScene implements EngineScene {
       | ((listener: EngineCameraChangeListener | null) => void)
       | undefined,
   ) {}
+
+  getEngineHandles(): EngineHandleBundle {
+    return {
+      adapterId: this.adapterId,
+      engineName: this.displayName,
+      engineInstance: this,
+      instances: {
+        scene: this,
+        sceneOptions: this.sceneOptions,
+        layers: this.layers,
+      },
+      resources: {
+        docs: "memory://s100-viewer/in-memory-scene",
+      },
+    };
+  }
 
   setCamera(pose: CameraPose): void {
     this.camera = { ...pose };

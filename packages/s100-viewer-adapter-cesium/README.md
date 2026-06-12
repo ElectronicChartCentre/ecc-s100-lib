@@ -58,6 +58,21 @@ Supported in this initial adapter:
 - Vessel/model layers via Cesium entities.
 - Camera, picking, live-picking callbacks, and hover-prism entities.
 
+## Native Handles
+
+`viewer.getEngineHandles()` exposes:
+
+- `engineInstance`: the Cesium `Viewer`.
+- `instances.viewer`, `scene`, `camera`, and `canvas`.
+- `staticObjects.Cesium`, `Color`, `Cartesian2`, `Cartesian3`, and `Matrix4`.
+- `resources.cesiumDocs`.
+
+`scene.getEngineHandles()` exposes the same Cesium viewer-level objects plus
+`instances.clock` and `instances.sceneOptions`.
+
+These handles are borrowed and invalid after `scene.destroy()` or
+`viewer.destroy()`.
+
 Known limitations:
 
 - Full projected-local 3D Tiles transformation is still dependent on the tile

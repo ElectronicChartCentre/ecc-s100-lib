@@ -1,5 +1,6 @@
 import type {
   AdapterCapabilities,
+  EngineHandleBundle,
   LoggerLike,
   S100EngineAdapter,
 } from "../adapters/types.js";
@@ -19,6 +20,7 @@ export interface S100Viewer {
   readonly adapterDisplayName: string;
   readonly capabilities: AdapterCapabilities;
   getCapabilities(): AdapterCapabilities;
+  getEngineHandles(): EngineHandleBundle;
   getCameraControls(): CameraControlConfig;
   setCameraControls(config: CameraControlConfig): void;
   createScene(options?: SceneOptions): Promise<S100Scene>;

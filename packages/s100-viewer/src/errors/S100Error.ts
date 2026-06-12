@@ -5,6 +5,7 @@ export type S100ErrorCode =
   | "layer-not-found"
   | "invalid-layer-spec"
   | "invalid-scene-options"
+  | "scene-destroyed"
   | "viewer-destroyed";
 
 export class S100Error extends Error {

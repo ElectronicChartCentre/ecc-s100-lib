@@ -26,6 +26,22 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
       adapter: createCesiumAdapter({ cesiumModule: cesium }),
     });
 
+    expect(viewer.getEngineHandles()).toMatchObject({
+      adapterId: "cesium",
+      engineName: "Cesium",
+      engineInstance: expect.any(Object),
+      instances: {
+        viewer: expect.any(Object),
+        scene: expect.any(Object),
+        camera: expect.any(Object),
+      },
+      staticObjects: {
+        Cesium: cesium,
+      },
+      resources: {
+        cesiumDocs: "https://cesium.com/learn/cesiumjs/ref-doc/",
+      },
+    });
     expect(cesium.operations.viewerOptions[0]).toMatchObject({
       useBrowserRecommendedResolution: false,
     });
@@ -57,6 +73,19 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
         crs: "EPSG:32619",
         origin: { x: 331100, y: 5186420 },
       }),
+    });
+    expect(scene.getEngineHandles()).toMatchObject({
+      adapterId: "cesium",
+      engineName: "Cesium",
+      instances: {
+        viewer: expect.any(Object),
+        scene: expect.any(Object),
+        camera: expect.any(Object),
+        sceneOptions: expect.any(Object),
+      },
+      staticObjects: {
+        Cesium: cesium,
+      },
     });
 
     expect(cesium.operations.sceneLights).toHaveLength(1);

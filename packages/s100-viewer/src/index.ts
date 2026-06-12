@@ -6,6 +6,7 @@ export type {
   AdapterVisualCapabilities,
   AdapterVisualFeatureCapability,
   EngineCameraChangeListener,
+  EngineHandleBundle,
   EngineLayerHandle,
   EngineLayerPatchEvent,
   EngineLayerPatchListener,

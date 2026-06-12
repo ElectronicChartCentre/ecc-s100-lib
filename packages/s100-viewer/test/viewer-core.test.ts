@@ -414,6 +414,71 @@ describe("createS100Viewer", () => {
     await viewer.destroy();
   });
 
+  it("exposes borrowed engine handles at viewer and scene levels", async () => {
+    const viewer = await createS100Viewer({
+      adapter: createInMemoryAdapter(),
+    });
+
+    const viewerHandles = viewer.getEngineHandles();
+    expect(viewerHandles).toMatchObject({
+      adapterId: "in-memory",
+      engineName: "In-memory test adapter",
+      engineInstance: {
+        kind: "in-memory-viewer-host",
+        destroyed: false,
+      },
+    });
+    expect(viewerHandles.staticObjects).toBeUndefined();
+
+    const scene = await viewer.createScene({ id: "engine-handles-test-scene" });
+    const sceneHandles = scene.getEngineHandles();
+
+    expect(sceneHandles).toMatchObject({
+      adapterId: "in-memory",
+      engineName: "In-memory test adapter",
+      instances: {
+        sceneOptions: {
+          id: "engine-handles-test-scene",
+        },
+      },
+    });
+    expect(sceneHandles.engineInstance).not.toBe(viewerHandles.engineInstance);
+    expect(sceneHandles.resources).toMatchObject({
+      docs: "memory://s100-viewer/in-memory-scene",
+    });
+
+    await scene.destroy();
+    expect(() => scene.getEngineHandles()).toThrow(S100Error);
+
+    await viewer.destroy();
+    expect(() => viewer.getEngineHandles()).toThrow(S100Error);
+  });
+
+  it("falls back to adapter identity when viewer hosts omit handle bundles", async () => {
+    const baseAdapter = createInMemoryAdapter({
+      id: "hookless",
+      displayName: "Hookless adapter",
+    });
+    const adapter = {
+      ...baseAdapter,
+      async createViewerHost(options: Parameters<typeof baseAdapter.createViewerHost>[0]) {
+        const host = await baseAdapter.createViewerHost(options);
+        return {
+          createScene: host.createScene.bind(host),
+          destroy: host.destroy.bind(host),
+        };
+      },
+    };
+    const viewer = await createS100Viewer({ adapter });
+
+    expect(viewer.getEngineHandles()).toEqual({
+      adapterId: "hookless",
+      engineName: "Hookless adapter",
+    });
+
+    await viewer.destroy();
+  });
+
   it("provides a depth ray controller over visual live picking", async () => {
     const liveModes: unknown[] = [];
     const viewer = await createS100Viewer({

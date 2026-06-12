@@ -21,8 +21,8 @@ const viewer = await createS100Viewer({
     environmentMapURL:
       "/textures/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
     showEnvironmentBackground: true,
-    backgroundRotationX: -Math.PI / 2,
-    environmentRotationX: -Math.PI / 2,
+    backgroundRotationX: Math.PI / 2,
+    environmentRotationX: Math.PI / 2,
   }),
 });
 ```
@@ -41,6 +41,28 @@ const viewer = await createS100Viewer({
 The adapter reports renderable S-100 product specification versions through
 `nasaAmmosAdapterCapabilities.supportedProductVersions`. At this stage these
 use the shared `latest-confirmed-supported` policy from `@ecc/s100-viewer`.
+
+## Native Handles
+
+`viewer.getEngineHandles()` exposes:
+
+- `engineInstance`: the adapter-owned `S100NasaViewer`.
+- `instances.viewer`: the `S100NasaViewer`.
+- `instances.canvas`: the viewer canvas when a DOM container is available.
+- `staticObjects.THREE`: the Three.js module namespace.
+- `resources.threeDocs` and `resources.tilesRendererDocs`.
+
+`scene.getEngineHandles()` exposes:
+
+- `engineInstance`: the compatibility `ViewerScene`.
+- `instances.viewerScene`, `cameraNavigation`, `picking`, `pickingRay`, and
+  `hoverPrism`.
+- `instances.renderer`, `scene`, `camera`, and `canvas` when the render context
+  is available.
+- `staticObjects.THREE`.
+
+These handles are borrowed and invalid after `scene.destroy()` or
+`viewer.destroy()`.
 
 ## Current Limitations
 

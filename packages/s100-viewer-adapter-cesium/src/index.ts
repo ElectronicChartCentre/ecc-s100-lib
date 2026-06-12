@@ -12,6 +12,7 @@ import {
   type CameraLookAt,
   type CameraPose,
   type Coordinate,
+  type EngineHandleBundle,
   type EngineLayerHandle,
   type EngineLayerPatchListener,
   type EnginePrismCorners2D,
@@ -359,6 +360,31 @@ class CesiumViewerHost implements EngineViewerHost {
     this.viewer = new Viewer(parent, viewerOptions);
   }
 
+  getEngineHandles(): EngineHandleBundle {
+    return {
+      adapterId: "cesium",
+      engineName: "Cesium",
+      ...createEngineVersionFields(this.cesium),
+      engineInstance: this.viewer,
+      instances: {
+        viewer: this.viewer,
+        scene: getObject(this.viewer, "scene"),
+        camera: getObject(this.viewer, "camera"),
+        canvas: getObject(getObject(this.viewer, "scene"), "canvas"),
+      },
+      staticObjects: {
+        Cesium: this.cesium,
+        Color: this.cesium.Color,
+        Cartesian2: this.cesium.Cartesian2,
+        Cartesian3: this.cesium.Cartesian3,
+        Matrix4: this.cesium.Matrix4,
+      },
+      resources: {
+        cesiumDocs: "https://cesium.com/learn/cesiumjs/ref-doc/",
+      },
+    };
+  }
+
   createScene(options: SceneOptions): Promise<EngineScene> {
     return Promise.resolve(new CesiumEngineScene(this.cesium, this.viewer, options, this.options));
   }
@@ -411,6 +437,33 @@ class CesiumEngineScene implements EngineScene {
       this.updateDynamicLightingForTime(this.currentTime);
     }
     this.vesselGizmoAbort = this.installVesselGizmoHandler();
+  }
+
+  getEngineHandles(): EngineHandleBundle {
+    return {
+      adapterId: "cesium",
+      engineName: "Cesium",
+      ...createEngineVersionFields(this.cesium),
+      engineInstance: this.viewer,
+      instances: {
+        viewer: this.viewer,
+        scene: getObject(this.viewer, "scene"),
+        camera: getObject(this.viewer, "camera"),
+        canvas: getObject(getObject(this.viewer, "scene"), "canvas"),
+        clock: getObject(this.viewer, "clock"),
+        sceneOptions: this.sceneOptions,
+      },
+      staticObjects: {
+        Cesium: this.cesium,
+        Color: this.cesium.Color,
+        Cartesian2: this.cesium.Cartesian2,
+        Cartesian3: this.cesium.Cartesian3,
+        Matrix4: this.cesium.Matrix4,
+      },
+      resources: {
+        cesiumDocs: "https://cesium.com/learn/cesiumjs/ref-doc/",
+      },
+    };
   }
 
   setCameraControls(config: CameraControlConfig): void {
@@ -4233,6 +4286,10 @@ function getHtmlElement(container: unknown): HTMLElement | null {
     return container as HTMLElement;
   }
   return null;
+}
+
+function createEngineVersionFields(cesium: CesiumModule): Pick<EngineHandleBundle, "engineVersion"> {
+  return typeof cesium.VERSION === "string" ? { engineVersion: cesium.VERSION } : {};
 }
 
 function getCesiumConstructor(cesium: CesiumModule, key: string): CesiumConstructor {

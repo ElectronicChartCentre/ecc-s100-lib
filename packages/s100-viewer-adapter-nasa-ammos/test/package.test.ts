@@ -25,6 +25,18 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
     const viewer = await createS100Viewer({
       adapter: createNasaAmmosAdapter(),
     });
+    const viewerHandles = viewer.getEngineHandles();
+
+    expect(viewerHandles).toMatchObject({
+      adapterId: "nasa-ammos",
+      engineName: "NASA-AMMOS / Three.js",
+      instances: {
+        viewer: expect.any(Object),
+      },
+      resources: {
+        threeDocs: "https://threejs.org/docs/",
+      },
+    });
 
     const scene = await viewer.createScene({
       georeference: {
@@ -51,6 +63,16 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
 
     expect(scene.getSeaLevel()).toBe(1.5);
     expect(scene.camera.getPose().position).toEqual({ x: 1, y: 2, z: 3 });
+    expect(scene.getEngineHandles()).toMatchObject({
+      adapterId: "nasa-ammos",
+      instances: {
+        viewerScene: expect.any(Object),
+        cameraNavigation: expect.any(Object),
+      },
+      staticObjects: {
+        THREE: expect.any(Object),
+      },
+    });
 
     await viewer.destroy();
   });

@@ -1,11 +1,13 @@
 import type {
   AdapterCapabilities,
+  EngineHandleBundle,
   EnginePrismCorners2D,
   EngineRgba,
   EngineScene,
 } from "../adapters/types.js";
 import { CoreCameraController } from "../camera/CoreCameraController.js";
 import type { SceneGeoreference } from "../coordinates/types.js";
+import { S100Error } from "../errors/S100Error.js";
 import { EventBus } from "../events/S100EventBus.js";
 import { CoreLayerCollection } from "../layers/CoreLayerCollection.js";
 import { CoreDepthRayController } from "../picking/CoreDepthRayController.js";
@@ -19,6 +21,8 @@ let nextSceneId = 1;
 export type CoreS100SceneOptions = {
   id?: string | undefined;
   georeference: SceneGeoreference;
+  adapterId: string;
+  adapterDisplayName: string;
   adapterCapabilities: AdapterCapabilities;
   engineScene: EngineScene;
 };
@@ -61,6 +65,17 @@ export class CoreS100Scene implements S100Scene {
 
   getCapabilities(): AdapterCapabilities {
     return this.options.adapterCapabilities;
+  }
+
+  getEngineHandles(): EngineHandleBundle {
+    if (this.destroyed) {
+      throw new S100Error("scene-destroyed", "Cannot access engine handles after scene destruction.");
+    }
+
+    return this.options.engineScene.getEngineHandles?.() ?? {
+      adapterId: this.options.adapterId,
+      engineName: this.options.adapterDisplayName,
+    };
   }
 
   setSeaLevel(value: number): void {
