@@ -65,9 +65,9 @@ npm publication, use package tarballs attached to immutable GitHub releases:
 
 ```json
 {
-  "@ecc/s100-viewer": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.0/ecc-s100-viewer-0.1.0-alpha.0.tgz",
-  "@ecc/s100-viewer-adapter-nasa-ammos": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.0/ecc-s100-viewer-adapter-nasa-ammos-0.1.0-alpha.0.tgz",
-  "@ecc/s100-viewer-adapter-cesium": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.0/ecc-s100-viewer-adapter-cesium-0.1.0-alpha.0.tgz"
+  "@ecc/s100-viewer": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.1/ecc-s100-viewer-0.1.0-alpha.1.tgz",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.1/ecc-s100-viewer-adapter-nasa-ammos-0.1.0-alpha.1.tgz",
+  "@ecc/s100-viewer-adapter-cesium": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.1/ecc-s100-viewer-adapter-cesium-0.1.0-alpha.1.tgz"
 }
 ```
 
@@ -75,9 +75,9 @@ After public npm publication, S-100 Explorer should consume registry versions:
 
 ```json
 {
-  "@ecc/s100-viewer": "0.1.0-alpha.0",
-  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.0",
-  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.0"
+  "@ecc/s100-viewer": "0.1.0-alpha.1",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.1",
+  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.1"
 }
 ```
 
