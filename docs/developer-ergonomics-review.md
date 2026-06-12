@@ -20,7 +20,8 @@ publication.
   `latest-confirmed-supported`, with explicit edition identifiers available for
   future product-version-specific rendering.
 - `defineS100LayerSpec(...)` remains available as a low-level type helper.
-- The compatibility facade keeps S-100 Explorer migration incremental.
+- The webapp-owned runtime bridge keeps S-100 Explorer migration incremental
+  without exposing a public compatibility package subpath.
 
 ## Current Friction
 
@@ -55,11 +56,11 @@ publication.
    Recommended improvement: migrate adapter internals from the compatibility
    surface to direct NASA-AMMOS primitives before public release.
 
-6. The temporary `@ecc/s100-viewer/compat` subpath is still widely used by
-   S-100 Explorer.
+6. The webapp-owned runtime bridge is still widely used by S-100 Explorer
+   handlers.
 
-   Recommended improvement: keep it local while needed, then remove it after
-   Explorer handlers use the core API directly.
+   Recommended improvement: keep it app-local while needed, then remove it
+   after Explorer handlers use the core API directly.
 
 ## Low-Boilerplate Target
 
@@ -93,10 +94,10 @@ common product layers.
    migration code.
 2. Replace NASA-AMMOS adapter internals that still use the compatibility
    surface.
-3. Migrate S-100 Explorer handlers from `@ecc/s100-viewer/compat` to direct core
+3. Migrate S-100 Explorer handlers from the app runtime bridge to direct core
    and product specs.
 4. Add standardized `S100Error` coverage for data source, CRS, capability, and
    time errors.
 5. Add real generated API docs once a docs generator is selected.
-6. Remove the temporary compat subpath once Explorer handlers use direct core
-   and product specs.
+6. Remove the app runtime bridge once Explorer handlers use direct core and
+   product specs.

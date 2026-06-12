@@ -12,8 +12,9 @@ Release-target packages for the current phase:
 - `@ecc/s100-viewer-adapter-cesium`: Cesium adapter and initial globe-native
   integration target.
 
-`@ecc/s100-viewer` also exposes a temporary `@ecc/s100-viewer/compat` subpath
-for legacy-shaped S-100 Explorer handlers. It is not a separate release package.
+S-100 Explorer owns any application-specific migration bridge in the webapp.
+The public package contract is the main `@ecc/s100-viewer` entry point plus
+adapter packages.
 
 The CogsEngine adapter remains in this workspace for now, but Phase 8 planning
 treats it as a separate local interoperability repo. It is not part of the

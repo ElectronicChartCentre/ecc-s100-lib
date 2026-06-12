@@ -12,9 +12,9 @@ The Cogs adapter is intentionally excluded from this set. It should move toward
 a separate local interoperability repo with `@ecc/s100-viewer` as a peer
 dependency. Public repo and public npm status are undecided.
 
-`@ecc/s100-viewer` includes a temporary `@ecc/s100-viewer/compat` subpath while
-S-100 Explorer still depends on legacy-shaped handlers. It is not published as a
-separate package.
+S-100 Explorer owns any application-specific migration bridge in the webapp.
+The release-target package surface is the main `@ecc/s100-viewer` entry point
+plus adapter packages.
 
 ## Readiness Checks
 
@@ -97,12 +97,6 @@ Normal application code should depend on:
 @ecc/s100-viewer
 @ecc/s100-viewer-adapter-nasa-ammos
 @ecc/s100-viewer-adapter-cesium
-```
-
-Temporary migration code may also depend on:
-
-```text
-@ecc/s100-viewer/compat
 ```
 
 Application code should not depend on NASA-AMMOS internals, Cogs classes, Three.js
