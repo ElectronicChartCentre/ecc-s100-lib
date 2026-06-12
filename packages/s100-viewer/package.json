@@ -16,6 +16,15 @@
     "viewer"
   ],
   "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ElectronicChartCentre/ecc-s100-lib.git",
+    "directory": "packages/s100-viewer"
+  },
+  "bugs": {
+    "url": "https://github.com/ElectronicChartCentre/ecc-s100-lib/issues"
+  },
+  "homepage": "https://github.com/ElectronicChartCentre/ecc-s100-lib/tree/main/packages/s100-viewer#readme",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

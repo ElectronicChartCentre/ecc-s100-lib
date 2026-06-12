@@ -37,6 +37,41 @@ npm run build:release-target
 npm run pack:release-target:dry-run
 ```
 
+## Consumer Dependency References
+
+During alpha integration, S-100 Explorer may use local `file:` dependencies for
+fast cross-repository development. Those references are not the intended
+long-term consumption shape for the release-target packages.
+
+The source repo already exists at
+`https://github.com/ElectronicChartCentre/ecc-s100-lib`, and each package
+manifest should point at that repo with its own `repository.directory` value.
+That is source metadata, though; it is not enough by itself to make the package
+installable from a dependency entry. A plain dependency such as
+`github:ElectronicChartCentre/ecc-s100-lib` makes npm install the repository
+root, not an individual workspace package under `packages/*`.
+
+Before public npm publication, the URL-based consumption shape should use
+package tarballs attached to immutable GitHub releases:
+
+```json
+{
+  "@ecc/s100-viewer": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.0/ecc-s100-viewer-0.1.0-alpha.0.tgz",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.0/ecc-s100-viewer-adapter-nasa-ammos-0.1.0-alpha.0.tgz",
+  "@ecc/s100-viewer-adapter-cesium": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.0/ecc-s100-viewer-adapter-cesium-0.1.0-alpha.0.tgz"
+}
+```
+
+After public npm publication, S-100 Explorer should consume registry versions:
+
+```json
+{
+  "@ecc/s100-viewer": "0.1.0-alpha.0",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.0",
+  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.0"
+}
+```
+
 ## Publication Prerequisites
 
 - Confirm `@ecc` npm scope ownership.

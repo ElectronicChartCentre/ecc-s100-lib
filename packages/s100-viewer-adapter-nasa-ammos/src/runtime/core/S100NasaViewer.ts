@@ -30,7 +30,9 @@ const DEFAULT_AMBIENT_LIGHT_INTENSITY = 0.042;
 const DEFAULT_DIRECTIONAL_LIGHT_INTENSITY = 0.108;
 const DEFAULT_ENVIRONMENT_INTENSITY = 0.2025;
 const DEFAULT_BACKGROUND_INTENSITY = 1;
-const Z_UP_BACKGROUND_ROTATION_X = -Math.PI / 2;
+// Three negates scene background/environment Euler angles before sending them
+// to the shader, so the configured rotation is the inverse of the sampled one.
+const Z_UP_BACKGROUND_ROTATION_X = Math.PI / 2;
 const Z_UP_BACKGROUND_ROTATION_Z = -MathUtils.degToRad(75);
 const Z_UP_ENVIRONMENT_ROTATION_X = Z_UP_BACKGROUND_ROTATION_X;
 const Z_UP_ENVIRONMENT_ROTATION_Z = Z_UP_BACKGROUND_ROTATION_Z;

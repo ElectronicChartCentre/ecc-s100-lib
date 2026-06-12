@@ -12,6 +12,15 @@
     "adapter"
   ],
   "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ElectronicChartCentre/ecc-s100-lib.git",
+    "directory": "packages/s100-viewer-adapter-cesium"
+  },
+  "bugs": {
+    "url": "https://github.com/ElectronicChartCentre/ecc-s100-lib/issues"
+  },
+  "homepage": "https://github.com/ElectronicChartCentre/ecc-s100-lib/tree/main/packages/s100-viewer-adapter-cesium#readme",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
