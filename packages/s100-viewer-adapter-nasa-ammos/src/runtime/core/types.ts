@@ -1,4 +1,4 @@
-import type { PerspectiveCamera, Scene, Texture, WebGLRenderer } from "three";
+import type { Mesh, PerspectiveCamera, Scene, Texture, WebGLRenderer } from "three";
 
 export type Vec3 = {
   x: number;
@@ -32,8 +32,10 @@ export type S100NasaViewerConfig = {
   backgroundIntensity?: number;
   environmentIntensity?: number;
   backgroundRotationX?: number;
+  backgroundRotationY?: number;
   backgroundRotationZ?: number;
   environmentRotationX?: number;
+  environmentRotationY?: number;
   environmentRotationZ?: number;
   ambientLightIntensity?: number;
   directionalLightIntensity?: number;
@@ -67,4 +69,5 @@ export type S100RenderContext = {
   environmentMap: Texture | null;
   renderer: WebGLRenderer;
   scene: Scene;
+  skyDome: Mesh | null;
 };

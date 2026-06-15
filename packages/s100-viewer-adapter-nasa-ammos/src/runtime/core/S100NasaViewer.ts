@@ -1,15 +1,19 @@
 import {
   AmbientLight,
   AxesHelper,
+  BackSide,
   Color,
   DirectionalLight,
   EquirectangularReflectionMapping,
   GridHelper,
   MathUtils,
+  Mesh,
   PMREMGenerator,
   PCFShadowMap,
   PerspectiveCamera,
   Scene,
+  ShaderMaterial,
+  SphereGeometry,
   type Texture,
   WebGLRenderer,
 } from "three";
@@ -30,12 +34,57 @@ const DEFAULT_AMBIENT_LIGHT_INTENSITY = 0.042;
 const DEFAULT_DIRECTIONAL_LIGHT_INTENSITY = 0.108;
 const DEFAULT_ENVIRONMENT_INTENSITY = 0.2025;
 const DEFAULT_BACKGROUND_INTENSITY = 1;
+const SKYDOME_RADIUS_METERS = 50_000;
 // Three negates scene background/environment Euler angles before sending them
 // to the shader, so the configured rotation is the inverse of the sampled one.
 const Z_UP_BACKGROUND_ROTATION_X = Math.PI / 2;
+const Z_UP_BACKGROUND_ROTATION_Y = 0;
 const Z_UP_BACKGROUND_ROTATION_Z = -MathUtils.degToRad(75);
 const Z_UP_ENVIRONMENT_ROTATION_X = Z_UP_BACKGROUND_ROTATION_X;
+const Z_UP_ENVIRONMENT_ROTATION_Y = Z_UP_BACKGROUND_ROTATION_Y;
 const Z_UP_ENVIRONMENT_ROTATION_Z = Z_UP_BACKGROUND_ROTATION_Z;
+const SKYDOME_VERTEX_SHADER = `
+varying vec3 vWorldDirection;
+
+void main() {
+  vWorldDirection = normalize((modelMatrix * vec4(position, 0.0)).xyz);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const SKYDOME_FRAGMENT_SHADER = `
+uniform sampler2D skyMap;
+uniform float intensity;
+uniform float azimuthRotation;
+
+varying vec3 vWorldDirection;
+
+const float RECIPROCAL_PI = 0.3183098861837907;
+const float RECIPROCAL_PI2 = 0.15915494309189535;
+
+void main() {
+  vec3 worldDirection = normalize(vWorldDirection);
+  float c = cos(azimuthRotation);
+  float s = sin(azimuthRotation);
+  vec2 horizontalDirection = vec2(
+    c * worldDirection.x - s * worldDirection.y,
+    s * worldDirection.x + c * worldDirection.y
+  );
+  vec3 textureDirection = normalize(vec3(
+    horizontalDirection.x,
+    worldDirection.z,
+    -horizontalDirection.y
+  ));
+  vec2 sampleUV = vec2(
+    atan(textureDirection.z, textureDirection.x) * RECIPROCAL_PI2 + 0.5,
+    asin(clamp(textureDirection.y, -1.0, 1.0)) * RECIPROCAL_PI + 0.5
+  );
+  vec4 texColor = texture2D(skyMap, sampleUV);
+  gl_FragColor = vec4(texColor.rgb * intensity, texColor.a);
+
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`;
 
 export class S100NasaViewer {
   readonly parent: HTMLElement | null;
@@ -110,6 +159,15 @@ export class S100NasaViewer {
       this.renderContext.renderer.dispose();
       this.renderContext.renderer.forceContextLoss();
     }
+    this.renderContext?.skyDome?.geometry.dispose();
+    const skyDomeMaterial = this.renderContext?.skyDome?.material;
+    if (Array.isArray(skyDomeMaterial)) {
+      for (const material of skyDomeMaterial) {
+        material.dispose();
+      }
+    } else {
+      skyDomeMaterial?.dispose();
+    }
     this.renderContext?.environmentMap?.dispose();
     this.renderContext?.backgroundMap?.dispose();
     this.canvas?.remove();
@@ -144,6 +202,7 @@ export class S100NasaViewer {
         scene.updateBeforeRender();
       }
 
+      this.renderContext.skyDome?.position.copy(this.renderContext.camera.position);
       this.renderContext.renderer.render(
         this.renderContext.scene,
         this.renderContext.camera,
@@ -213,6 +272,10 @@ async function createRenderContext(
       config.backgroundRotationX,
       Z_UP_BACKGROUND_ROTATION_X,
     );
+    const backgroundRotationY = normalizeFiniteNumber(
+      config.backgroundRotationY,
+      Z_UP_BACKGROUND_ROTATION_Y,
+    );
     const backgroundRotationZ = normalizeFiniteNumber(
       config.backgroundRotationZ,
       Z_UP_BACKGROUND_ROTATION_Z,
@@ -221,18 +284,22 @@ async function createRenderContext(
       config.environmentRotationX,
       Z_UP_ENVIRONMENT_ROTATION_X,
     );
+    const environmentRotationY = normalizeFiniteNumber(
+      config.environmentRotationY,
+      Z_UP_ENVIRONMENT_ROTATION_Y,
+    );
     const environmentRotationZ = normalizeFiniteNumber(
       config.environmentRotationZ,
       Z_UP_ENVIRONMENT_ROTATION_Z,
     );
     scene.backgroundRotation.set(
       backgroundRotationX,
-      0,
+      backgroundRotationY,
       backgroundRotationZ,
     );
     scene.environmentRotation.set(
       environmentRotationX,
-      0,
+      environmentRotationY,
       environmentRotationZ,
     );
     scene.add(
@@ -292,6 +359,7 @@ async function createRenderContext(
         environmentMap: environmentMaps.environmentMap,
         renderer,
         scene,
+        skyDome: environmentMaps.skyDome,
       },
       resizeObserver,
     };
@@ -308,11 +376,16 @@ async function loadEnvironmentMap(
   renderer: WebGLRenderer,
   scene: Scene,
   config: S100NasaViewerConfig,
-): Promise<{ environmentMap: Texture | null; backgroundMap: Texture | null }> {
+): Promise<{
+  environmentMap: Texture | null;
+  backgroundMap: Texture | null;
+  skyDome: Mesh | null;
+}> {
   if (!config.environmentMapURL) {
     return {
       environmentMap: null,
       backgroundMap: null,
+      skyDome: null,
     };
   }
 
@@ -328,10 +401,11 @@ async function loadEnvironmentMap(
       .texture;
     scene.environment = environmentMap;
     if (config.showEnvironmentBackground !== false) {
-      scene.background = sourceTexture;
+      const skyDome = createSkyDome(sourceTexture, scene, config);
       return {
         environmentMap,
         backgroundMap: sourceTexture,
+        skyDome,
       };
     }
 
@@ -339,6 +413,7 @@ async function loadEnvironmentMap(
     return {
       environmentMap,
       backgroundMap: null,
+      skyDome: null,
     };
   } catch (error) {
     config.logger?.warn?.(
@@ -349,10 +424,51 @@ async function loadEnvironmentMap(
     return {
       environmentMap: null,
       backgroundMap: null,
+      skyDome: null,
     };
   } finally {
     pmremGenerator.dispose();
   }
+}
+
+function createSkyDome(
+  texture: Texture,
+  scene: Scene,
+  config: S100NasaViewerConfig,
+): Mesh {
+  const geometry = new SphereGeometry(SKYDOME_RADIUS_METERS, 64, 32);
+  const material = new ShaderMaterial({
+    name: "S100ZUpSkyDomeMaterial",
+    uniforms: {
+      skyMap: { value: texture },
+      intensity: {
+        value: normalizePositiveNumber(
+          config.backgroundIntensity,
+          DEFAULT_BACKGROUND_INTENSITY,
+        ),
+      },
+      azimuthRotation: {
+        value: normalizeFiniteNumber(
+          config.backgroundRotationZ,
+          Z_UP_BACKGROUND_ROTATION_Z,
+        ),
+      },
+    },
+    vertexShader: SKYDOME_VERTEX_SHADER,
+    fragmentShader: SKYDOME_FRAGMENT_SHADER,
+    side: BackSide,
+    depthTest: false,
+    depthWrite: false,
+    fog: false,
+  });
+
+  const skyDome = new Mesh(geometry, material);
+  skyDome.name = "s100-environment-skydome";
+  skyDome.frustumCulled = false;
+  skyDome.renderOrder = -10_000;
+  scene.add(skyDome);
+
+  return skyDome;
 }
 
 function getCanvasSize(
