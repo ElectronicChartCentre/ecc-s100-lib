@@ -90,6 +90,11 @@ application wants to spell out a complete spec object.
 - `VesselLayerSpec`
 - `MapOverlayLayerSpec`
 
+`VesselLayerSpec` carries vessel geometry semantics directly through
+`dimensions` (`bow`, `stern`, `port`, `starboard`, `draught`) and
+`referencePoint`. The distances are expressed relative to the vessel reference
+point, typically the transponder/mast reference used by operational workflows.
+
 Short aliases are also exported:
 
 - `S101LayerSpec`

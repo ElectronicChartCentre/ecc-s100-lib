@@ -1,5 +1,13 @@
 import type { ModelSource, WmsSource } from "./sources.js";
-import type { MapOverlayLayerSpec, MapOverlayStyle, VesselLayerSpec, VesselPose, VesselStyle } from "./viewer-features.js";
+import type {
+  MapOverlayLayerSpec,
+  MapOverlayStyle,
+  VesselDimensions,
+  VesselLayerSpec,
+  VesselPose,
+  VesselReferencePoint,
+  VesselStyle,
+} from "./viewer-features.js";
 import { MapOverlayStyles, VesselStyles } from "./viewer-features.js";
 import {
   commonLayerFields,
@@ -15,6 +23,8 @@ export type CreateVesselLayerOptions = LayerBuilderCommonOptions<VesselStyle> &
     crs?: string;
     verticalDatum?: string;
     pose: VesselPose;
+    dimensions?: VesselDimensions;
+    referencePoint?: VesselReferencePoint;
   };
 
 export type CreateMapOverlayWmsLayerOptions = LayerBuilderCommonOptions<MapOverlayStyle> &
@@ -56,6 +66,8 @@ export const createVessel = (options: CreateVesselLayerOptions): VesselLayerSpec
     ...(options.sourceMetadata !== undefined ? { metadata: options.sourceMetadata } : {}),
   },
   pose: options.pose,
+  ...(options.dimensions !== undefined ? { dimensions: options.dimensions } : {}),
+  ...(options.referencePoint !== undefined ? { referencePoint: options.referencePoint } : {}),
   style: mergeVesselStyle(options.style),
 });
 

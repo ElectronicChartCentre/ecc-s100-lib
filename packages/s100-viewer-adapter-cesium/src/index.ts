@@ -6689,14 +6689,15 @@ function getVesselModelRootOffset(spec: VesselLayerSpec): Vector3Fields {
 }
 
 function getVesselDimensions(spec: VesselLayerSpec): VesselDimensionsLike {
+  const semantic: Partial<VesselDimensionsLike> = spec.dimensions ?? {};
   const extension = getExtension<Partial<VesselDimensionsLike>>(spec, "nasaAmmos", "dimensions") ?? {};
-  const draught = finiteNumber(extension.draught ?? spec.style?.draughtMeters, 7);
+  const draught = finiteNumber(semantic.draught ?? extension.draught ?? spec.style?.draughtMeters, 7);
   return {
     draught,
-    bow: finiteNumber(extension.bow, 100),
-    stern: finiteNumber(extension.stern, 100),
-    port: finiteNumber(extension.port, 20),
-    starboard: finiteNumber(extension.starboard, 20),
+    bow: finiteNumber(semantic.bow ?? extension.bow, 100),
+    stern: finiteNumber(semantic.stern ?? extension.stern, 100),
+    port: finiteNumber(semantic.port ?? extension.port, 20),
+    starboard: finiteNumber(semantic.starboard ?? extension.starboard, 20),
   };
 }
 

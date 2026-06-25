@@ -10,6 +10,21 @@ export type VesselPose = {
   rollDegrees?: number;
 };
 
+export type VesselReferencePoint = "transponder" | "model-origin" | "custom";
+
+export type VesselDimensions = {
+  /** Vertical draught below the vessel reference point, in meters. */
+  draught: number;
+  /** Forward distance from the vessel reference point to the bow, in meters. */
+  bow: number;
+  /** Aft distance from the vessel reference point to the stern, in meters. */
+  stern: number;
+  /** Port distance from the vessel reference point, in meters. */
+  port: number;
+  /** Starboard distance from the vessel reference point, in meters. */
+  starboard: number;
+};
+
 export type VesselTransformControlMode = "none" | "translate" | "rotate" | "translate-rotate";
 
 export type VesselTransformGizmoStyle =
@@ -58,6 +73,8 @@ export type MapOverlayStyle = OpacityVisibilityStyle & {
 export interface VesselLayerSpec extends BaseLayerSpec<"vessel"> {
   source: ModelSource;
   pose: VesselPose;
+  dimensions?: VesselDimensions;
+  referencePoint?: VesselReferencePoint;
   style?: VesselStyle;
 }
 

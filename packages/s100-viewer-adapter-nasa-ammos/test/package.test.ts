@@ -200,6 +200,14 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
         draughtMeters: 8,
         showSeaLevelIndicator: true,
       },
+      dimensions: {
+        draught: 8,
+        bow: 40,
+        stern: 30,
+        port: 10,
+        starboard: 12,
+      },
+      referencePoint: "transponder",
       extensions: {
         nasaAmmos: {
           seaSurfaceVisible: true,
@@ -217,6 +225,7 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
       kind: string;
       view: {
         specification: {
+          dimensions?: unknown;
           model: {
             boundingBox?: unknown;
             orientation?: unknown;
@@ -228,16 +237,37 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
       };
     }>();
     expect(vesselNative?.kind).toBe("vessel");
+    expect(vesselNative?.view.specification.dimensions).toEqual({
+      draught: 8,
+      bow: 40,
+      stern: 30,
+      port: 10,
+      starboard: 12,
+    });
     expect(vesselNative?.view.specification.model.boundingBox).toEqual(vesselBoundingBox);
     expect(vesselNative?.view.specification.model.orientation).toEqual(vesselOrientation);
     expect(vesselNative?.view.seaLevelIndicator.seaSurfaceVisible).toBe(true);
 
     await vessel.update({
+      dimensions: {
+        draught: 9,
+        bow: 42,
+        stern: 31,
+        port: 11,
+        starboard: 13,
+      },
       extensions: {
         nasaAmmos: {
           seaSurfaceVisible: false,
         },
       },
+    });
+    expect(vesselNative?.view.specification.dimensions).toEqual({
+      draught: 9,
+      bow: 42,
+      stern: 31,
+      port: 11,
+      starboard: 13,
     });
     expect(vesselNative?.view.seaLevelIndicator.seaSurfaceVisible).toBe(false);
 

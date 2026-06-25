@@ -217,6 +217,14 @@ describe("@ecc/s100-viewer product specs", () => {
           crs: "EPSG:32633",
         },
       },
+      dimensions: {
+        draught: 8,
+        bow: 40,
+        stern: 30,
+        port: 10,
+        starboard: 12,
+      },
+      referencePoint: "transponder",
     });
     const mapOverlay = LayerBuilder.createMapOverlayWms({
       url: "https://example.test/map",
@@ -252,6 +260,14 @@ describe("@ecc/s100-viewer product specs", () => {
       id: "vessel",
       product: "vessel",
       source: { kind: "model", format: "glb" },
+      dimensions: {
+        draught: 8,
+        bow: 40,
+        stern: 30,
+        port: 10,
+        starboard: 12,
+      },
+      referencePoint: "transponder",
       style: LayerBuilder.VesselStyles.DEFAULT,
     });
     expect(mapOverlay).toMatchObject({

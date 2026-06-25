@@ -572,6 +572,13 @@ class NasaAmmosEngineScene implements EngineScene {
         native.view.setPosition([position.x, position.y, position.z]);
         native.view.setHeading(native.spec.pose.headingDegrees ?? native.view.getHeading());
       }
+      if (
+        native.spec.dimensions !== undefined ||
+        native.spec.style?.draughtMeters !== undefined ||
+        getNasaAmmosExtension(native.spec, "dimensions") !== undefined
+      ) {
+        native.view.setDimensions(getVesselDimensions(native.spec));
+      }
       applyVisibility(native.view, patch.visible);
       applyVesselPresentation(native.view, native.spec);
     }
@@ -1021,15 +1028,16 @@ function getRecordTime(data: object): number | null {
 }
 
 function getVesselDimensions(spec: VesselLayerSpec): VesselDimensions {
+  const semantic: Partial<VesselDimensions> = spec.dimensions ?? {};
   const extension = getNasaAmmosExtension<Partial<VesselDimensions>>(spec, "dimensions") ?? {};
-  const draught = spec.style?.draughtMeters ?? extension.draught ?? 7;
+  const draught = semantic.draught ?? extension.draught ?? spec.style?.draughtMeters ?? 7;
 
   return {
     draught,
-    bow: extension.bow ?? 100,
-    stern: extension.stern ?? 100,
-    port: extension.port ?? 20,
-    starboard: extension.starboard ?? 20,
+    bow: semantic.bow ?? extension.bow ?? 100,
+    stern: semantic.stern ?? extension.stern ?? 100,
+    port: semantic.port ?? extension.port ?? 20,
+    starboard: semantic.starboard ?? extension.starboard ?? 20,
   };
 }
 

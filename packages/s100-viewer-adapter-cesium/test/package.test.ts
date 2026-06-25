@@ -635,9 +635,10 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
           },
           headingDegrees: 0,
         },
+        dimensions: { draught: 12, bow: 195.2, stern: 30, port: 20.8, starboard: 11.2 },
+        referencePoint: "transponder",
         extensions: {
           nasaAmmos: {
-            dimensions: { draught: 12, bow: 195.2, stern: 30, port: 20.8, starboard: 11.2 },
             model: {
               boundingBox: {
                 min: [-20.8, -30, -40.2],
@@ -708,11 +709,8 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
           shadow: { enabled: true, opacity: 0.25 },
           transformGizmo: { enabled: true, sizeMeters: 25 },
         },
-        extensions: {
-          nasaAmmos: {
-            dimensions: { draught: 12, bow: 195.2, stern: 30, port: 20.8, starboard: 11.2 },
-          },
-        },
+        dimensions: { draught: 12, bow: 195.2, stern: 30, port: 20.8, starboard: 11.2 },
+        referencePoint: "transponder",
       }),
     );
 
