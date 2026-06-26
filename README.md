@@ -70,6 +70,12 @@ policy. By default, product layers use `latest-confirmed-supported`; pass
 `productSpecificationVersion` only when a service exposes a concrete IHO product
 specification identifier or edition that the app wants to track explicitly.
 
+For applications that want a more batteries-included surface, the core package
+also exports product controllers such as `TerrainFeature`, `MapFeature`,
+`S111Feature`, and `VesselFeature`. These controllers translate app-friendly
+inputs into canonical layer specs, including templated WMS map sources, while
+still using the same `scene.layers` kernel underneath.
+
 The core package exports `S100SupportedProductVersions`, and each adapter reports
 its engine-specific matrix through `adapter.capabilities.supportedProductVersions`.
 Third-party engines integrate by implementing `S100EngineAdapter`; applications

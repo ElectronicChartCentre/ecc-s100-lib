@@ -5,6 +5,9 @@ import {
   getLayerDisplayTitle,
   isServiceReadySource,
   LayerBuilder,
+  mapSpecificationToLayerSpec,
+  MapDiscardMode,
+  MapLayerType,
   S100SupportedProductVersions,
   S100ProductSpecificationVersions,
   S100ProductType,
@@ -309,5 +312,70 @@ describe("@ecc/s100-viewer product specs", () => {
       source: { kind: "wms", transparent: true },
       style: LayerBuilder.MapOverlayStyles.DEFAULT,
     });
+  });
+
+  it("converts runtime map specifications into canonical ENC WMS-template layers", () => {
+    const spec = mapSpecificationToLayerSpec(
+      {
+        id: "s57WMS",
+        type: MapLayerType.Base,
+        encStandard: "S-57",
+        corners: {
+          upperLeft: [0, 10],
+          upperRight: [10, 10],
+          lowerLeft: [0, 0],
+          lowerRight: [10, 0],
+        },
+        dataset: {
+          mapSubset: {
+            min: [0, 0],
+            max: [10, 10],
+          },
+          extents: {
+            minX: 0,
+            minY: 0,
+            maxX: 10,
+            maxY: 10,
+          },
+          minLevel: 2,
+          maxLevel: 12,
+        },
+        urlTemplate:
+          "https://example.test/wms?bbox={xmin},{ymin},{xmax},{ymax}&SRS=EPSG:32633",
+      },
+      MapDiscardMode.MaskLayerAlphaZero,
+    );
+
+    expect(spec).toMatchObject({
+      id: "s57WMS",
+      product: "S-57",
+      category: "enc",
+      standard: "S-57",
+      role: "basemap",
+      source: {
+        kind: "wms-template",
+        crs: "EPSG:32633",
+      },
+      spatialExtent: {
+        crs: "EPSG:32633",
+        minX: 0,
+        minY: 0,
+        maxX: 10,
+        maxY: 10,
+      },
+      extensions: {
+        nasaAmmos: {
+          minLevel: 2,
+          maxLevel: 12,
+        },
+        cogs: {
+          minLevel: 2,
+          maxLevel: 12,
+          discardMode: MapDiscardMode.MaskLayerAlphaZero,
+        },
+      },
+    });
+    expect("mapSpecification" in ((spec.extensions?.nasaAmmos ?? {}) as Record<string, unknown>))
+      .toBe(false);
   });
 });

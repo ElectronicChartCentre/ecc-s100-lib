@@ -1,6 +1,13 @@
 import type { Coordinate } from "../coordinates/types.js";
 import type { BaseLayerSpec } from "../layers/types.js";
-import type { ModelSource, MvtSource, StaticJsonSource, WmsSource, WmtsSource } from "./sources.js";
+import type {
+  ModelSource,
+  MvtSource,
+  StaticJsonSource,
+  WmsSource,
+  WmsTemplateSource,
+  WmtsSource,
+} from "./sources.js";
 import type { ColorValue, OpacityVisibilityStyle, ProductFilter } from "./style.js";
 
 export type VesselPose = {
@@ -79,7 +86,7 @@ export interface VesselLayerSpec extends BaseLayerSpec<"vessel"> {
 }
 
 export interface MapOverlayLayerSpec extends BaseLayerSpec<"map-overlay"> {
-  source: WmsSource | WmtsSource | MvtSource | StaticJsonSource;
+  source: WmsSource | WmsTemplateSource | WmtsSource | MvtSource | StaticJsonSource;
   role?: "basemap" | "overlay" | "mask" | "annotation";
   style?: MapOverlayStyle;
 }

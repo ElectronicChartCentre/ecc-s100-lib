@@ -34,6 +34,7 @@ import {
   type ThreeDTilesSource,
   type VesselLayerSpec,
   type WmsSource,
+  type WmsTemplateSource,
   type WmtsSource,
 } from "@ecc/s100-viewer";
 import {
@@ -859,9 +860,14 @@ function getProjectedExtents(spec: EncLayerSpec | MapOverlayLayerSpec): {
   );
 }
 
-function createMapUrlTemplate(source: WmsSource | WmtsSource | StaticJsonSource | { kind: "mvt"; urlTemplate: string }): string {
+function createMapUrlTemplate(
+  source: WmsSource | WmsTemplateSource | WmtsSource | StaticJsonSource | { kind: "mvt"; urlTemplate: string },
+): string {
   if (source.kind === "wms") {
     return createWmsUrlTemplate(source);
+  }
+  if (source.kind === "wms-template") {
+    return source.urlTemplate;
   }
   if (source.kind === "wmts") {
     return createWmtsUrlTemplate(source);
@@ -872,7 +878,7 @@ function createMapUrlTemplate(source: WmsSource | WmtsSource | StaticJsonSource 
 
   throw new S100Error(
     "invalid-layer-spec",
-    `NASA-AMMOS map layers require WMS, WMTS, or MVT sources; received '${source.kind}'.`,
+    `NASA-AMMOS map layers require WMS, WMS template, WMTS, or MVT sources; received '${source.kind}'.`,
     source,
   );
 }

@@ -2117,7 +2117,10 @@ class CesiumEngineScene implements EngineScene {
       };
     }
 
-    if (!this.isProjectedLocalScene() || spec.source.kind !== "wms") {
+    if (
+      !this.isProjectedLocalScene() ||
+      (spec.source.kind !== "wms" && spec.source.kind !== "wms-template")
+    ) {
       return null;
     }
 
@@ -2127,7 +2130,9 @@ class CesiumEngineScene implements EngineScene {
     }
 
     return {
-      urlTemplate: createWmsUrlTemplate(spec.source),
+      urlTemplate: spec.source.kind === "wms-template"
+        ? spec.source.urlTemplate
+        : createWmsUrlTemplate(spec.source),
       extent: {
         ...extent,
         crs: extent.crs ?? spec.source.crs ?? this.sceneCrs(),

@@ -3,6 +3,7 @@ export type HttpMethod = "GET" | "POST";
 export type ServiceReadySource =
   | ThreeDTilesSource
   | WmsSource
+  | WmsTemplateSource
   | WmtsSource
   | RestJsonSource
   | StaticJsonSource
@@ -44,6 +45,14 @@ export type WmsSource = SourceRequestOptions & {
   transparent?: boolean;
   crs?: string;
   parameters?: Record<string, string | number | boolean>;
+  metadata?: SourceMetadata;
+};
+
+export type WmsTemplateSource = SourceRequestOptions & {
+  kind: "wms-template";
+  urlTemplate: string;
+  layers?: readonly string[];
+  crs?: string;
   metadata?: SourceMetadata;
 };
 
@@ -102,5 +111,5 @@ export const isServiceReadySource = (source: unknown): source is ServiceReadySou
   }
 
   const kind = (source as { kind: string }).kind;
-  return ["3d-tiles", "wms", "wmts", "rest-json", "static-json", "model", "mvt"].includes(kind);
+  return ["3d-tiles", "wms", "wms-template", "wmts", "rest-json", "static-json", "model", "mvt"].includes(kind);
 };

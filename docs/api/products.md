@@ -37,6 +37,30 @@ LayerBuilder.createS57Wms({ url, layers: ["enc_cells"] });
 LayerBuilder.createS57Wmts({ url, layer: "s57", tileMatrixSet: "utm" });
 ```
 
+For application-style WMS URL templates, use the package-owned runtime helpers
+instead of carrying adapter-native map specifications in application code:
+
+```ts
+import { MapDiscardMode, MapLayerType, mapSpecificationToLayerSpec } from "@ecc/s100-viewer";
+
+const encLayer = mapSpecificationToLayerSpec({
+  id: "s57WMS",
+  type: MapLayerType.Base,
+  encStandard: "S-57",
+  dataset: {
+    mapSubset: { min: [0, 0], max: [1000, 1000] },
+    extents: { minX: 0, minY: 0, maxX: 1000, maxY: 1000 },
+    minLevel: 0,
+    maxLevel: 10,
+  },
+  corners,
+  urlTemplate: "https://example.test/wms?bbox={xmin},{ymin},{xmax},{ymax}&SRS=EPSG:32633",
+}, MapDiscardMode.Transparent);
+```
+
+That produces a normal `EncLayerSpec` with `source.kind: "wms-template"`.
+Adapters translate that source shape internally.
+
 ## Product Specification Versions
 
 S-100 product type and product specification version are separate concepts. For
@@ -124,6 +148,7 @@ Short aliases are also exported:
 
 - `3d-tiles`
 - `wms`
+- `wms-template`
 - `wmts`
 - `mvt`
 - `rest-json`
