@@ -5,7 +5,7 @@ import {
   type BaseLayerSpec,
   type CameraControlConfig,
   type CameraLookAt,
-  type CameraPose,
+  type EngineCameraPose,
   type Coordinate,
   type EncLayerSpec,
   type EngineCameraChangeListener,
@@ -38,7 +38,9 @@ import {
   type WmtsSource,
 } from "@ecc/s100-viewer";
 import {
+  S100NasaLogLevel,
   S100NasaViewer,
+  type S100NasaLogSettings,
   type S100NasaViewerConfig,
   type Vec3,
 } from "./runtime/index.js";
@@ -77,6 +79,9 @@ type SubscriptionLike = {
 export type NasaAmmosAdapterOptions = S100NasaViewerConfig & {
   fetchHandler?: FetchLike;
 };
+
+export { S100NasaLogLevel };
+export type { S100NasaLogSettings };
 
 type NasaLayerNative =
   | { kind: "terrain"; spec: S102BathymetryLayerSpec; view: TerrainView }
@@ -236,7 +241,7 @@ class NasaAmmosEngineScene implements EngineScene {
     };
   }
 
-  setCamera(pose: CameraPose): void {
+  setCamera(pose: EngineCameraPose): void {
     const cameraPose: {
       position: [number, number, number];
       rotation: [number, number, number, number];
@@ -251,9 +256,9 @@ class NasaAmmosEngineScene implements EngineScene {
     this.scene.cameraNavigation.setCameraPose(cameraPose);
   }
 
-  getCamera(): CameraPose {
+  getCamera(): EngineCameraPose {
     const pose = this.scene.cameraNavigation.getCameraPose();
-    const cameraPose: CameraPose = {
+    const cameraPose: EngineCameraPose = {
       position: {
         x: pose.position[0],
         y: pose.position[1],
@@ -630,7 +635,7 @@ function tupleCameraPoseToObjectPose(pose: {
   position: [number, number, number];
   rotation: [number, number, number, number];
   focalDistance?: number;
-}): CameraPose {
+}): EngineCameraPose {
   return {
     position: {
       x: pose.position[0],

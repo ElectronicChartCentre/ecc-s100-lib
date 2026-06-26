@@ -20,6 +20,8 @@ export type CameraPose = {
   focalDistance?: number;
 };
 
+export type EngineCameraPose = CameraPose;
+
 export type CameraLookAt = {
   target: Coordinate;
   rangeMeters: number;

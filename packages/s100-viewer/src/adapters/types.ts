@@ -1,4 +1,4 @@
-import type { CameraControlConfig, CameraLookAt, CameraPose } from "../camera/types.js";
+import type { CameraControlConfig, CameraLookAt, EngineCameraPose } from "../camera/types.js";
 import type { SceneGeoreferenceMode } from "../coordinates/types.js";
 import type { BaseLayerSpec, LayerPatch } from "../layers/types.js";
 import type { LivePickingOptions, PickRequest, PickResult } from "../picking/types.js";
@@ -84,7 +84,7 @@ export type EngineLayerPatchEvent<TSpec extends BaseLayerSpec = BaseLayerSpec> =
 };
 
 export type EngineLayerPatchListener = (event: EngineLayerPatchEvent) => void;
-export type EngineCameraChangeListener = (pose: CameraPose) => void;
+export type EngineCameraChangeListener = (pose: EngineCameraPose) => void;
 
 export type EnginePrismVec2Tuple = [number, number];
 
@@ -104,8 +104,8 @@ export type EngineRgba = {
 
 export interface EngineScene {
   getEngineHandles?(): EngineHandleBundle;
-  setCamera(pose: CameraPose): void;
-  getCamera(): CameraPose;
+  setCamera(pose: EngineCameraPose): void;
+  getCamera(): EngineCameraPose;
   lookAt?(view: CameraLookAt): void;
   setCameraChangeListener?(listener: EngineCameraChangeListener | null): void;
   setCameraControls?(config: CameraControlConfig): void;

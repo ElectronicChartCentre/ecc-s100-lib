@@ -11,18 +11,18 @@ import type {
 } from "../products/iho-s100.js";
 import type { VesselDimensions, VesselLayerSpec } from "../products/viewer-features.js";
 
-export type RuntimeSubscription = {
+export type Subscription = {
   unsubscribe(): void;
 };
 
-export class RuntimeEventEmitter<TPayload> {
+export class EventEmitter<TPayload> {
   private readonly listeners = new Set<(payload: TPayload) => void>();
 
   get size(): number {
     return this.listeners.size;
   }
 
-  subscribe(listener: (payload: TPayload) => void): RuntimeSubscription {
+  subscribe(listener: (payload: TPayload) => void): Subscription {
     this.listeners.add(listener);
     return {
       unsubscribe: () => {
@@ -31,7 +31,7 @@ export class RuntimeEventEmitter<TPayload> {
     };
   }
 
-  on(listener: (payload: TPayload) => void): RuntimeSubscription {
+  on(listener: (payload: TPayload) => void): Subscription {
     return this.subscribe(listener);
   }
 
@@ -157,8 +157,8 @@ export type SurfaceCurrentDataset = {
 };
 
 type NativeVesselViewLike = {
-  positionChanged?: { subscribe(listener: (position: Vec3Tuple) => void): RuntimeSubscription };
-  headingChanged?: { subscribe(listener: (heading: number) => void): RuntimeSubscription };
+  positionChanged?: { subscribe(listener: (position: Vec3Tuple) => void): Subscription };
+  headingChanged?: { subscribe(listener: (heading: number) => void): Subscription };
 };
 
 let idCounter = 0;
@@ -509,9 +509,9 @@ export class CustomModelFeature {
 }
 
 export class CustomModelView extends ProductLayerView<VesselLayerSpec> {
-  readonly loadChanged = new RuntimeEventEmitter<{ status: "loaded" | "error"; error?: unknown }>();
-  readonly positionChanged = new RuntimeEventEmitter<Vec3Tuple>();
-  readonly headingChanged = new RuntimeEventEmitter<number>();
+  readonly loadChanged = new EventEmitter<{ status: "loaded" | "error"; error?: unknown }>();
+  readonly positionChanged = new EventEmitter<Vec3Tuple>();
+  readonly headingChanged = new EventEmitter<number>();
   readonly loaded: Promise<boolean>;
   private position: Vec3Tuple;
   private heading = 0;
@@ -627,7 +627,7 @@ export class VesselFeature {
 }
 
 export class VesselView extends ProductLayerView<VesselLayerSpec> {
-  readonly positionChanged = new RuntimeEventEmitter<Vec3Tuple>();
+  readonly positionChanged = new EventEmitter<Vec3Tuple>();
   readonly model: VesselDimensions;
   readonly seaLevelIndicator: {
     mode: SeaLevelIndicatorMode;
@@ -639,8 +639,8 @@ export class VesselView extends ProductLayerView<VesselLayerSpec> {
   private heading = 0;
   private seaLevelIndicatorMode = SeaLevelIndicatorMode.Off;
   private seaSurfaceVisible = false;
-  private nativePositionSubscription: RuntimeSubscription | null = null;
-  private nativeHeadingSubscription: RuntimeSubscription | null = null;
+  private nativePositionSubscription: Subscription | null = null;
+  private nativeHeadingSubscription: Subscription | null = null;
 
   constructor(
     readonly specification: VesselSpecification,

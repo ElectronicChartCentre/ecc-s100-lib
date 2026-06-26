@@ -2,7 +2,7 @@ import {
   cloneCameraControlConfig,
   type CameraControlConfig,
   type CameraLookAt,
-  type CameraPose,
+  type EngineCameraPose,
 } from "../camera/types.js";
 import type {
   AdapterCapabilities,
@@ -42,7 +42,7 @@ export type InMemoryAdapterOptions = {
   onCameraChangeListener?: (listener: EngineCameraChangeListener | null) => void;
 };
 
-const defaultCameraPose = (): CameraPose => ({
+const defaultCameraPose = (): EngineCameraPose => ({
   position: { x: 0, y: 0, z: 1000 },
   rotation: { x: 0, y: 0, z: 0, w: 1 },
   focalDistance: 1000,
@@ -167,11 +167,11 @@ class InMemoryEngineScene implements EngineScene {
     };
   }
 
-  setCamera(pose: CameraPose): void {
+  setCamera(pose: EngineCameraPose): void {
     this.camera = { ...pose };
   }
 
-  getCamera(): CameraPose {
+  getCamera(): EngineCameraPose {
     return { ...this.camera };
   }
 

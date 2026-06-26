@@ -42,9 +42,11 @@ import { S100NasaViewer } from "../core/S100NasaViewer.js";
 import type { S100Scene as CoreS100Scene } from "../core/S100Scene.js";
 import type {
   FrameSubscription,
+  S100NasaLogSettings,
   S100NasaViewerConfig,
   S100RenderContext,
 } from "../core/types.js";
+import { S100NasaLogLevel } from "../core/types.js";
 import {
   TerrainDisplayPropertyAdapter,
   TerrainMaterialController,
@@ -93,27 +95,8 @@ export type ViewerConfig = S100NasaViewerConfig & {
   logSettings?: LogSettings;
 };
 
-export type LogSettings = {
-  logLevel?: LogLevel;
-  cogsLogging?: boolean;
-  webTexLoader?: boolean;
-  resources?: boolean;
-  extensionLoading?: boolean;
-  capabilities?: boolean;
-  GLES30?: boolean;
-  shaderInfo?: boolean;
-  shaderSource?: boolean;
-  OGC3DTiles?: boolean;
-};
-
-export enum LogLevel {
-  Trace = 0,
-  Debug = 1,
-  Info = 2,
-  Warn = 3,
-  Error = 4,
-  Off = 5,
-}
+export type LogSettings = S100NasaLogSettings;
+export { S100NasaLogLevel as LogLevel };
 
 export class ConsoleLogger {
   debug(...args: unknown[]): void {

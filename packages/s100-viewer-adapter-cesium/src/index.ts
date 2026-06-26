@@ -10,7 +10,7 @@ import {
   type CameraControlModifier,
   type CameraControlPointerBinding,
   type CameraLookAt,
-  type CameraPose,
+  type EngineCameraPose,
   type Coordinate,
   type EncLayerSpec,
   type EngineHandleBundle,
@@ -419,7 +419,7 @@ class CesiumEngineScene implements EngineScene {
     ambientIntensity: S102_LIGHTING_FALLBACK_AMBIENT_INTENSITY,
     directionalIntensity: S102_LIGHTING_FALLBACK_DIRECTIONAL_INTENSITY,
   };
-  private lastCameraPose: CameraPose = {
+  private lastCameraPose: EngineCameraPose = {
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0, w: 1 },
   };
@@ -495,7 +495,7 @@ class CesiumEngineScene implements EngineScene {
     );
   }
 
-  setCamera(pose: CameraPose): void {
+  setCamera(pose: EngineCameraPose): void {
     this.lastCameraPose = cloneCameraPose(pose);
     const camera = getObject(this.viewer, "camera");
     const destination = this.coordinateToCartesian({
@@ -511,7 +511,7 @@ class CesiumEngineScene implements EngineScene {
     }
   }
 
-  getCamera(): CameraPose {
+  getCamera(): EngineCameraPose {
     const camera = getObject(this.viewer, "camera");
     const position = getObject(camera, "position");
     if (!camera || !position) {
@@ -3243,7 +3243,7 @@ class CesiumEngineScene implements EngineScene {
       : null;
   }
 
-  private createCameraOrientationFromPose(pose: CameraPose): { direction: CesiumObject; up: CesiumObject } | undefined {
+  private createCameraOrientationFromPose(pose: EngineCameraPose): { direction: CesiumObject; up: CesiumObject } | undefined {
     const directionLocal = rotateVectorByQuaternion({ x: 0, y: 0, z: -1 }, pose.rotation);
     const upLocal = rotateVectorByQuaternion({ x: 0, y: 1, z: 0 }, pose.rotation);
     return this.createCameraOrientationFromVectors(directionLocal, upLocal);
@@ -3265,7 +3265,7 @@ class CesiumEngineScene implements EngineScene {
     return vectorFromObject(world);
   }
 
-  private cameraRotationFromCesium(camera: CesiumObject): CameraPose["rotation"] | null {
+  private cameraRotationFromCesium(camera: CesiumObject): EngineCameraPose["rotation"] | null {
     const directionWorld = vectorFromObject(getObject(camera, "directionWC") ?? getObject(camera, "direction"));
     const upWorld = vectorFromObject(getObject(camera, "upWC") ?? getObject(camera, "up"));
     if (!directionWorld || !upWorld) {
@@ -4706,7 +4706,7 @@ function rotateVectorAroundAxis(vector: Vector3Fields, axis: Vector3Fields, radi
   };
 }
 
-function rotateVectorByQuaternion(vector: Vector3Fields, rotation: CameraPose["rotation"]): Vector3Fields {
+function rotateVectorByQuaternion(vector: Vector3Fields, rotation: EngineCameraPose["rotation"]): Vector3Fields {
   const quaternion = normalizeQuaternion(rotation);
   const qx = quaternion.x;
   const qy = quaternion.y;
@@ -4727,7 +4727,7 @@ function rotateVectorByQuaternion(vector: Vector3Fields, rotation: CameraPose["r
 function quaternionFromCameraDirectionUp(
   direction: Vector3Fields | null,
   up: Vector3Fields | null,
-): CameraPose["rotation"] | null {
+): EngineCameraPose["rotation"] | null {
   const forward = normalizeVector3(direction);
   const upVector = normalizeVector3(up);
   if (!forward || !upVector) {
@@ -4749,7 +4749,7 @@ function quaternionFromBasis(
   right: Vector3Fields,
   up: Vector3Fields,
   back: Vector3Fields,
-): CameraPose["rotation"] {
+): EngineCameraPose["rotation"] {
   const m00 = right.x;
   const m01 = up.x;
   const m02 = back.x;
@@ -4794,7 +4794,7 @@ function quaternionFromBasis(
   return normalizeQuaternion({ x, y, z, w });
 }
 
-function normalizeQuaternion(rotation: CameraPose["rotation"]): CameraPose["rotation"] {
+function normalizeQuaternion(rotation: EngineCameraPose["rotation"]): EngineCameraPose["rotation"] {
   const x = getFiniteNumber(rotation.x, 0);
   const y = getFiniteNumber(rotation.y, 0);
   const z = getFiniteNumber(rotation.z, 0);
@@ -7224,7 +7224,7 @@ function radiansToDegrees(value: number): number {
   return (value * 180) / Math.PI;
 }
 
-function cloneCameraPose(pose: CameraPose): CameraPose {
+function cloneCameraPose(pose: EngineCameraPose): EngineCameraPose {
   return {
     position: { ...pose.position },
     rotation: { ...pose.rotation },

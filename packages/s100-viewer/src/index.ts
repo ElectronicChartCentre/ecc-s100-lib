@@ -36,7 +36,7 @@ export type {
   CameraControlTouchBinding,
   CameraControlWheelBinding,
   CameraLookAt,
-  CameraPose,
+  EngineCameraPose,
   Quaternion,
   Vec3,
 } from "./camera/types.js";
@@ -72,7 +72,6 @@ export type {
   LayerTemporalOptions,
   OperationalLayerType,
   S100Layer,
-  S100ProductType as S100ProductTypeValue,
 } from "./layers/types.js";
 export type {
   LivePickingOptions,
@@ -116,7 +115,6 @@ export type {
 export type { TimeController, TimeInterval, TimePlaybackState } from "./time/types.js";
 export * from "./products/index.js";
 export * from "./runtime/product-runtime.js";
-export { RuntimeEventEmitter as EventEmitter } from "./runtime/product-runtime.js";
-export type { RuntimeSubscription as Subscription } from "./runtime/product-runtime.js";
+export * from "./runtime/viewer-runtime.js";
 export { createS100Viewer } from "./viewer/createS100Viewer.js";
 export type { CreateS100ViewerOptions, S100Viewer } from "./viewer/types.js";
