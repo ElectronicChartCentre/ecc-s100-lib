@@ -31,8 +31,8 @@ const viewer = await createS100Viewer({
 
 - Projected/local scenes.
 - S-102 OGC 3D Tiles terrain.
-- S-101 WMS/WMTS/MVT overlays where supported by the runtime.
-- S-104 water level data.
+- ENC WMS/WMTS/MVT layers for S-101 and S-57 where supported by the runtime.
+- Simulated water-level data.
 - S-111 surface current arrows.
 - Vessel/model layers and transform tools.
 - Camera pose/look-at.

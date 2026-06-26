@@ -1,16 +1,26 @@
 import { S100Error } from "../errors/S100Error.js";
+import { EncLayerBuilder } from "./enc-builders.js";
+import type { EncLayerSpec } from "./enc.js";
 import { S100IhoProductLayerBuilder } from "./iho-builders.js";
 import type { S100IhoProductLayerSpec } from "./iho-s100.js";
 import { isServiceReadySource } from "./sources.js";
+import { SimulatedWaterLevelLayerBuilder } from "./simulated-water-level-builders.js";
+import type { SimulatedWaterLevelLayerSpec } from "./simulated-water-level.js";
 import { ViewerFeatureLayerBuilder } from "./viewer-feature-builders.js";
 import type { ViewerFeatureLayerSpec } from "./viewer-features.js";
 
-export type S100ProductLayerSpec = S100IhoProductLayerSpec | ViewerFeatureLayerSpec;
+export type S100ProductLayerSpec =
+  | S100IhoProductLayerSpec
+  | EncLayerSpec
+  | SimulatedWaterLevelLayerSpec
+  | ViewerFeatureLayerSpec;
 
 export type S100ServiceProductType = S100ProductLayerSpec["product"];
 
 export const LayerBuilder = {
+  ...EncLayerBuilder,
   ...S100IhoProductLayerBuilder,
+  ...SimulatedWaterLevelLayerBuilder,
   ...ViewerFeatureLayerBuilder,
 };
 

@@ -11,9 +11,9 @@ const adapter = createCesiumAdapter({
 ```
 
 The adapter reports both `projected-local` and `ellipsoid-ecef` scene support.
-Current implemented layer support covers S-102 3D Tiles, S-101/map WMS/WMTS
-imagery, S-104 JSON sea-level binding, S-111 JSON arrow entities, and vessel
-model entities.
+Current implemented layer support covers S-102 3D Tiles, ENC WMS/WMTS imagery
+for S-101 and S-57, map overlays, simulated water-level JSON sea-level binding,
+S-111 JSON arrow entities, and vessel model entities.
 
 For Vite applications, import Cesium widget CSS and configure Cesium static
 assets through the app bundler. The S-100 Explorer currently uses

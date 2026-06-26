@@ -1199,7 +1199,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     await viewer.destroy();
   });
 
-  it("binds S-104 sea level and creates S-111 arrow entities", async () => {
+  it("binds simulated water level and creates S-111 arrow entities", async () => {
     const cesium = createMockCesium();
     const viewer = await createS100Viewer({
       container: createMockContainer(),
@@ -1213,7 +1213,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     });
 
     await scene.layers.add(
-      LayerBuilder.createStaticS104({
+      LayerBuilder.createStaticSimulatedWaterLevel({
         data: {
           records: [
             { time: "2026-01-01T00:00:00Z", waterLevelMeters: 1.2 },
@@ -1527,7 +1527,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     const firstShader = primitive.customShader;
 
     await scene.layers.add(
-      LayerBuilder.createStaticS104({
+      LayerBuilder.createStaticSimulatedWaterLevel({
         data: {
           records: [
             { time: "2026-01-01T00:00:00Z", waterLevelMeters: 1.2 },

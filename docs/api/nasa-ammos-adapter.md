@@ -17,9 +17,9 @@ const viewer = await createS100Viewer({
 });
 ```
 
-The adapter currently supports projected-local scenes, S-101, S-102, S-104,
-S-111, vessel/model layers, map overlays, camera pose/look-at, time-dynamic
-layers, picking, and native handles.
+The adapter currently supports projected-local scenes, ENC layers for S-101 and
+S-57, S-102, S-111, simulated water-level layers, vessel/model layers, map
+overlays, camera pose/look-at, time-dynamic layers, picking, and native handles.
 
 It reports supported product-specification versions through:
 
@@ -27,8 +27,9 @@ It reports supported product-specification versions through:
 nasaAmmosAdapterCapabilities.supportedProductVersions;
 ```
 
-At the current package-readiness stage, the reported S-101, S-102, S-104, and
-S-111 versions are `latest-confirmed-supported`.
+At the current package-readiness stage, the reported S-101, S-102, and S-111
+versions are `latest-confirmed-supported`. S-57 ENC layers and simulated
+water-level layers are not IHO S-100 product-specification versioned.
 
 ## Native Handles
 

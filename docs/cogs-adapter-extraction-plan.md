@@ -34,12 +34,11 @@ The adapter should keep testing the same public API concepts:
 
 - projected-local scene creation
 - S-102 terrain
-- S-101/map overlays
+- ENC maps for S-101 and S-57 plus generic map overlays
 - S-111 currents
-- S-104 sea-level updates
+- Simulated water-level sea-level updates
 - vessel pose and controls where supported
 - camera and picking normalization
 
 Any feature that only works through a Cogs-specific native handle should stay
 documented as adapter-native, not added to the core API by default.
-

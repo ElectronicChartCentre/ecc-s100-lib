@@ -115,17 +115,21 @@ import { LayerBuilder, SceneBuilder } from "@ecc/s100-viewer";
 - `LayerBuilder.createS102(...)` builds S-102 3D Tiles layers.
 - `LayerBuilder.createS101Wms(...)` and `createS101Wmts(...)` build S-101
   overlay layers.
-- `LayerBuilder.createS104(...)` and `createStaticS104(...)` build water-level
+- `LayerBuilder.createS57Wms(...)` and `createS57Wmts(...)` build S-57 ENC
+  layers with the shared ENC source shape.
+- `LayerBuilder.createSimulatedWaterLevel(...)` and
+  `createStaticSimulatedWaterLevel(...)` build non-IHO simulated water-level
   layers.
 - `LayerBuilder.createS111(...)` and `createStaticS111(...)` build current
   layers.
 - `LayerBuilder.createVessel(...)` builds vessel model layers.
 - `LayerBuilder.createMapOverlayWms(...)` builds generic map-overlay layers.
 
-S-101, S-102, S-104, and S-111 builders also set
-`productSpecificationVersion` to `latest-confirmed-supported`. Exact product
-specification identifiers or editions should be passed explicitly only when the
-service metadata exposes them and the implementation has validated the edition.
+S-101, S-102, and S-111 builders also set `productSpecificationVersion` to
+`latest-confirmed-supported`. Exact product specification identifiers or
+editions should be passed explicitly only when the service metadata exposes them
+and the implementation has validated the edition. Simulated water-level layers
+and S-57 ENC layers do not claim an IHO S-100 product specification version.
 
 The core package lists library-level support in `S100SupportedProductVersions`.
 Each adapter must list renderable product versions on

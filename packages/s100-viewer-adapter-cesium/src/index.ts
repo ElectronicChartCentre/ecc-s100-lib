@@ -12,6 +12,7 @@ import {
   type CameraLookAt,
   type CameraPose,
   type Coordinate,
+  type EncLayerSpec,
   type EngineHandleBundle,
   type EngineLayerHandle,
   type EngineLayerPatchListener,
@@ -28,19 +29,19 @@ import {
   type PickResult,
   type RestJsonSource,
   type S100EngineAdapter,
-  type S101EncLayerSpec,
   type S102BathymetryLayerSpec,
-  type S104WaterLevelLayerSpec,
   type S111SurfaceCurrentLayerSpec,
   type SceneGeoreference,
   type SceneOptions,
   type ServiceReadySource,
+  type SimulatedWaterLevelLayerSpec,
   type SpatialExtent,
   type StaticJsonSource,
   type VesselLayerSpec,
   type ViewerHostOptions,
   type WmsSource,
   type WmtsSource,
+  isEncLayerSpec,
 } from "@ecc/s100-viewer";
 
 type FetchLike = typeof fetch;
@@ -82,13 +83,13 @@ type CesiumLayerNative =
     }
   | {
       kind: "imagery";
-      spec: S101EncLayerSpec | MapOverlayLayerSpec;
+      spec: EncLayerSpec | MapOverlayLayerSpec;
       layer: CesiumObject;
       provider: CesiumObject;
     }
   | {
       kind: "projected-wms";
-      spec: S101EncLayerSpec | MapOverlayLayerSpec;
+      spec: EncLayerSpec | MapOverlayLayerSpec;
       urlTemplate: string;
       extent: SpatialExtent;
       drawables: CesiumSceneDrawable[];
@@ -111,7 +112,7 @@ type CesiumLayerNative =
       drawables: CesiumSceneDrawable[];
       view: CesiumVesselNativeView;
     }
-  | { kind: "s104"; spec: S104WaterLevelLayerSpec; data: unknown };
+  | { kind: "simulated-water-level"; spec: SimulatedWaterLevelLayerSpec; data: unknown };
 
 type CesiumVesselGizmoScene = CesiumObject & {
   __s100VesselGizmoDragging?: boolean;
@@ -263,6 +264,7 @@ const S111_ARROW_POLYGON: readonly (readonly [number, number])[] = [
 ];
 const S111_ARROW_OUTLINE_POLYGON = offsetClosedPolygon(S111_ARROW_POLYGON, S111_ARROW_OUTLINE_WIDTH);
 const S111_ARROW_FILL_INDICES = [0, 1, 6, 2, 3, 4, 2, 4, 5] as const;
+const SIMULATED_WATER_LEVEL_PRODUCT = "simulated-water-level";
 
 type DomListenerTarget = {
   addEventListener: (
@@ -279,7 +281,7 @@ type DomListenerTarget = {
 
 export const cesiumAdapterCapabilities: AdapterCapabilities = {
   sceneGeoreferences: ["projected-local", "ellipsoid-ecef"],
-  layerProducts: ["S-101", "S-102", "S-104", "S-111", "vessel", "map-overlay", "tool"],
+  layerProducts: ["S-101", "S-57", "S-102", "S-111", "simulated-water-level", "vessel", "map-overlay", "tool"],
   supportedProductVersions: S100SupportedProductVersions,
   dataSources: ["3d-tiles", "wms", "wmts", "rest-json", "static-json", "model"],
   cameraControls: ["pose", "look-at"],
@@ -573,7 +575,7 @@ class CesiumEngineScene implements EngineScene {
     }
 
     for (const native of this.layers.values()) {
-      if (native.kind === "s104") {
+      if (native.kind === "simulated-water-level") {
         const seaLevel = resolveWaterLevel(native.data, this.currentTime);
         if (seaLevel !== null) {
           this.setSeaLevel(seaLevel);
@@ -1095,11 +1097,13 @@ class CesiumEngineScene implements EngineScene {
       case S100ProductType.S102:
         return this.createTilesLayer(spec as S102BathymetryLayerSpec);
       case S100ProductType.S101:
-        return this.createImageryLayer(spec as S101EncLayerSpec);
-      case S100ProductType.S104:
-        return this.createS104Layer(spec as S104WaterLevelLayerSpec);
+        return this.createImageryLayer(spec as EncLayerSpec);
+      case "S-57":
+        return this.createImageryLayer(spec as EncLayerSpec);
       case S100ProductType.S111:
         return this.createS111Layer(spec as S111SurfaceCurrentLayerSpec);
+      case SIMULATED_WATER_LEVEL_PRODUCT:
+        return this.createSimulatedWaterLevelLayer(spec as SimulatedWaterLevelLayerSpec);
       case "map-overlay":
         return this.createImageryLayer(spec as MapOverlayLayerSpec);
       case "vessel":
@@ -1167,7 +1171,7 @@ class CesiumEngineScene implements EngineScene {
     return { kind: "3d-tiles", spec, primitive: tileset, cleanup };
   }
 
-  private createImageryLayer(spec: S101EncLayerSpec | MapOverlayLayerSpec): CesiumLayerNative {
+  private createImageryLayer(spec: EncLayerSpec | MapOverlayLayerSpec): CesiumLayerNative {
     const projectedWms = this.createProjectedWmsDefinition(spec);
     if (projectedWms) {
       return this.createProjectedWmsLayer(spec, projectedWms.urlTemplate, projectedWms.extent);
@@ -1180,13 +1184,15 @@ class CesiumEngineScene implements EngineScene {
     return { kind: "imagery", spec, provider, layer };
   }
 
-  private async createS104Layer(spec: S104WaterLevelLayerSpec): Promise<CesiumLayerNative> {
+  private async createSimulatedWaterLevelLayer(
+    spec: SimulatedWaterLevelLayerSpec,
+  ): Promise<CesiumLayerNative> {
     const data = await loadJsonSource(spec.source, this.options.fetchHandler);
     const seaLevel = resolveWaterLevel(data, this.currentTime);
     if (seaLevel !== null) {
       this.setSeaLevel(seaLevel);
     }
-    return { kind: "s104", spec, data };
+    return { kind: "simulated-water-level", spec, data };
   }
 
   private async createS111Layer(spec: S111SurfaceCurrentLayerSpec): Promise<CesiumLayerNative> {
@@ -1937,7 +1943,7 @@ class CesiumEngineScene implements EngineScene {
     throw new S100Error("layer-not-found", `Cesium layer '${handle.id ?? "<unknown>"}' not found.`);
   }
 
-  private createImageryProvider(spec: S101EncLayerSpec | MapOverlayLayerSpec): CesiumObject {
+  private createImageryProvider(spec: EncLayerSpec | MapOverlayLayerSpec): CesiumObject {
     const source = spec.source;
     if (source.kind === "wmts") {
       const Provider = getCesiumConstructor(this.cesium, "WebMapTileServiceImageryProvider");
@@ -1968,7 +1974,7 @@ class CesiumEngineScene implements EngineScene {
   }
 
   private createProjectedWmsLayer(
-    spec: S101EncLayerSpec | MapOverlayLayerSpec,
+    spec: EncLayerSpec | MapOverlayLayerSpec,
     urlTemplate: string,
     extent: SpatialExtent,
   ): CesiumLayerNative {
@@ -1991,7 +1997,7 @@ class CesiumEngineScene implements EngineScene {
   }
 
   private createProjectedWmsDrawables(
-    spec: S101EncLayerSpec | MapOverlayLayerSpec,
+    spec: EncLayerSpec | MapOverlayLayerSpec,
     urlTemplate: string,
     extent: SpatialExtent,
   ): CesiumSceneDrawable[] {
@@ -2011,12 +2017,12 @@ class CesiumEngineScene implements EngineScene {
   }
 
   private registerProjectedWmsCutoutCandidate(
-    spec: S101EncLayerSpec | MapOverlayLayerSpec,
+    spec: EncLayerSpec | MapOverlayLayerSpec,
     urlTemplate: string,
     extent: SpatialExtent,
   ): void {
     if (
-      spec.product !== S100ProductType.S101 ||
+      !isEncLayerSpec(spec) ||
       spec.role !== "overlay" ||
       !urlTemplate.includes("IGNORE=DepthArea,DepthContour")
     ) {
@@ -2028,10 +2034,10 @@ class CesiumEngineScene implements EngineScene {
   }
 
   private getProjectedWmsCutoutExtent(
-    spec: S101EncLayerSpec | MapOverlayLayerSpec,
+    spec: EncLayerSpec | MapOverlayLayerSpec,
     extent: SpatialExtent,
   ): SpatialExtent | null {
-    if (spec.product !== S100ProductType.S101 || spec.role !== "basemap") {
+    if (!isEncLayerSpec(spec) || spec.role !== "basemap") {
       return null;
     }
     for (let index = this.projectedWmsCutoutCandidates.length - 1; index >= 0; index -= 1) {
@@ -2045,7 +2051,7 @@ class CesiumEngineScene implements EngineScene {
   }
 
   private createProjectedWmsDrawable(
-    spec: S101EncLayerSpec | MapOverlayLayerSpec,
+    spec: EncLayerSpec | MapOverlayLayerSpec,
     urlTemplate: string,
     extent: SpatialExtent,
   ): CesiumSceneDrawable {
@@ -2097,7 +2103,7 @@ class CesiumEngineScene implements EngineScene {
   }
 
   private createProjectedWmsDefinition(
-    spec: S101EncLayerSpec | MapOverlayLayerSpec,
+    spec: EncLayerSpec | MapOverlayLayerSpec,
   ): ProjectedWmsDefinition | null {
     const mapSpec = getMapSpecificationExtension(spec);
     if (mapSpec?.urlTemplate && mapSpec.dataset?.extents) {

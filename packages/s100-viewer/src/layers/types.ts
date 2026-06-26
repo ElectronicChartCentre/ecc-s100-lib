@@ -4,12 +4,11 @@ import type { S100Unsubscribe } from "../events/S100EventBus.js";
 export const S100ProductType = {
   S101: "S-101",
   S102: "S-102",
-  S104: "S-104",
   S111: "S-111",
 } as const;
 
 export type S100ProductType = (typeof S100ProductType)[keyof typeof S100ProductType];
-export type OperationalLayerType = "vessel" | "map-overlay" | "tool";
+export type OperationalLayerType = "vessel" | "map-overlay" | "simulated-water-level" | "tool";
 export type LayerProduct = S100ProductType | OperationalLayerType | string;
 
 export type LayerMetadata = {

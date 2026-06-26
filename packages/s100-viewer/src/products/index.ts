@@ -1,8 +1,12 @@
 export * from "./sources.js";
 export * from "./style.js";
+export * from "./enc.js";
 export * from "./iho-s100.js";
+export * from "./simulated-water-level.js";
 export * from "./viewer-features.js";
+export * from "./enc-builders.js";
 export * from "./iho-builders.js";
+export * from "./simulated-water-level-builders.js";
 export * from "./viewer-feature-builders.js";
 export * from "./layer-builder.js";
 

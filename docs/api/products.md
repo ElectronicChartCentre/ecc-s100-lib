@@ -6,8 +6,8 @@ The core viewer package defines service-ready S-100 product specs. The current
 package targets already-derived services:
 
 - OGC 3D Tiles for S-102 bathymetry
-- WMS/WMTS/MVT for S-101 and map overlays
-- REST or static JSON for S-104 and S-111
+- WMS/WMTS/MVT for ENC layers, including S-101 and S-57, plus map overlays
+- REST or static JSON for simulated water-level layers and S-111
 - GLB/GLTF model sources for vessels
 
 ## Layer Builder
@@ -26,6 +26,15 @@ const s102: S102LayerSpec = LayerBuilder.createS102({
 });
 
 await scene.layers.add(s102);
+```
+
+ENC helpers are split by standard:
+
+```ts
+LayerBuilder.createS101Wms({ url, layers: ["s100dataSets.101"] });
+LayerBuilder.createS101Wmts({ url, layer: "s101", tileMatrixSet: "utm" });
+LayerBuilder.createS57Wms({ url, layers: ["enc_cells"] });
+LayerBuilder.createS57Wmts({ url, layer: "s57", tileMatrixSet: "utm" });
 ```
 
 ## Product Specification Versions
@@ -72,7 +81,8 @@ Default styles are available as static values:
 ```ts
 LayerBuilder.S102Styles.DEFAULT;
 LayerBuilder.S101Styles.DEFAULT;
-LayerBuilder.S104Styles.DEFAULT;
+LayerBuilder.S57Styles.DEFAULT;
+LayerBuilder.SimulatedWaterLevelStyles.DEFAULT;
 LayerBuilder.S111Styles.DEFAULT;
 LayerBuilder.VesselStyles.DEFAULT;
 LayerBuilder.MapOverlayStyles.DEFAULT;
@@ -83,12 +93,21 @@ application wants to spell out a complete spec object.
 
 ## Core Product Specs
 
+- `EncLayerSpec`
 - `S101EncLayerSpec`
+- `S57EncLayerSpec`
 - `S102BathymetryLayerSpec`
-- `S104WaterLevelLayerSpec`
 - `S111SurfaceCurrentLayerSpec`
+- `SimulatedWaterLevelLayerSpec`
 - `VesselLayerSpec`
 - `MapOverlayLayerSpec`
+
+`EncLayerSpec` captures common Electronic Nautical Chart behavior across
+standards. `S101EncLayerSpec` is the IHO S-100 ENC product and carries
+`productSpecificationVersion`; `S57EncLayerSpec` is the legacy ENC standard and
+keeps S-57-specific display options separate from future S-101 portrayal
+controls. Common source handling stays under `category: "enc"` and
+`standard: "S-101" | "S-57"`.
 
 `VesselLayerSpec` carries vessel geometry semantics directly through
 `dimensions` (`bow`, `stern`, `port`, `starboard`, `draught`) and
@@ -99,7 +118,6 @@ Short aliases are also exported:
 
 - `S101LayerSpec`
 - `S102LayerSpec`
-- `S104LayerSpec`
 - `S111LayerSpec`
 
 ## Source Kinds

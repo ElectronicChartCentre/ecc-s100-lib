@@ -111,7 +111,7 @@ export const createMyEngineAdapter = (): S100EngineAdapter => ({
   displayName: "My Engine",
   capabilities: {
     sceneGeoreferences: ["projected-local"],
-    layerProducts: ["S-101", "S-102", "S-111"],
+    layerProducts: ["S-101", "S-57", "S-102", "S-111"],
     supportedProductVersions: S100SupportedProductVersions.filter((support) =>
       ["S-101", "S-102", "S-111"].includes(support.product),
     ),
@@ -126,6 +126,10 @@ export const createMyEngineAdapter = (): S100EngineAdapter => ({
   },
 });
 ```
+
+`S-57` can appear in `layerProducts` because adapters may render legacy ENC
+layers, but it is not part of `S100SupportedProductVersions` because it is not an
+IHO S-100 product specification.
 
 Applications should only depend on the adapter contract. Engine-specific objects
 belong behind `EngineLayerHandle.native` or another documented escape hatch.

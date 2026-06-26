@@ -7,6 +7,7 @@ import {
   type CameraLookAt,
   type CameraPose,
   type Coordinate,
+  type EncLayerSpec,
   type EngineCameraChangeListener,
   type EngineHandleBundle,
   type EngineLayerHandle,
@@ -25,11 +26,10 @@ import {
   type MapOverlayLayerSpec,
   type ModelSource,
   type RestJsonSource,
-  type S101EncLayerSpec,
   type S102BathymetryLayerSpec,
-  type S104WaterLevelLayerSpec,
   type S111SurfaceCurrentLayerSpec,
   type ServiceReadySource,
+  type SimulatedWaterLevelLayerSpec,
   type StaticJsonSource,
   type ThreeDTilesSource,
   type VesselLayerSpec,
@@ -60,6 +60,7 @@ import * as THREE from "three";
 import { Raycaster, Vector2, Vector3, type Camera, type Object3D, type Scene, type WebGLRenderer } from "three";
 
 type FetchLike = typeof fetch;
+const SIMULATED_WATER_LEVEL_PRODUCT = "simulated-water-level";
 
 type NasaRenderContext = {
   canvas: HTMLCanvasElement;
@@ -79,14 +80,14 @@ export type NasaAmmosAdapterOptions = S100NasaViewerConfig & {
 type NasaLayerNative =
   | { kind: "terrain"; spec: S102BathymetryLayerSpec; view: TerrainView }
   | { kind: "s111"; spec: S111SurfaceCurrentLayerSpec; view: S111View }
-  | { kind: "s104"; spec: S104WaterLevelLayerSpec; data: unknown }
-  | { kind: "map"; spec: S101EncLayerSpec | MapOverlayLayerSpec; view: MapView }
+  | { kind: "simulated-water-level"; spec: SimulatedWaterLevelLayerSpec; data: unknown }
+  | { kind: "map"; spec: EncLayerSpec | MapOverlayLayerSpec; view: MapView }
   | { kind: "vessel"; spec: VesselLayerSpec; view: VesselView }
   | { kind: "model"; spec: BaseLayerSpec; view: CustomModelView };
 
 export const nasaAmmosAdapterCapabilities: AdapterCapabilities = {
   sceneGeoreferences: ["projected-local"],
-  layerProducts: ["S-101", "S-102", "S-104", "S-111", "vessel", "map-overlay", "tool"],
+  layerProducts: ["S-101", "S-57", "S-102", "S-111", "simulated-water-level", "vessel", "map-overlay", "tool"],
   supportedProductVersions: S100SupportedProductVersions,
   dataSources: ["3d-tiles", "wms", "wmts", "rest-json", "static-json", "model"],
   cameraControls: ["pose", "look-at"],
@@ -294,7 +295,7 @@ class NasaAmmosEngineScene implements EngineScene {
       if (native.kind === "s111") {
         native.view.time.currentTime = this.currentTime.getTime();
       }
-      if (native.kind === "s104") {
+      if (native.kind === "simulated-water-level") {
         const seaLevel = resolveWaterLevel(native.data, this.currentTime);
         if (seaLevel !== null) {
           this.setSeaLevel(seaLevel);
@@ -455,10 +456,12 @@ class NasaAmmosEngineScene implements EngineScene {
         return this.createTerrainLayer(spec as S102BathymetryLayerSpec);
       case "S-111":
         return this.createS111Layer(spec as S111SurfaceCurrentLayerSpec);
-      case "S-104":
-        return this.createS104Layer(spec as S104WaterLevelLayerSpec);
       case "S-101":
-        return this.createMapLayer(spec as S101EncLayerSpec);
+        return this.createMapLayer(spec as EncLayerSpec);
+      case "S-57":
+        return this.createMapLayer(spec as EncLayerSpec);
+      case SIMULATED_WATER_LEVEL_PRODUCT:
+        return this.createSimulatedWaterLevelLayer(spec as SimulatedWaterLevelLayerSpec);
       case "map-overlay":
         return this.createMapLayer(spec as MapOverlayLayerSpec);
       case "vessel":
@@ -505,17 +508,19 @@ class NasaAmmosEngineScene implements EngineScene {
     return { kind: "s111", spec, view };
   }
 
-  private async createS104Layer(spec: S104WaterLevelLayerSpec): Promise<NasaLayerNative> {
+  private async createSimulatedWaterLevelLayer(
+    spec: SimulatedWaterLevelLayerSpec,
+  ): Promise<NasaLayerNative> {
     const data = await loadJsonSource(spec.source, this.options.fetchHandler);
     const seaLevel = resolveWaterLevel(data, this.currentTime);
     if (seaLevel !== null) {
       this.setSeaLevel(seaLevel);
     }
 
-    return { kind: "s104", spec, data };
+    return { kind: "simulated-water-level", spec, data };
   }
 
-  private createMapLayer(spec: S101EncLayerSpec | MapOverlayLayerSpec): NasaLayerNative {
+  private createMapLayer(spec: EncLayerSpec | MapOverlayLayerSpec): NasaLayerNative {
     const mapSpecification = createMapSpecification(spec);
     const view = this.scene.Map.add(mapSpecification);
     view.alpha = spec.opacity ?? 1;
@@ -601,7 +606,7 @@ class NasaAmmosEngineScene implements EngineScene {
       case "model":
         this.scene.CustomModels.remove(native.view);
         return;
-      case "s104":
+      case "simulated-water-level":
         return;
     }
   }
@@ -773,7 +778,7 @@ function applyVisibility(
   }
 }
 
-function createMapSpecification(spec: S101EncLayerSpec | MapOverlayLayerSpec): MapSpecification {
+function createMapSpecification(spec: EncLayerSpec | MapOverlayLayerSpec): MapSpecification {
   const nativeSpec = getNasaAmmosExtension<MapSpecification>(spec, "mapSpecification");
   if (nativeSpec) {
     return nativeSpec;
@@ -806,7 +811,7 @@ function createMapSpecification(spec: S101EncLayerSpec | MapOverlayLayerSpec): M
   };
 }
 
-function getMapLayerType(spec: S101EncLayerSpec | MapOverlayLayerSpec): MapLayerType {
+function getMapLayerType(spec: EncLayerSpec | MapOverlayLayerSpec): MapLayerType {
   if (spec.product === "map-overlay" && spec.role === "mask") {
     return MapLayerType.MaskLayer;
   }
@@ -816,7 +821,7 @@ function getMapLayerType(spec: S101EncLayerSpec | MapOverlayLayerSpec): MapLayer
   return MapLayerType.BaseTransparent;
 }
 
-function getProjectedExtents(spec: S101EncLayerSpec | MapOverlayLayerSpec): {
+function getProjectedExtents(spec: EncLayerSpec | MapOverlayLayerSpec): {
   minX: number;
   maxX: number;
   minY: number;

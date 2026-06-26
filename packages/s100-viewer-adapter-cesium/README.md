@@ -50,9 +50,9 @@ assets available according to their bundler setup.
 Supported in this initial adapter:
 
 - S-102 3D Tiles via Cesium `Cesium3DTileset`.
-- S-101/map-overlay WMS/WMTS imagery, including a single-tile projected WMS
-  fallback for legacy UTM overlays.
-- S-104 water-level JSON sources bound to scene sea level.
+- ENC WMS/WMTS imagery for S-101 and S-57, plus map overlays, including a
+  single-tile projected WMS fallback for legacy UTM overlays.
+- Simulated water-level JSON sources bound to scene sea level.
 - S-111 arrow entities for PRIMAR-style `positions` plus time-record
   `speed`/`direction` JSON.
 - Vessel/model layers via Cesium entities.
@@ -77,5 +77,5 @@ Known limitations:
 
 - Full projected-local 3D Tiles transformation is still dependent on the tile
   service returning Cesium-compatible ECEF/geodetic tiles.
-- Ocean masking and curved-earth S-102/S-101 replacement workflows belong to
+- Ocean masking and curved-earth S-102/ENC replacement workflows belong to
   the later globe/ECEF phase.

@@ -6,8 +6,9 @@ baseline for an engine-neutral S-100 viewer API.
 Release-target packages for the current phase:
 
 - `@ecc/s100-viewer`: viewer, scene, layer, product, time, picking,
-  coordinate, and adapter contracts. This includes S-101, S-102, S-104, S-111,
-  vessel, and map-overlay layer builders.
+  coordinate, and adapter contracts. This includes ENC builders for S-101 and
+  S-57, S-102, S-111, simulated water-level, vessel, and map-overlay layer
+  builders.
 - `@ecc/s100-viewer-adapter-nasa-ammos`: NASA-AMMOS/Three.js adapter.
 - `@ecc/s100-viewer-adapter-cesium`: Cesium adapter and initial globe-native
   integration target.

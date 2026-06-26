@@ -1,10 +1,9 @@
 import type { BaseLayerSpec } from "../layers/types.js";
 import { S100ProductType } from "../layers/types.js";
-import type { MvtSource, RestJsonSource, StaticJsonSource, ThreeDTilesSource, WmsSource, WmtsSource } from "./sources.js";
+import type { RestJsonSource, StaticJsonSource, ThreeDTilesSource } from "./sources.js";
+import { type S101EncLayerSpec } from "./enc.js";
 import type {
-  S101EncStyle,
   S102BathymetryStyle,
-  S104WaterLevelStyle,
   S111SurfaceCurrentStyle,
   ProductTimeOptions,
 } from "./style.js";
@@ -25,9 +24,6 @@ export const S100ProductSpecificationVersions = {
     LATEST_CONFIRMED_SUPPORTED: LATEST_CONFIRMED_SUPPORTED_PRODUCT_SPEC_VERSION,
   },
   S102: {
-    LATEST_CONFIRMED_SUPPORTED: LATEST_CONFIRMED_SUPPORTED_PRODUCT_SPEC_VERSION,
-  },
-  S104: {
     LATEST_CONFIRMED_SUPPORTED: LATEST_CONFIRMED_SUPPORTED_PRODUCT_SPEC_VERSION,
   },
   S111: {
@@ -54,38 +50,17 @@ export const S100SupportedProductVersions = [
     defaultVersion: S100ProductSpecificationVersions.S102.LATEST_CONFIRMED_SUPPORTED,
   },
   {
-    product: S100ProductType.S104,
-    versions: [S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED],
-    defaultVersion: S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED,
-  },
-  {
     product: S100ProductType.S111,
     versions: [S100ProductSpecificationVersions.S111.LATEST_CONFIRMED_SUPPORTED],
     defaultVersion: S100ProductSpecificationVersions.S111.LATEST_CONFIRMED_SUPPORTED,
   },
 ] as const satisfies readonly S100ProductVersionSupport[];
 
-export interface S101EncLayerSpec
-  extends BaseLayerSpec<typeof S100ProductType.S101>,
-    ProductSpecificationVersionedLayerSpec {
-  source: WmsSource | WmtsSource | MvtSource;
-  role?: "basemap" | "overlay" | "chart";
-  style?: S101EncStyle;
-}
-
 export interface S102BathymetryLayerSpec
   extends BaseLayerSpec<typeof S100ProductType.S102>,
     ProductSpecificationVersionedLayerSpec {
   source: ThreeDTilesSource;
   style?: S102BathymetryStyle;
-}
-
-export interface S104WaterLevelLayerSpec
-  extends BaseLayerSpec<typeof S100ProductType.S104>,
-    ProductSpecificationVersionedLayerSpec {
-  source: RestJsonSource | StaticJsonSource;
-  time?: ProductTimeOptions;
-  style?: S104WaterLevelStyle;
 }
 
 export interface S111SurfaceCurrentLayerSpec
@@ -98,13 +73,11 @@ export interface S111SurfaceCurrentLayerSpec
 
 export type S101LayerSpec = S101EncLayerSpec;
 export type S102LayerSpec = S102BathymetryLayerSpec;
-export type S104LayerSpec = S104WaterLevelLayerSpec;
 export type S111LayerSpec = S111SurfaceCurrentLayerSpec;
 
 export type S100IhoProductLayerSpec =
   | S101EncLayerSpec
   | S102BathymetryLayerSpec
-  | S104WaterLevelLayerSpec
   | S111SurfaceCurrentLayerSpec;
 
 export const S102Styles = {
@@ -120,25 +93,6 @@ export const S102Styles = {
     shading: "lit",
     verticalExaggeration: 1,
   } satisfies S102BathymetryStyle,
-};
-
-export const S101Styles = {
-  DEFAULT: {
-    visible: true,
-    opacity: 0.72,
-    cutout: {
-      enabled: true,
-    },
-  } satisfies S101EncStyle,
-};
-
-export const S104Styles = {
-  DEFAULT: {
-    visible: true,
-    opacity: 1,
-    colorRamp: "s100-default",
-    showSurface: true,
-  } satisfies S104WaterLevelStyle,
 };
 
 export const S111Styles = {

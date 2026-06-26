@@ -26,11 +26,6 @@ describe("@ecc/s100-viewer product specs", () => {
         defaultVersion: S100ProductSpecificationVersions.S102.LATEST_CONFIRMED_SUPPORTED,
       },
       {
-        product: S100ProductType.S104,
-        versions: [S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED],
-        defaultVersion: S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED,
-      },
-      {
         product: S100ProductType.S111,
         versions: [S100ProductSpecificationVersions.S111.LATEST_CONFIRMED_SUPPORTED],
         defaultVersion: S100ProductSpecificationVersions.S111.LATEST_CONFIRMED_SUPPORTED,
@@ -95,6 +90,8 @@ describe("@ecc/s100-viewer product specs", () => {
       {
         id: "s101-overlay",
         product: S100ProductType.S101,
+        category: "enc",
+        standard: S100ProductType.S101,
         source: {
           kind: "wms",
           url: "https://example.test/wms",
@@ -102,6 +99,19 @@ describe("@ecc/s100-viewer product specs", () => {
           transparent: true,
         },
         role: "overlay",
+      },
+      {
+        id: "s57-basemap",
+        product: "S-57",
+        category: "enc",
+        standard: "S-57",
+        source: {
+          kind: "wms",
+          url: "https://example.test/s57/wms",
+          layers: ["s57"],
+          transparent: true,
+        },
+        role: "basemap",
       },
       {
         id: "vessel",
@@ -127,7 +137,8 @@ describe("@ecc/s100-viewer product specs", () => {
     const products = specs.map((spec) => {
       switch (spec.product) {
         case S100ProductType.S101:
-          return `${spec.product}:${spec.source.kind}:${spec.role}`;
+        case "S-57":
+          return `${spec.standard}:${spec.source.kind}:${spec.role}`;
         case "vessel":
           return `${spec.product}:${spec.source.format}:${spec.pose.headingDegrees}`;
         default:
@@ -135,7 +146,7 @@ describe("@ecc/s100-viewer product specs", () => {
       }
     });
 
-    expect(products).toEqual(["S-101:wms:overlay", "vessel:glb:12"]);
+    expect(products).toEqual(["S-101:wms:overlay", "S-57:wms:basemap", "vessel:glb:12"]);
   });
 
   it("builds S-102 layers without product, source kind, or style boilerplate", () => {
@@ -189,11 +200,20 @@ describe("@ecc/s100-viewer product specs", () => {
     expect(spec.style?.depthColors).toBe("s102-depth-default");
   });
 
-  it("builds common S-101, S-111, S-104, vessel, and map overlay layers", () => {
+  it("builds common ENC, IHO, simulated water-level, vessel, and map overlay layers", () => {
     const s101 = LayerBuilder.createS101Wms({
       url: "https://example.test/wms",
       layers: ["s100dataSets.101"],
       crs: "EPSG:32633",
+    });
+    const s57 = LayerBuilder.createS57Wms({
+      url: "https://example.test/s57/wms",
+      layers: ["enc_cells"],
+      crs: "EPSG:32633",
+      role: "basemap",
+      style: {
+        legacyDisplayMode: "custom",
+      },
     });
     const s111 = LayerBuilder.createS111({
       url: "/currents.json",
@@ -202,7 +222,7 @@ describe("@ecc/s100-viewer product specs", () => {
         interpolation: "nearest",
       },
     });
-    const s104 = LayerBuilder.createStaticS104({
+    const simulatedWaterLevel = LayerBuilder.createStaticSimulatedWaterLevel({
       data: { waterLevels: [] },
       crs: "EPSG:32633",
     });
@@ -234,11 +254,25 @@ describe("@ecc/s100-viewer product specs", () => {
     expect(s101).toMatchObject({
       id: "s101-enc",
       product: "S-101",
+      category: "enc",
+      standard: "S-101",
       productSpecificationVersion:
         S100ProductSpecificationVersions.S101.LATEST_CONFIRMED_SUPPORTED,
       role: "overlay",
       source: { kind: "wms", transparent: true },
       style: LayerBuilder.S101Styles.DEFAULT,
+    });
+    expect(s57).toMatchObject({
+      id: "s57-enc",
+      product: "S-57",
+      category: "enc",
+      standard: "S-57",
+      role: "basemap",
+      source: { kind: "wms", transparent: true },
+      style: {
+        ...LayerBuilder.S57Styles.DEFAULT,
+        legacyDisplayMode: "custom",
+      },
     });
     expect(s111).toMatchObject({
       id: "s111-currents",
@@ -248,13 +282,11 @@ describe("@ecc/s100-viewer product specs", () => {
       source: { kind: "rest-json" },
       style: LayerBuilder.S111Styles.DEFAULT,
     });
-    expect(s104).toMatchObject({
-      id: "s104-water-level",
-      product: "S-104",
-      productSpecificationVersion:
-        S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED,
+    expect(simulatedWaterLevel).toMatchObject({
+      id: "simulated-water-level",
+      product: "simulated-water-level",
       source: { kind: "static-json" },
-      style: LayerBuilder.S104Styles.DEFAULT,
+      style: LayerBuilder.SimulatedWaterLevelStyles.DEFAULT,
     });
     expect(vessel).toMatchObject({
       id: "vessel",

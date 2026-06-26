@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createS100Viewer, S100ProductType, S100SupportedProductVersions } from "@ecc/s100-viewer";
 import type {
   S101EncLayerSpec,
+  S57EncLayerSpec,
   S102BathymetryLayerSpec,
-  S104WaterLevelLayerSpec,
   S111SurfaceCurrentLayerSpec,
+  SimulatedWaterLevelLayerSpec,
   VesselLayerSpec,
 } from "@ecc/s100-viewer";
 import { createNasaAmmosAdapter, nasaAmmosAdapterCapabilities } from "../src/index.js";
@@ -77,7 +78,7 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
     await viewer.destroy();
   });
 
-  it("maps S-102 and S-104 layer specs to NASA-AMMOS native handles", async () => {
+  it("maps S-102 and simulated water-level specs to NASA-AMMOS native handles", async () => {
     const viewer = await createS100Viewer({
       adapter: createNasaAmmosAdapter(),
     });
@@ -102,9 +103,9 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
       },
     });
 
-    const waterLevel = await scene.layers.add<S104WaterLevelLayerSpec>({
-      id: "s104",
-      product: S100ProductType.S104,
+    const waterLevel = await scene.layers.add<SimulatedWaterLevelLayerSpec>({
+      id: "simulated-water-level",
+      product: "simulated-water-level",
       source: {
         kind: "static-json",
         data: {
@@ -123,14 +124,14 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
     }>();
     expect(terrainNative?.kind).toBe("terrain");
     expect(terrainNative?.view.dataset.additionalURLParameters).toBe("crs=EPSG:32633");
-    expect(waterLevel.getNativeHandle<{ kind: string }>()?.kind).toBe("s104");
+    expect(waterLevel.getNativeHandle<{ kind: string }>()?.kind).toBe("simulated-water-level");
     expect(scene.getSeaLevel()).toBe(2.25);
 
     await scene.layers.clear();
     await viewer.destroy();
   });
 
-  it("maps S-101, S-111, and vessel specs to native NASA-AMMOS handles", async () => {
+  it("maps ENC, S-111, and vessel specs to native NASA-AMMOS handles", async () => {
     const viewer = await createS100Viewer({
       adapter: createNasaAmmosAdapter(),
     });
@@ -139,11 +140,34 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
     const chart = await scene.layers.add<S101EncLayerSpec>({
       id: "s101",
       product: S100ProductType.S101,
+      category: "enc",
+      standard: S100ProductType.S101,
       role: "overlay",
       source: {
         kind: "wms",
         url: "https://example.test/wms",
         layers: ["s101"],
+        crs: "EPSG:32633",
+      },
+      spatialExtent: {
+        crs: "EPSG:32633",
+        minX: 0,
+        minY: 0,
+        maxX: 1000,
+        maxY: 1000,
+      },
+    });
+
+    const s57Chart = await scene.layers.add<S57EncLayerSpec>({
+      id: "s57",
+      product: "S-57",
+      category: "enc",
+      standard: "S-57",
+      role: "basemap",
+      source: {
+        kind: "wms",
+        url: "https://example.test/s57/wms",
+        layers: ["s57"],
         crs: "EPSG:32633",
       },
       spatialExtent: {
@@ -220,6 +244,7 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
     });
 
     expect(chart.getNativeHandle<{ kind: string }>()?.kind).toBe("map");
+    expect(s57Chart.getNativeHandle<{ kind: string }>()?.kind).toBe("map");
     expect(currents.getNativeHandle<{ kind: string }>()?.kind).toBe("s111");
     const vesselNative = vessel.getNativeHandle<{
       kind: string;

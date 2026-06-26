@@ -12,8 +12,9 @@ publication.
   support before adding layers or enabling tools.
 - `SceneBuilder.projectedLocal(...)` removes common projected/local scene
   georeference boilerplate.
-- `LayerBuilder` removes common product-layer boilerplate for S-101, S-102,
-  S-104, S-111, vessels, and map overlays.
+- `LayerBuilder` removes common product-layer boilerplate for ENC standards
+  (S-101 and S-57), S-102, S-111, simulated water-level layers, vessels, and
+  map overlays.
 - Product specs and builders now export from `@ecc/s100-viewer`, so normal
   application code does not need a second product package.
 - Product builders default `productSpecificationVersion` to

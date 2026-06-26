@@ -46,7 +46,7 @@ export type ContourStyle = {
 
 export type DepthColorStyle = ColorRampRef | readonly ColorStop[];
 
-export type S101EncStyle = OpacityVisibilityStyle & {
+export type EncCommonStyle = OpacityVisibilityStyle & {
   displayCategories?: readonly string[];
   ignoredCategories?: readonly string[];
   filters?: readonly ProductFilter[];
@@ -55,6 +55,18 @@ export type S101EncStyle = OpacityVisibilityStyle & {
     extent?: SpatialExtent;
     featherMeters?: number;
   };
+};
+
+export type S101EncStyle = EncCommonStyle & {
+  portrayalCatalogue?: string;
+  viewingGroupLayers?: readonly string[];
+  alertHighlighting?: boolean;
+  featureInspector?: boolean;
+};
+
+export type S57EncStyle = EncCommonStyle & {
+  s57StyleName?: string;
+  legacyDisplayMode?: "standard" | "custom";
 };
 
 export type S102BathymetryStyle = OpacityVisibilityStyle & {
@@ -66,7 +78,7 @@ export type S102BathymetryStyle = OpacityVisibilityStyle & {
   verticalExaggeration?: number;
 };
 
-export type S104WaterLevelStyle = OpacityVisibilityStyle & {
+export type SimulatedWaterLevelStyle = OpacityVisibilityStyle & {
   datum?: string;
   colorRamp?: ColorRampRef | readonly ColorStop[];
   minMeters?: number;
