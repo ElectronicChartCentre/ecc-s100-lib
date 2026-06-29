@@ -1,5 +1,6 @@
 import type { SpatialExtent } from "../coordinates/types.js";
 import type { S100Unsubscribe } from "../events/S100EventBus.js";
+import type { LayerControllers } from "./controllers.js";
 
 export const S100ProductType = {
   S101: "S-101",
@@ -50,6 +51,7 @@ export interface S100Layer<TSpec extends BaseLayerSpec = BaseLayerSpec> {
   readonly id: string;
   readonly product: TSpec["product"];
   readonly spec: TSpec;
+  readonly controllers: LayerControllers<TSpec>;
   readonly nativeHandle: unknown;
   visible: boolean;
   opacity: number;

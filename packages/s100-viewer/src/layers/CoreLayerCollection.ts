@@ -4,6 +4,7 @@ import type { S100EventBus } from "../events/S100EventBus.js";
 import type { S100SceneEvents } from "../scene/types.js";
 import { validateLayerSpec } from "../validation.js";
 import { CoreS100Layer } from "./CoreS100Layer.js";
+import type { LayerControllerContext } from "./controllers.js";
 import type { BaseLayerSpec, LayerCollection, S100Layer } from "./types.js";
 
 export class CoreLayerCollection implements LayerCollection {
@@ -13,6 +14,7 @@ export class CoreLayerCollection implements LayerCollection {
   constructor(
     private readonly engineScene: EngineScene,
     private readonly events: S100EventBus<S100SceneEvents>,
+    private readonly controllerContext: LayerControllerContext = {},
   ) {
     this.engineScene.setLayerPatchListener?.((event) => {
       const layer = this.layersByHandle.get(event.handle);
@@ -47,6 +49,7 @@ export class CoreLayerCollection implements LayerCollection {
       async (removedLayer) => {
         await this.remove(removedLayer.id);
       },
+      this.controllerContext,
     );
 
     this.layers.set(spec.id, layer as unknown as CoreS100Layer<BaseLayerSpec>);

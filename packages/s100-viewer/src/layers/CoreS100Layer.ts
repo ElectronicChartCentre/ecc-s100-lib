@@ -1,6 +1,8 @@
 import type { EngineLayerHandle } from "../adapters/types.js";
 import { EventBus } from "../events/S100EventBus.js";
 import type { S100Unsubscribe } from "../events/S100EventBus.js";
+import { createLayerControllers } from "./controllers.js";
+import type { LayerControllerContext, LayerControllers } from "./controllers.js";
 import type { BaseLayerSpec, LayerPatch, S100Layer } from "./types.js";
 
 type UpdateLayer<TSpec extends BaseLayerSpec> = (
@@ -23,14 +25,17 @@ export class CoreS100Layer<TSpec extends BaseLayerSpec> implements S100Layer<TSp
     private readonly engineHandle: EngineLayerHandle,
     private readonly updateLayer: UpdateLayer<TSpec>,
     private readonly removeLayer: RemoveLayer<TSpec>,
+    controllerContext: LayerControllerContext = {},
   ) {
     this.id = spec.id;
     this.currentSpec = { ...spec };
     this.visible = spec.visible ?? true;
     this.opacity = spec.opacity ?? 1;
+    this.controllers = createLayerControllers(this, controllerContext);
   }
 
   readonly id: string;
+  readonly controllers: LayerControllers<TSpec>;
   visible: boolean;
   opacity: number;
 

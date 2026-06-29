@@ -74,6 +74,18 @@ export type {
   S100Layer,
 } from "./layers/types.js";
 export type {
+  BaseLayerControllers,
+  LayerControllers,
+  MapLayerController,
+  SurfaceCurrentLayerController,
+  SurfaceCurrentTimeController,
+  TerrainContourOptions,
+  TerrainDisplayController,
+  TerrainDisplayPatch,
+  TerrainLayerController,
+  TerrainSettingsController,
+} from "./layers/controllers.js";
+export type {
   LivePickingOptions,
   DepthRayController,
   DepthRayState,

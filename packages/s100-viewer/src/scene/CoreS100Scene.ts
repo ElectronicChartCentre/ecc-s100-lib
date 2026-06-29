@@ -41,10 +41,13 @@ export class CoreS100Scene implements S100Scene {
 
   constructor(private readonly options: CoreS100SceneOptions) {
     this.id = options.id ?? `scene-${nextSceneId++}`;
-    this.layers = new CoreLayerCollection(options.engineScene, this.events);
     this.camera = new CoreCameraController(options.engineScene, this.events);
     this.time = new CoreTimeController(options.engineScene, this.events, (seaLevel) => {
       this.setSeaLevelFromEngine(seaLevel);
+    });
+    this.layers = new CoreLayerCollection(options.engineScene, this.events, {
+      getSceneTime: () => this.time.getCurrent(),
+      setSceneTime: (time) => this.time.setCurrent(time),
     });
     this.picking = new CorePickingController(options.engineScene, this.events);
     this.depthRay = new CoreDepthRayController(this.picking, this.events);

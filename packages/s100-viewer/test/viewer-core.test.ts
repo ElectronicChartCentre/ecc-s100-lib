@@ -168,6 +168,169 @@ describe("createS100Viewer", () => {
     await viewer.destroy();
   });
 
+  it("exposes typed controllers from canonical product layers", async () => {
+    const viewer = await createS100Viewer({
+      adapter: createInMemoryAdapter(),
+    });
+    const scene = await viewer.createScene();
+    const timeEvents: number[] = [];
+    scene.time.onChanged((time) => timeEvents.push(time.getTime()));
+
+    const terrain = await scene.layers.add(
+      LayerBuilder.createS102({
+        id: "controlled-s102",
+        url: "https://example.test/s102/tileset.json",
+        style: {
+          unsafeDepth: -1,
+          contours: {
+            visible: false,
+            intervalMeters: 5,
+          },
+        },
+        extensions: {
+          nasaAmmos: {
+            detailFactor: 250,
+          },
+        },
+      }),
+    );
+
+    await terrain.controllers.terrain.setUnsafeDepth(-8);
+    await terrain.controllers.terrain.setContours({
+      visible: true,
+      intervalMeters: 3,
+    });
+    terrain.controllers.terrain.settings.renderBBoxes = true;
+    await terrain.controllers.terrain.setDetailFactor(700);
+
+    expect(terrain.controllers.terrain.terrain.unsafeDepth).toBe(-8);
+    expect(terrain.controllers.terrain.terrain.showContour).toBe(true);
+    expect(terrain.controllers.terrain.terrain.contourInterval).toBe(3);
+    expect(terrain.controllers.terrain.settings.renderBBoxes).toBe(true);
+    expect(terrain.spec.style).toMatchObject({
+      unsafeDepth: -8,
+      contours: {
+        visible: true,
+        intervalMeters: 3,
+      },
+    });
+    expect(terrain.spec.extensions?.nasaAmmos).toMatchObject({
+      detailFactor: 700,
+    });
+    expect(terrain.spec.extensions?.cogs).toMatchObject({
+      detailFactor: 700,
+    });
+
+    await terrain.update({
+      style: {
+        ...terrain.spec.style,
+        unsafeDepth: -4,
+        contours: {
+          visible: false,
+          intervalMeters: 9,
+        },
+      },
+    });
+    expect(terrain.controllers.terrain.terrain.unsafeDepth).toBe(-4);
+    expect(terrain.controllers.terrain.terrain.showContour).toBe(false);
+    expect(terrain.controllers.terrain.terrain.contourInterval).toBe(9);
+
+    const currents = await scene.layers.add(
+      LayerBuilder.createStaticS111({
+        id: "controlled-s111",
+        data: {
+          dateTimeOfFirstRecord: "20260529T120000Z",
+          timeRecordInterval: 3600,
+          numberOfTimes: 3,
+        },
+        style: {
+          renderer: "arrows",
+          scale: "auto",
+        },
+      }),
+    );
+
+    expect(currents.controllers.surfaceCurrent.time.startTime)
+      .toBe(Date.parse("2026-05-29T12:00:00Z"));
+    expect(currents.controllers.surfaceCurrent.time.endTime)
+      .toBe(Date.parse("2026-05-29T14:00:00Z"));
+
+    await currents.controllers.surfaceCurrent.setCustomScale(2.5);
+    expect(currents.controllers.surfaceCurrent.disableAutoScaling).toBe(true);
+    expect(currents.controllers.surfaceCurrent.customScale).toBe(2.5);
+    expect(currents.spec.style).toMatchObject({
+      scale: 2.5,
+    });
+
+    currents.controllers.surfaceCurrent.setCurrentTime(Date.parse("2026-05-29T13:00:00Z"));
+    expect(scene.time.getCurrent().getTime()).toBe(Date.parse("2026-05-29T13:00:00Z"));
+    expect(timeEvents.at(-1)).toBe(Date.parse("2026-05-29T13:00:00Z"));
+
+    await currents.controllers.surfaceCurrent.setAutoScaling(true);
+    expect(currents.controllers.surfaceCurrent.disableAutoScaling).toBe(false);
+    expect(currents.controllers.surfaceCurrent.scalingMode).toBe("auto");
+    expect(currents.spec.style).toMatchObject({
+      scale: "auto",
+    });
+
+    await currents.update({
+      style: {
+        ...currents.spec.style,
+        renderer: "arrows",
+        scale: 4,
+      },
+    });
+    expect(currents.controllers.surfaceCurrent.scalingMode).toBe("custom");
+    expect(currents.controllers.surfaceCurrent.customScale).toBe(4);
+
+    scene.time.setCurrent(new Date("2026-05-29T14:00:00Z"));
+    expect(currents.controllers.surfaceCurrent.time.currentTime)
+      .toBe(Date.parse("2026-05-29T14:00:00Z"));
+
+    const map = await scene.layers.add(
+      LayerBuilder.createS57WmsTemplate({
+        id: "controlled-s57",
+        urlTemplate: "https://example.test/s57/{z}/{x}/{y}.png",
+        visible: true,
+        opacity: 1,
+        extents: {
+          minX: 0,
+          minY: 0,
+          maxX: 10,
+          maxY: 10,
+        },
+        discardMode: MapDiscardMode.None,
+      }),
+    );
+
+    await map.controllers.map.setAlpha(0.4);
+    await map.controllers.map.setVisibility(false);
+    await map.controllers.map.setDiscardMode(MapDiscardMode.MaskLayerAlphaOne);
+
+    expect(map.controllers.map.alpha).toBe(0.4);
+    expect(map.controllers.map.discardMode).toBe(MapDiscardMode.MaskLayerAlphaOne);
+    expect(map.opacity).toBe(0.4);
+    expect(map.visible).toBe(false);
+    expect(map.spec.extensions?.cogs).toMatchObject({
+      discardMode: MapDiscardMode.MaskLayerAlphaOne,
+    });
+
+    await map.update({
+      opacity: 0.8,
+      extensions: {
+        ...map.spec.extensions,
+        cogs: {
+          ...((map.spec.extensions?.cogs as Record<string, unknown> | undefined) ?? {}),
+          discardMode: MapDiscardMode.None,
+        },
+      },
+    });
+    expect(map.controllers.map.alpha).toBe(0.8);
+    expect(map.controllers.map.discardMode).toBe(MapDiscardMode.None);
+
+    await viewer.destroy();
+  });
+
   it("applies adapter-originated layer patches through normal layer events", async () => {
     let emitAdapterPatch: EngineLayerPatchListener | null = null;
     const viewer = await createS100Viewer({

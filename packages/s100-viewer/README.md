@@ -45,6 +45,28 @@ await scene.layers.add(LayerBuilder.createS102({
 }));
 ```
 
+Canonical layers expose product-specific controller handles through
+`layer.controllers`, so applications can use the same clean layer API for both
+setup and later interaction:
+
+```ts
+const terrain = await scene.layers.add(LayerBuilder.createS102({
+  id: "bathymetry",
+  url: "https://example.test/s102/tileset.json",
+}));
+
+await terrain.controllers.terrain.setUnsafeDepth(-8);
+terrain.controllers.terrain.settings.renderBBoxes = true;
+
+const currents = await scene.layers.add(LayerBuilder.createStaticS111({
+  id: "currents",
+  data: surfaceCurrentData,
+}));
+
+await currents.controllers.surfaceCurrent.setCustomScale(2.5);
+currents.controllers.surfaceCurrent.setCurrentTime(Date.now());
+```
+
 Viewer-level camera controls are optional. When omitted, the viewer applies
 `CameraControlPresets.S100_DEFAULT` to every scene so applications do not need
 per-scene or per-engine camera-control boilerplate. Scene cameras still own the
