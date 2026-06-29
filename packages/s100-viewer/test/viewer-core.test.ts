@@ -6,10 +6,13 @@ import {
   createPrismGeometry,
   createQuatIdentity,
   CameraControlPresets,
+  LayerBuilder,
+  MapDiscardMode,
   SceneBuilder,
   S100Error,
   S100ProductSpecificationVersions,
   S100ProductType,
+  Viewer,
   type BaseLayerSpec,
   type EngineCameraChangeListener,
   type EngineLayerHandle,
@@ -100,6 +103,67 @@ describe("createS100Viewer", () => {
     expect(scene.layers.size).toBe(0);
     expect(updatedOpacities).toEqual([0.5]);
     expect(events).toEqual(["added:bathymetry", "updated:bathymetry", "removed:bathymetry"]);
+
+    await viewer.destroy();
+  });
+
+  it("adds LayerBuilder specs through the high-level ViewerScene layer API", async () => {
+    const viewer = await Viewer.create(null, {
+      adapter: createInMemoryAdapter(),
+    });
+    const scene = await viewer.createScene();
+
+    const layer = await scene.layers.add(
+      LayerBuilder.createS102({
+        id: "viewer-scene-bathymetry",
+        url: "https://example.test/s102/tileset.json",
+        crs: "EPSG:32633",
+      }),
+    );
+
+    expect(layer.id).toBe("viewer-scene-bathymetry");
+    expect(layer.product).toBe(S100ProductType.S102);
+    expect(scene.layers.has("viewer-scene-bathymetry")).toBe(true);
+    expect(scene.layers.size).toBe(1);
+
+    await scene.layers.remove(layer);
+    expect(scene.layers.size).toBe(0);
+
+    await viewer.destroy();
+  });
+
+  it("preserves explicit builder map discard modes through Map view conveniences", async () => {
+    const viewer = await Viewer.create(null, {
+      adapter: createInMemoryAdapter(),
+    });
+    const scene = await viewer.createScene();
+
+    const mapView = scene.Map.add(
+      LayerBuilder.createS57WmsTemplate({
+        id: "s57-template",
+        urlTemplate: "https://example.test/s57/{z}/{x}/{y}.png",
+        extents: {
+          minX: 0,
+          minY: 0,
+          maxX: 10,
+          maxY: 10,
+        },
+        discardMode: MapDiscardMode.None,
+      }),
+    );
+
+    await expect(mapView.initialized()).resolves.toBe(true);
+    expect((scene.layers.get("s57-template")?.spec.extensions?.cogs as Record<string, unknown>))
+      .toMatchObject({
+        discardMode: MapDiscardMode.None,
+      });
+
+    mapView.setDiscardMode(MapDiscardMode.MaskLayerAlphaZero);
+    await expect(mapView.initialized()).resolves.toBe(true);
+    expect((scene.layers.get("s57-template")?.spec.extensions?.cogs as Record<string, unknown>))
+      .toMatchObject({
+        discardMode: MapDiscardMode.MaskLayerAlphaZero,
+      });
 
     await viewer.destroy();
   });

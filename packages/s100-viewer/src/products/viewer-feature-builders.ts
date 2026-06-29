@@ -10,6 +10,13 @@ import type {
 } from "./viewer-features.js";
 import { MapOverlayStyles, VesselStyles } from "./viewer-features.js";
 import {
+  ProjectedMapLayerType,
+  projectedMapSpecification,
+  projectedMapTemplateExtensions,
+  projectedSpatialExtent,
+  type ProjectedMapTemplateOptions,
+} from "./projected-map-template.js";
+import {
   commonLayerFields,
   requestOptions,
   type LayerBuilderCommonOptions,
@@ -39,6 +46,15 @@ export type CreateMapOverlayWmsLayerOptions = LayerBuilderCommonOptions<MapOverl
     transparent?: boolean;
     parameters?: Record<string, string | number | boolean>;
   };
+
+export type CreateMapOverlayWmsTemplateLayerOptions =
+  LayerBuilderCommonOptions<MapOverlayStyle> &
+    ProjectedMapTemplateOptions & {
+      urlTemplate: string;
+      layers?: readonly string[];
+      crs?: string;
+      role?: MapOverlayLayerSpec["role"];
+    };
 
 const mergeVesselStyle = (style: Partial<VesselStyle> | undefined): VesselStyle => ({
   ...VesselStyles.DEFAULT,
@@ -94,9 +110,48 @@ export const createMapOverlayWms = (
   style: mergeMapOverlayStyle(options.style),
 });
 
+export const createMapOverlayWmsTemplate = (
+  options: CreateMapOverlayWmsTemplateLayerOptions,
+): MapOverlayLayerSpec => {
+  const common = commonLayerFields(options);
+  const role = options.role ?? "overlay";
+  const mapSpecification = projectedMapSpecification(
+    options.id ?? "map-overlay",
+    options.urlTemplate,
+    options,
+    mapLayerTypeForRole(role),
+  );
+  return {
+    id: options.id ?? "map-overlay",
+    product: "map-overlay",
+    role,
+    ...common,
+    spatialExtent: options.spatialExtent ?? projectedSpatialExtent(options.extents),
+    extensions: projectedMapTemplateExtensions(common.extensions, mapSpecification, options),
+    source: {
+      kind: "wms-template",
+      urlTemplate: options.urlTemplate,
+      layers: options.layers ?? [options.id ?? "map-overlay"],
+      ...(options.crs !== undefined ? { crs: options.crs } : {}),
+    },
+    style: mergeMapOverlayStyle(options.style),
+  };
+};
+
 export const ViewerFeatureLayerBuilder = {
   VesselStyles,
   MapOverlayStyles,
   createVessel,
   createMapOverlayWms,
+  createMapOverlayWmsTemplate,
+};
+
+const mapLayerTypeForRole = (role: MapOverlayLayerSpec["role"]): number => {
+  if (role === "basemap") {
+    return ProjectedMapLayerType.Base;
+  }
+  if (role === "mask") {
+    return ProjectedMapLayerType.MaskLayer;
+  }
+  return ProjectedMapLayerType.BaseTransparent;
 };

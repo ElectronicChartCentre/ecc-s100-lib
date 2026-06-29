@@ -253,6 +253,22 @@ describe("@ecc/s100-viewer product specs", () => {
       url: "https://example.test/map",
       layers: ["annotations"],
     });
+    const s101Template = LayerBuilder.createS101WmsTemplate({
+      id: "s101-template",
+      urlTemplate:
+        "https://example.test/wms?bbox={xmin},{ymin},{xmax},{ymax}&SRS=EPSG:32633",
+      crs: "EPSG:32633",
+      extents: {
+        minX: 0,
+        minY: 0,
+        maxX: 10,
+        maxY: 10,
+        crs: "EPSG:32633",
+      },
+      minLevel: 2,
+      maxLevel: 12,
+      discardMode: MapDiscardMode.MaskLayerAlphaZero,
+    });
 
     expect(s101).toMatchObject({
       id: "s101-enc",
@@ -312,6 +328,34 @@ describe("@ecc/s100-viewer product specs", () => {
       source: { kind: "wms", transparent: true },
       style: LayerBuilder.MapOverlayStyles.DEFAULT,
     });
+    expect(s101Template).toMatchObject({
+      id: "s101-template",
+      product: "S-101",
+      source: {
+        kind: "wms-template",
+        crs: "EPSG:32633",
+      },
+      spatialExtent: {
+        crs: "EPSG:32633",
+        minX: 0,
+        minY: 0,
+        maxX: 10,
+        maxY: 10,
+      },
+      extensions: {
+        nasaAmmos: {
+          minLevel: 2,
+          maxLevel: 12,
+        },
+        cogs: {
+          minLevel: 2,
+          maxLevel: 12,
+          discardMode: MapDiscardMode.MaskLayerAlphaZero,
+        },
+      },
+    });
+    expect("mapSpecification" in ((s101Template.extensions?.nasaAmmos ?? {}) as Record<string, unknown>))
+      .toBe(true);
   });
 
   it("converts runtime map specifications into canonical ENC WMS-template layers", () => {
@@ -376,6 +420,6 @@ describe("@ecc/s100-viewer product specs", () => {
       },
     });
     expect("mapSpecification" in ((spec.extensions?.nasaAmmos ?? {}) as Record<string, unknown>))
-      .toBe(false);
+      .toBe(true);
   });
 });

@@ -2,8 +2,10 @@ import type { S100EngineAdapter, LoggerLike } from "../adapters/types.js";
 import type { CameraControlConfig, EngineCameraPose } from "../camera/types.js";
 import type { Coordinate } from "../coordinates/types.js";
 import type { S100Unsubscribe } from "../events/S100EventBus.js";
+import type { BaseLayerSpec, S100Layer } from "../layers/types.js";
 import type { Corners2D, QuatTuple, RGBA, Vec3Tuple } from "../math.js";
 import type { PickRequest, PickResult } from "../picking/types.js";
+import type { S100ProductLayerSpec } from "../products/layer-builder.js";
 import type { EnvironmentState, SceneOptions, S100Scene } from "../scene/types.js";
 import { createS100Viewer } from "../viewer/createS100Viewer.js";
 import type { CreateS100ViewerOptions, S100Viewer } from "../viewer/types.js";
@@ -59,6 +61,8 @@ export type PickInfo = {
   view?: unknown;
   selected?: unknown;
 };
+
+export type ViewerLayer<TSpec extends BaseLayerSpec = S100ProductLayerSpec> = S100Layer<TSpec>;
 
 export const createViewerFacade = async (
   options: CreateS100ViewerOptions,
@@ -122,6 +126,7 @@ export class Viewer {
 
 export class ViewerScene {
   readonly runtime = {};
+  readonly layers: ViewerLayerCollection;
   readonly cameraChanged = new EventEmitter<CameraUpdate>();
   readonly Terrain: TerrainFeature;
   readonly S111: S111Feature;
@@ -143,6 +148,7 @@ export class ViewerScene {
     readonly coreScene: S100Scene,
     readonly config: ViewerConfig = {},
   ) {
+    this.layers = new ViewerLayerCollection(this.coreScene);
     this.Terrain = new TerrainFeature(this.coreScene);
     this.S111 = new S111Feature(this.coreScene);
     this.Map = new MapFeature(this.coreScene);
@@ -180,6 +186,44 @@ export class ViewerScene {
 
   set seaLevel(value: number) {
     this.coreScene.setSeaLevel(value);
+  }
+}
+
+export class ViewerLayerCollection {
+  constructor(private readonly scene: S100Scene) {}
+
+  get size(): number {
+    return this.scene.layers.size;
+  }
+
+  add<TSpec extends S100ProductLayerSpec>(spec: TSpec): Promise<ViewerLayer<TSpec>> {
+    return this.scene.layers.add(spec);
+  }
+
+  get<TSpec extends S100ProductLayerSpec = S100ProductLayerSpec>(
+    id: string,
+  ): ViewerLayer<TSpec> | undefined {
+    return this.scene.layers.get<TSpec>(id);
+  }
+
+  has(id: string): boolean {
+    return this.scene.layers.has(id);
+  }
+
+  remove(idOrLayer: string | ViewerLayer): Promise<boolean> {
+    return this.scene.layers.remove(idOrLayer);
+  }
+
+  clear(): Promise<void> {
+    return this.scene.layers.clear();
+  }
+
+  all(): readonly ViewerLayer[] {
+    return this.scene.layers.all() as readonly ViewerLayer[];
+  }
+
+  [Symbol.iterator](): IterableIterator<ViewerLayer> {
+    return this.scene.layers[Symbol.iterator]() as IterableIterator<ViewerLayer>;
   }
 }
 

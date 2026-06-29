@@ -9,6 +9,13 @@ import {
 import type { WmsSource } from "./sources.js";
 import type { S101EncStyle, S57EncStyle } from "./style.js";
 import {
+  ProjectedMapLayerType,
+  projectedMapSpecification,
+  projectedMapTemplateExtensions,
+  projectedSpatialExtent,
+  type ProjectedMapTemplateOptions,
+} from "./projected-map-template.js";
+import {
   commonLayerFields,
   productSpecificationVersionField,
   requestOptions,
@@ -44,15 +51,29 @@ type CreateEncWmtsLayerBaseOptions<TStyle> =
       parameters?: Record<string, string | number | boolean>;
     };
 
+type CreateEncWmsTemplateLayerBaseOptions<TStyle> =
+  LayerBuilderCommonOptions<TStyle> &
+    ProjectedMapTemplateOptions & {
+      urlTemplate: string;
+      layers?: readonly string[];
+      crs?: string;
+      role?: EncLayerRole;
+    };
+
 export type CreateS101WmsLayerOptions =
   CreateEncWmsLayerBaseOptions<S101EncStyle> & ProductSpecificationVersionOptions;
 
 export type CreateS101WmtsLayerOptions =
   CreateEncWmtsLayerBaseOptions<S101EncStyle> & ProductSpecificationVersionOptions;
 
+export type CreateS101WmsTemplateLayerOptions =
+  CreateEncWmsTemplateLayerBaseOptions<S101EncStyle> & ProductSpecificationVersionOptions;
+
 export type CreateS57WmsLayerOptions = CreateEncWmsLayerBaseOptions<S57EncStyle>;
 
 export type CreateS57WmtsLayerOptions = CreateEncWmtsLayerBaseOptions<S57EncStyle>;
+
+export type CreateS57WmsTemplateLayerOptions = CreateEncWmsTemplateLayerBaseOptions<S57EncStyle>;
 
 const mergeS101Style = (style: Partial<S101EncStyle> | undefined): S101EncStyle => ({
   ...S101Styles.DEFAULT,
@@ -119,6 +140,37 @@ export const createS101Wmts = (options: CreateS101WmtsLayerOptions): S101EncLaye
   style: mergeS101Style(options.style),
 });
 
+export const createS101WmsTemplate = (
+  options: CreateS101WmsTemplateLayerOptions,
+): S101EncLayerSpec => {
+  const common = commonLayerFields(options);
+  const role = options.role ?? "overlay";
+  const mapSpecification = projectedMapSpecification(
+    options.id ?? "s101-enc",
+    options.urlTemplate,
+    options,
+    mapLayerTypeForRole(role),
+  );
+  return {
+    id: options.id ?? "s101-enc",
+    product: EncStandard.S101,
+    category: "enc",
+    standard: EncStandard.S101,
+    ...productSpecificationVersionField(options),
+    role,
+    ...common,
+    spatialExtent: options.spatialExtent ?? projectedSpatialExtent(options.extents),
+    extensions: projectedMapTemplateExtensions(common.extensions, mapSpecification, options),
+    source: {
+      kind: "wms-template",
+      urlTemplate: options.urlTemplate,
+      layers: options.layers ?? [options.id ?? "s101-enc"],
+      ...(options.crs !== undefined ? { crs: options.crs } : {}),
+    },
+    style: mergeS101Style(options.style),
+  };
+};
+
 export const createS57Wms = (options: CreateS57WmsLayerOptions): S57EncLayerSpec => ({
   id: options.id ?? "s57-enc",
   product: EncStandard.S57,
@@ -141,6 +193,36 @@ export const createS57Wms = (options: CreateS57WmsLayerOptions): S57EncLayerSpec
   },
   style: mergeS57Style(options.style),
 });
+
+export const createS57WmsTemplate = (
+  options: CreateS57WmsTemplateLayerOptions,
+): S57EncLayerSpec => {
+  const common = commonLayerFields(options);
+  const role = options.role ?? "overlay";
+  const mapSpecification = projectedMapSpecification(
+    options.id ?? "s57-enc",
+    options.urlTemplate,
+    options,
+    mapLayerTypeForRole(role),
+  );
+  return {
+    id: options.id ?? "s57-enc",
+    product: EncStandard.S57,
+    category: "enc",
+    standard: EncStandard.S57,
+    role,
+    ...common,
+    spatialExtent: options.spatialExtent ?? projectedSpatialExtent(options.extents),
+    extensions: projectedMapTemplateExtensions(common.extensions, mapSpecification, options),
+    source: {
+      kind: "wms-template",
+      urlTemplate: options.urlTemplate,
+      layers: options.layers ?? [options.id ?? "s57-enc"],
+      ...(options.crs !== undefined ? { crs: options.crs } : {}),
+    },
+    style: mergeS57Style(options.style),
+  };
+};
 
 export const createS57Wmts = (options: CreateS57WmtsLayerOptions): S57EncLayerSpec => ({
   id: options.id ?? "s57-enc",
@@ -169,7 +251,14 @@ export const EncLayerBuilder = {
   S101Styles,
   S57Styles,
   createS101Wms,
+  createS101WmsTemplate,
   createS101Wmts,
   createS57Wms,
+  createS57WmsTemplate,
   createS57Wmts,
 };
+
+const mapLayerTypeForRole = (role: EncLayerRole): number =>
+  role === "basemap"
+    ? ProjectedMapLayerType.Base
+    : ProjectedMapLayerType.BaseTransparent;

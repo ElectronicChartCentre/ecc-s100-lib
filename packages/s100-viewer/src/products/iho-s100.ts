@@ -71,6 +71,15 @@ export interface S111SurfaceCurrentLayerSpec
   style?: S111SurfaceCurrentStyle;
 }
 
+export type S111SurfaceCurrentData = {
+  id?: string;
+  timeRecordInterval?: number;
+  dateTimeOfFirstRecord?: string;
+  dateTimeOfLastRecord?: string;
+  numberOfTimes?: number;
+  [key: string]: unknown;
+};
+
 export type S101LayerSpec = S101EncLayerSpec;
 export type S102LayerSpec = S102BathymetryLayerSpec;
 export type S111LayerSpec = S111SurfaceCurrentLayerSpec;

@@ -2,6 +2,7 @@ export * from "./sources.js";
 export * from "./style.js";
 export * from "./data-coding.js";
 export * from "./enc.js";
+export * from "./projected-map-template.js";
 export * from "./iho-s100.js";
 export * from "./simulated-water-level.js";
 export * from "./viewer-features.js";

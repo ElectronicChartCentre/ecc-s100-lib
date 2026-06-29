@@ -1,4 +1,3 @@
-import { S100ProductType } from "../layers/types.js";
 import type { BaseLayerSpec, S100Layer } from "../layers/types.js";
 import type { Coordinate } from "../coordinates/types.js";
 import type { S100Scene } from "../scene/types.js";
@@ -7,8 +6,10 @@ import type { EncLayerSpec } from "../products/enc.js";
 import type { MapOverlayLayerSpec } from "../products/viewer-features.js";
 import type {
   S102BathymetryLayerSpec,
+  S111SurfaceCurrentData,
   S111SurfaceCurrentLayerSpec,
 } from "../products/iho-s100.js";
+import { LayerBuilder } from "../products/layer-builder.js";
 import type { VesselDimensions, VesselLayerSpec } from "../products/viewer-features.js";
 
 export type Subscription = {
@@ -73,6 +74,8 @@ export type TerrainDataset = {
   detailFactor?: number;
 };
 
+export type TerrainInput = TerrainDataset | S102BathymetryLayerSpec;
+
 export type TerrainSettings = {
   rootPosition?: Vec3Tuple;
   renderBBoxes: boolean;
@@ -118,6 +121,8 @@ export type MapSpecification = {
   urlTemplate: string;
 };
 
+export type MapInput = MapSpecification | EncLayerSpec | MapOverlayLayerSpec;
+
 export type ModelAssetSpecification = {
   path: string;
   name: string;
@@ -147,14 +152,9 @@ export type TransformControlsFacade = {
   setMode(mode: TransformControlsMode): void;
 };
 
-export type SurfaceCurrentDataset = {
-  id?: string;
-  timeRecordInterval?: number;
-  dateTimeOfFirstRecord?: string;
-  dateTimeOfLastRecord?: string;
-  numberOfTimes?: number;
-  [key: string]: unknown;
-};
+export type SurfaceCurrentDataset = S111SurfaceCurrentData;
+
+export type S111Input = SurfaceCurrentDataset | S111SurfaceCurrentLayerSpec;
 
 type NativeVesselViewLike = {
   positionChanged?: { subscribe(listener: (position: Vec3Tuple) => void): Subscription };
@@ -238,8 +238,8 @@ export class TerrainFeature {
 
   constructor(private readonly scene: S100Scene) {}
 
-  add(dataset: TerrainDataset): TerrainView {
-    const view = new TerrainView(dataset, this.scene, () => {
+  add(input: TerrainInput): TerrainView {
+    const view = new TerrainView(input, this.scene, () => {
       this.views.delete(view);
     });
     this.views.add(view);
@@ -256,59 +256,22 @@ export class TerrainFeature {
 }
 
 export class TerrainView extends ProductLayerView<S102BathymetryLayerSpec> {
+  readonly dataset: TerrainDataset | undefined;
   readonly terrain: TerrainDisplayProperties;
   readonly settings: TerrainSettings;
 
   constructor(
-    readonly dataset: TerrainDataset,
+    input: TerrainInput,
     scene: S100Scene,
     onDestroy: () => void,
   ) {
-    const terrainState = {
-      unsafeDepth: 0,
-      seaContour: false,
-      seaLevel: scene.getSeaLevel(),
-      showContour: false,
-      contourInterval: 5,
-    };
-    const source: S102BathymetryLayerSpec["source"] = {
-      kind: "3d-tiles",
-      url: dataset.baseURL,
-    };
-    const query = parseAdditionalUrlParameters(dataset.additionalURLParameters);
-    if (query !== undefined) {
-      source.query = query;
-      const crs = getCrsFromQuery(query);
-      if (crs !== undefined) {
-        source.crs = crs;
-      }
-    }
-    if (dataset.accessToken !== undefined) {
-      source.headers = { Authorization: `Bearer ${dataset.accessToken}` };
-    }
-    const nasaAmmosExtension: Record<string, unknown> = {
-      detailFactor: dataset.detailFactor ?? 1,
-    };
-    if (dataset.additionalURLParameters !== undefined) {
-      nasaAmmosExtension.additionalURLParameters = dataset.additionalURLParameters;
-    }
-    const spec: S102BathymetryLayerSpec = {
-      id: dataset.id ?? `terrain-${nextId()}`,
-      product: S100ProductType.S102,
-      source,
-      style: {
-        unsafeDepth: terrainState.unsafeDepth,
-        seaLevel: terrainState.seaLevel,
-        contours: {
-          visible: terrainState.showContour,
-          intervalMeters: terrainState.contourInterval,
-        },
-      },
-      extensions: {
-        nasaAmmos: nasaAmmosExtension,
-      },
-    };
+    const dataset = isS102LayerSpec(input) ? undefined : input;
+    const spec = isS102LayerSpec(input)
+      ? input
+      : terrainDatasetToLayerSpec(input, scene.getSeaLevel());
+    const terrainState = terrainStateFromSpec(spec, scene.getSeaLevel());
     super(scene, spec, onDestroy);
+    this.dataset = dataset;
     this.terrain = createTerrainDisplayProperties(terrainState, () => {
       void this.patch({
         style: {
@@ -323,20 +286,79 @@ export class TerrainView extends ProductLayerView<S102BathymetryLayerSpec> {
     });
     this.settings = {
       renderBBoxes: false,
-      detailFactor: dataset.detailFactor ?? 1,
+      detailFactor: terrainDetailFactor(spec, dataset),
       neverDiscardRootNodes: false,
       waitForSiblings: false,
     };
   }
 }
 
+const isS102LayerSpec = (input: TerrainInput): input is S102BathymetryLayerSpec =>
+  "product" in input && input.product === "S-102";
+
+const terrainDatasetToLayerSpec = (
+  dataset: TerrainDataset,
+  seaLevel: number,
+): S102BathymetryLayerSpec => {
+  const query = parseAdditionalUrlParameters(dataset.additionalURLParameters);
+  const crs = query === undefined ? undefined : getCrsFromQuery(query);
+  const nasaAmmosExtension: Record<string, unknown> = {
+    detailFactor: dataset.detailFactor ?? 1,
+  };
+  if (dataset.additionalURLParameters !== undefined) {
+    nasaAmmosExtension.additionalURLParameters = dataset.additionalURLParameters;
+  }
+  return LayerBuilder.createS102({
+    id: dataset.id ?? `terrain-${nextId()}`,
+    url: dataset.baseURL,
+    ...(query !== undefined ? { query } : {}),
+    ...(crs !== undefined ? { crs } : {}),
+    ...(dataset.accessToken !== undefined
+      ? { headers: { Authorization: `Bearer ${dataset.accessToken}` } }
+      : {}),
+    style: {
+      unsafeDepth: 0,
+      seaLevel,
+      contours: {
+        visible: false,
+        intervalMeters: 5,
+      },
+    },
+    extensions: {
+      nasaAmmos: nasaAmmosExtension,
+    },
+  });
+};
+
+const terrainStateFromSpec = (
+  spec: S102BathymetryLayerSpec,
+  seaLevel: number,
+): {
+  unsafeDepth: number;
+  seaContour: boolean;
+  seaLevel: number;
+  showContour: boolean;
+  contourInterval: number;
+} => ({
+  unsafeDepth: finiteNumber(spec.style?.unsafeDepth, 0),
+  seaContour: false,
+  seaLevel: finiteNumber(spec.style?.seaLevel, seaLevel),
+  showContour: spec.style?.contours?.visible ?? false,
+  contourInterval: finiteNumber(spec.style?.contours?.intervalMeters, 5),
+});
+
+const terrainDetailFactor = (
+  spec: S102BathymetryLayerSpec,
+  dataset: TerrainDataset | undefined,
+): number => dataset?.detailFactor ?? getNumberFromExtensions(spec.extensions, "detailFactor", 1);
+
 export class S111Feature {
   private readonly views = new Set<S111View>();
 
   constructor(private readonly scene: S100Scene) {}
 
-  add(dataset: SurfaceCurrentDataset): S111View {
-    const view = new S111View(dataset, this.scene, () => {
+  add(input: S111Input): S111View {
+    const view = new S111View(input, this.scene, () => {
       this.views.delete(view);
     });
     this.views.add(view);
@@ -348,6 +370,38 @@ export class S111Feature {
   }
 }
 
+const isS111LayerSpec = (input: S111Input): input is S111SurfaceCurrentLayerSpec =>
+  "product" in input && input.product === "S-111";
+
+const surfaceCurrentDatasetFromSpec = (
+  spec: S111SurfaceCurrentLayerSpec,
+): SurfaceCurrentDataset => {
+  if (spec.source.kind === "static-json" && isRecord(spec.source.data)) {
+    return spec.source.data as SurfaceCurrentDataset;
+  }
+  throw new Error(
+    "S111Feature.add requires a static-json S-111 layer spec. Use scene.layers.add for rest-json S-111 specs.",
+  );
+};
+
+const surfaceCurrentDatasetToLayerSpec = (
+  dataset: SurfaceCurrentDataset,
+): S111SurfaceCurrentLayerSpec => {
+  const crs = getDatasetCrs(dataset);
+  return LayerBuilder.createStaticS111({
+    id: dataset.id ?? `s111-${nextId()}`,
+    data: dataset,
+    ...(crs !== undefined ? { crs } : {}),
+    time: {
+      interpolation: "nearest",
+    },
+    style: {
+      renderer: "arrows",
+      scale: 1,
+    },
+  });
+};
+
 export class S111View extends ProductLayerView<S111SurfaceCurrentLayerSpec> {
   disableAutoScaling = false;
   scalingMode = "custom";
@@ -358,39 +412,23 @@ export class S111View extends ProductLayerView<S111SurfaceCurrentLayerSpec> {
     currentTime: number;
   };
   private currentTimeMs: number;
+  readonly dataset: SurfaceCurrentDataset;
 
   constructor(
-    readonly dataset: SurfaceCurrentDataset,
+    input: S111Input,
     scene: S100Scene,
     onDestroy: () => void,
   ) {
+    const dataset = isS111LayerSpec(input) ? surfaceCurrentDatasetFromSpec(input) : input;
+    const spec = isS111LayerSpec(input) ? input : surfaceCurrentDatasetToLayerSpec(dataset);
     const startTime = parseTime(dataset.dateTimeOfFirstRecord) ?? 0;
     const intervalSeconds = normalizePositiveInteger(dataset.timeRecordInterval, 1);
     const recordCount = getSurfaceCurrentRecordCount(dataset);
     const endTime =
       parseTime(dataset.dateTimeOfLastRecord) ??
       startTime + intervalSeconds * 1000 * Math.max(0, recordCount - 1);
-    const source: S111SurfaceCurrentLayerSpec["source"] = {
-      kind: "static-json",
-      data: dataset,
-    };
-    const crs = getDatasetCrs(dataset);
-    if (crs !== undefined) {
-      source.crs = crs;
-    }
-
-    const spec: S111SurfaceCurrentLayerSpec = createSurfaceCurrentLayerSpec({
-      id: dataset.id ?? `s111-${nextId()}`,
-      source,
-      time: {
-        interpolation: "nearest",
-      },
-      style: {
-        renderer: "arrows",
-        scale: 1,
-      },
-    });
     super(scene, spec, onDestroy);
+    this.dataset = dataset;
     this.currentTimeMs = startTime;
     const view = this;
     this.time = {
@@ -437,7 +475,7 @@ export class MapFeature {
     }
   }
 
-  add(specification: MapSpecification): MapView {
+  add(specification: MapInput): MapView {
     const view = new MapView(
       specification,
       this.currentDiscardMode,
@@ -456,17 +494,29 @@ export class MapFeature {
 }
 
 export class MapView extends ProductLayerView<EncLayerSpec | MapOverlayLayerSpec> {
+  readonly specification: MapSpecification | undefined;
   private currentAlpha = 1;
   private currentDiscardMode: MapDiscardMode;
 
   constructor(
-    readonly specification: MapSpecification,
+    input: MapInput,
     discardMode: MapDiscardMode,
     scene: S100Scene,
     onDestroy: () => void,
   ) {
-    super(scene, mapSpecificationToLayerSpec(specification, discardMode), onDestroy);
-    this.currentDiscardMode = discardMode;
+    let specification: MapSpecification | undefined;
+    let spec: EncLayerSpec | MapOverlayLayerSpec;
+    let effectiveDiscardMode = discardMode;
+    if (isMapSpecification(input)) {
+      specification = input;
+      spec = mapSpecificationToLayerSpec(input, effectiveDiscardMode);
+    } else {
+      effectiveDiscardMode = getMapLayerDiscardMode(input, discardMode);
+      spec = withMapLayerDiscardMode(input, effectiveDiscardMode);
+    }
+    super(scene, spec, onDestroy);
+    this.specification = specification;
+    this.currentDiscardMode = effectiveDiscardMode;
   }
 
   get alpha(): number {
@@ -480,12 +530,15 @@ export class MapView extends ProductLayerView<EncLayerSpec | MapOverlayLayerSpec
 
   setDiscardMode(discardMode: MapDiscardMode): void {
     this.currentDiscardMode = discardMode;
+    const extensions = this.specification === undefined
+      ? withMapDiscardModeExtension(this.spec.extensions, this.currentDiscardMode)
+      : createMapLayerExtensions(
+          this.spec.extensions,
+          this.specification,
+          this.currentDiscardMode,
+        );
     void this.patch({
-      extensions: createMapLayerExtensions(
-        this.spec.extensions,
-        this.specification,
-        this.currentDiscardMode,
-      ),
+      extensions,
     });
   }
 }
@@ -832,59 +885,88 @@ export const getCrsFromUrlTemplate = (urlTemplate: string): string | undefined =
   return getCrsFromQuery(Object.fromEntries(new URLSearchParams(normalizedTemplate)));
 };
 
+const isMapSpecification = (input: MapInput): input is MapSpecification =>
+  !("product" in input);
+
+const withMapLayerDiscardMode = <TSpec extends EncLayerSpec | MapOverlayLayerSpec>(
+  spec: TSpec,
+  discardMode: MapDiscardMode,
+): TSpec => ({
+  ...spec,
+  extensions: withMapDiscardModeExtension(spec.extensions, discardMode),
+});
+
+const withMapDiscardModeExtension = (
+  extensions: Record<string, unknown> | undefined,
+  discardMode: MapDiscardMode,
+): Record<string, unknown> => ({
+  ...extensions,
+  cogs: {
+    ...recordFromUnknown(extensions?.cogs),
+    discardMode,
+  },
+});
+
+const getMapLayerDiscardMode = (
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+  fallback: MapDiscardMode,
+): MapDiscardMode => {
+  const discardMode = getNumberFromExtensions(spec.extensions, "discardMode", fallback);
+  return isMapDiscardMode(discardMode) ? discardMode : fallback;
+};
+
+const isMapDiscardMode = (value: number): value is MapDiscardMode =>
+  value === MapDiscardMode.BaseMapAlpha ||
+  value === MapDiscardMode.None ||
+  value === MapDiscardMode.MaskLayerAlphaZero ||
+  value === MapDiscardMode.MaskLayerAlphaOne;
+
 export const mapSpecificationToLayerSpec = (
   specification: MapSpecification,
   discardMode: MapDiscardMode,
 ): EncLayerSpec | MapOverlayLayerSpec => {
-  const crs = getCrsFromUrlTemplate(specification.urlTemplate);
-  const source = {
-    kind: "wms-template" as const,
+  const crs = getCrsFromUrlTemplate(specification.urlTemplate) ?? specification.dataset.extents.crs;
+  const quality = typeof specification.quality === "number" ? specification.quality : undefined;
+  const baseOptions = {
+    id: specification.id,
     urlTemplate: specification.urlTemplate,
     layers: [specification.id],
     ...(crs !== undefined ? { crs } : {}),
-  };
-  const base = {
-    id: specification.id,
-    source,
     visible: false,
     opacity: 1,
-    spatialExtent: {
+    corners: specification.corners,
+    extents: {
+      ...specification.dataset.extents,
       ...(crs !== undefined ? { crs } : {}),
-      minX: specification.dataset.extents.minX,
-      minY: specification.dataset.extents.minY,
-      maxX: specification.dataset.extents.maxX,
-      maxY: specification.dataset.extents.maxY,
     },
-    extensions: createMapLayerExtensions(undefined, specification, discardMode),
+    mapSubset: specification.dataset.mapSubset,
+    minLevel: specification.dataset.minLevel,
+    maxLevel: specification.dataset.maxLevel,
+    ...(quality !== undefined ? { quality } : {}),
+    mapLayerType: specification.type,
+    discardMode,
   };
 
   if (specification.type === MapLayerType.MaskLayer) {
-    return {
-      ...base,
-      product: "map-overlay",
+    return LayerBuilder.createMapOverlayWmsTemplate({
+      ...baseOptions,
       role: "mask",
-    };
+    });
   }
 
   const role = specification.type === MapLayerType.Base ? "basemap" : "overlay";
 
   if (specification.encStandard === "S-57") {
-    return {
-      ...base,
-      product: "S-57",
-      category: "enc",
-      standard: "S-57",
+    return LayerBuilder.createS57WmsTemplate({
+      ...baseOptions,
       role,
-    };
+    });
   }
 
-  return {
-    ...base,
-    product: S100ProductType.S101,
-    category: "enc",
-    standard: S100ProductType.S101,
+  return LayerBuilder.createS101WmsTemplate({
+    ...baseOptions,
     role,
-  };
+  });
 };
 
 export const createMapLayerExtensions = (
@@ -1030,13 +1112,6 @@ const getDatasetCrs = (dataset: SurfaceCurrentDataset): string | undefined => {
   return undefined;
 };
 
-const createSurfaceCurrentLayerSpec = (
-  spec: Omit<S111SurfaceCurrentLayerSpec, "product">,
-): S111SurfaceCurrentLayerSpec => ({
-  ...spec,
-  product: S100ProductType.S111,
-});
-
 const parseTime = (value: string | undefined): number | null => {
   if (!value) {
     return null;
@@ -1084,8 +1159,31 @@ const normalizePositiveInteger = (value: unknown, fallback: number): number =>
     ? Math.floor(value)
     : fallback;
 
+const finiteNumber = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
 const normalizeNumber = (value: number, fallback: number): number =>
   Number.isFinite(value) ? value : fallback;
+
+const getNumberFromExtensions = (
+  extensions: Record<string, unknown> | undefined,
+  key: string,
+  fallback: number,
+): number => {
+  for (const namespace of ["nasaAmmos", "cogs", "cesium"]) {
+    const value = recordFromUnknown(extensions?.[namespace])[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return fallback;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object";
+
+const recordFromUnknown = (value: unknown): Record<string, unknown> =>
+  isRecord(value) ? { ...value } : {};
 
 const getNativeVesselView = (nativeHandle: unknown): NativeVesselViewLike | null => {
   if (!nativeHandle || typeof nativeHandle !== "object") {
