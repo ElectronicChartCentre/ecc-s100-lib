@@ -73,6 +73,19 @@ export class CoreS100Layer<TSpec extends BaseLayerSpec> implements S100Layer<TSp
     await this.removeLayer(this);
   }
 
+  destroyControllers(): void {
+    for (const controller of Object.values(this.controllers)) {
+      if (
+        controller &&
+        typeof controller === "object" &&
+        "destroy" in controller &&
+        typeof controller.destroy === "function"
+      ) {
+        controller.destroy();
+      }
+    }
+  }
+
   getNativeHandle<TNative = unknown>(): TNative | null {
     return (this.engineHandle.native ?? this.engineHandle ?? null) as TNative | null;
   }

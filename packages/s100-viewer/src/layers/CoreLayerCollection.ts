@@ -75,6 +75,7 @@ export class CoreLayerCollection implements LayerCollection {
       return false;
     }
 
+    layer.destroyControllers();
     await this.engineScene.removeLayer(layer.engineLayerHandle);
     this.layers.delete(id);
     this.layersByHandle.delete(layer.engineLayerHandle);

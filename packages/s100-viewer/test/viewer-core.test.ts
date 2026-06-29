@@ -328,6 +328,120 @@ describe("createS100Viewer", () => {
     expect(map.controllers.map.alpha).toBe(0.8);
     expect(map.controllers.map.discardMode).toBe(MapDiscardMode.None);
 
+    const vessel = await scene.layers.add(
+      LayerBuilder.createVessel({
+        id: "controlled-vessel",
+        url: "https://example.test/assets/vessel.glb",
+        pose: {
+          position: {
+            kind: "projected",
+            crs: "EPSG:32633",
+            x: 500000,
+            y: 7000000,
+            z: 0,
+          },
+          headingDegrees: 12,
+        },
+        dimensions: {
+          draught: 8,
+          bow: 40,
+          stern: 30,
+          port: 10,
+          starboard: 12,
+        },
+        style: {
+          showSeaLevelIndicator: true,
+          transformControls: "translate",
+        },
+      }),
+    );
+    const vesselPositions: unknown[] = [];
+    const vesselHeadings: number[] = [];
+    vessel.controllers.vessel.onPositionChanged((position) => {
+      vesselPositions.push(position);
+    });
+    vessel.controllers.vessel.onHeadingChanged((heading) => {
+      vesselHeadings.push(heading);
+    });
+
+    await vessel.controllers.vessel.setPosition([500010, 7000020, -3]);
+    await vessel.controllers.vessel.setHeading(725);
+    await vessel.controllers.vessel.setDimensions({
+      draught: 9,
+      bow: 42,
+      stern: 31,
+      port: 11,
+      starboard: 13,
+    });
+    await vessel.controllers.vessel.setVisibility(false);
+    await vessel.controllers.vessel.setSeaLevelIndicatorMode("off");
+    await vessel.controllers.vessel.setOceanSurfaceVisible(true);
+    await vessel.controllers.vessel.setTransformMode("rotate");
+
+    expect(vessel.controllers.vessel.getPosition()).toEqual([500010, 7000020, -3]);
+    expect(vessel.controllers.vessel.getHeading()).toBe(5);
+    expect(vesselPositions).toEqual([[500010, 7000020, -3]]);
+    expect(vesselHeadings).toEqual([5]);
+    expect(vessel.visible).toBe(false);
+    expect(vessel.spec.pose.position).toMatchObject({
+      kind: "projected",
+      crs: "EPSG:32633",
+      x: 500010,
+      y: 7000020,
+      z: -3,
+    });
+    expect(vessel.spec.pose.headingDegrees).toBe(5);
+    expect(vessel.spec.dimensions).toEqual({
+      draught: 9,
+      bow: 42,
+      stern: 31,
+      port: 11,
+      starboard: 13,
+    });
+    expect(vessel.spec.style).toMatchObject({
+      showSeaLevelIndicator: false,
+      showOceanSurface: true,
+      oceanSurface: true,
+      transformControls: "rotate",
+    });
+    expect(vessel.spec.extensions?.nasaAmmos).toMatchObject({
+      dimensions: {
+        draught: 9,
+      },
+      seaSurfaceVisible: true,
+    });
+
+    await vessel.controllers.vessel.setPose({
+      position: [500020, 7000030, -4],
+      headingDegrees: 185,
+    });
+    expect(vessel.controllers.vessel.getPosition()).toEqual([500020, 7000030, -4]);
+    expect(vessel.controllers.vessel.getHeading()).toBe(185);
+
+    const pendingHeading = vessel.controllers.vessel.setHeading(270);
+    const pendingPosition = vessel.controllers.vessel.setPosition([500030, 7000040, -5]);
+    await Promise.all([pendingHeading, pendingPosition]);
+    expect(vessel.controllers.vessel.getPosition()).toEqual([500030, 7000040, -5]);
+    expect(vessel.controllers.vessel.getHeading()).toBe(270);
+
+    let rapidPoseUpdates = 0;
+    const unsubscribeRapidPoseUpdates = vessel.onChanged(() => {
+      rapidPoseUpdates += 1;
+    });
+    const rapidUpdates = [
+      vessel.controllers.vessel.setPosition([500040, 7000050, -6]),
+      vessel.controllers.vessel.setPosition([500050, 7000060, -7]),
+      vessel.controllers.vessel.setPose({
+        position: [500060, 7000070, -8],
+        headingDegrees: 315,
+      }),
+    ];
+    await Promise.all(rapidUpdates);
+    unsubscribeRapidPoseUpdates();
+    expect(rapidPoseUpdates).toBe(1);
+    expect(vessel.controllers.vessel.getPosition()).toEqual([500060, 7000070, -8]);
+    expect(vessel.controllers.vessel.getHeading()).toBe(315);
+
     await viewer.destroy();
   });
 

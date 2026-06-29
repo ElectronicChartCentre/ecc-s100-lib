@@ -84,6 +84,11 @@ export type {
   TerrainDisplayPatch,
   TerrainLayerController,
   TerrainSettingsController,
+  VesselLayerController,
+  VesselPosePatch,
+  VesselSeaLevelIndicatorController,
+  VesselSeaLevelIndicatorMode,
+  VesselTransformController,
 } from "./layers/controllers.js";
 export type {
   LivePickingOptions,

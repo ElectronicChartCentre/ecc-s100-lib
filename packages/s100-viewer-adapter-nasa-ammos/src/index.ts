@@ -578,20 +578,25 @@ class NasaAmmosEngineScene implements EngineScene {
     }
 
     if (native.kind === "vessel") {
-      if (native.spec.pose) {
+      const vesselPatch = patch as LayerPatch<VesselLayerSpec>;
+      if (vesselPatch.pose) {
         const position = coordinateToVec3(native.spec.pose.position);
         native.view.setPosition([position.x, position.y, position.z]);
         native.view.setHeading(native.spec.pose.headingDegrees ?? native.view.getHeading());
       }
       if (
-        native.spec.dimensions !== undefined ||
-        native.spec.style?.draughtMeters !== undefined ||
-        getNasaAmmosExtension(native.spec, "dimensions") !== undefined
+        vesselPatch.dimensions !== undefined ||
+        vesselPatch.style?.draughtMeters !== undefined ||
+        getNasaAmmosExtension(vesselPatch as BaseLayerSpec, "dimensions") !== undefined
       ) {
         native.view.setDimensions(getVesselDimensions(native.spec));
       }
-      applyVisibility(native.view, patch.visible);
-      applyVesselPresentation(native.view, native.spec);
+      if (vesselPatch.visible !== undefined) {
+        applyVisibility(native.view, vesselPatch.visible);
+      }
+      if (vesselPatch.style !== undefined || vesselPatch.extensions !== undefined) {
+        applyVesselPresentation(native.view, native.spec);
+      }
     }
   }
 
