@@ -1,6 +1,6 @@
 {
   "name": "@ecc/s100-viewer-adapter-cesium",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "private": false,
   "type": "module",
   "description": "Cesium adapter package for @ecc/s100-viewer.",
@@ -42,7 +42,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@ecc/s100-viewer": "0.1.0-alpha.2",
+    "@ecc/s100-viewer": "0.1.0-alpha.3",
     "proj4": "^2.20.8"
   },
   "peerDependencies": {
