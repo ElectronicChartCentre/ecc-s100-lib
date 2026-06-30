@@ -124,9 +124,6 @@ import { LayerBuilder, SceneBuilder } from "@ecc/s100-viewer";
   layers.
 - `LayerBuilder.createVessel(...)` builds vessel model layers.
 - `LayerBuilder.createMapOverlayWms(...)` builds generic map-overlay layers.
-- `TerrainFeature`, `MapFeature`, `S111Feature`, `VesselFeature`, and related
-  view controllers provide a package-owned high-level runtime for applications
-  that need mutable product views rather than raw layer specs.
 - `mapSpecificationToLayerSpec(...)` converts app-style projected WMS map
   specifications into canonical ENC/map-overlay specs using `wms-template`
   sources, so apps do not have to construct adapter-native map extensions.

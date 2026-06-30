@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as publicApi from "../src/index.js";
 import {
   createInMemoryAdapter,
   createS100Viewer,
@@ -7,12 +8,11 @@ import {
   createQuatIdentity,
   CameraControlPresets,
   LayerBuilder,
-  MapDiscardMode,
+  ProjectedMapDiscardMode,
   SceneBuilder,
   S100Error,
   S100ProductSpecificationVersions,
   S100ProductType,
-  Viewer,
   type BaseLayerSpec,
   type EngineCameraChangeListener,
   type EngineLayerHandle,
@@ -20,6 +20,16 @@ import {
 } from "../src/index.js";
 
 describe("createS100Viewer", () => {
+  it("keeps the root package surface canonical-only", () => {
+    expect(publicApi).toHaveProperty("createS100Viewer");
+    expect(publicApi).not.toHaveProperty("Viewer");
+    expect(publicApi).not.toHaveProperty("ViewerScene");
+    expect(publicApi).not.toHaveProperty("PickInfo");
+    expect(publicApi).not.toHaveProperty("CameraUpdate");
+    expect(publicApi).not.toHaveProperty("MapDiscardMode");
+    expect(publicApi).not.toHaveProperty("MapLayerType");
+  });
+
   it("provides engine-neutral tuple and prism geometry helpers", () => {
     expect(createQuatIdentity()).toEqual([0, 0, 0, 1]);
     expect(createBoundingBox([-1, -2, -3], [1, 2, 3])).toEqual({
@@ -107,8 +117,8 @@ describe("createS100Viewer", () => {
     await viewer.destroy();
   });
 
-  it("adds LayerBuilder specs through the high-level ViewerScene layer API", async () => {
-    const viewer = await Viewer.create(null, {
+  it("adds LayerBuilder specs through the canonical S100Scene layer API", async () => {
+    const viewer = await createS100Viewer({
       adapter: createInMemoryAdapter(),
     });
     const scene = await viewer.createScene();
@@ -128,42 +138,6 @@ describe("createS100Viewer", () => {
 
     await scene.layers.remove(layer);
     expect(scene.layers.size).toBe(0);
-
-    await viewer.destroy();
-  });
-
-  it("preserves explicit builder map discard modes through Map view conveniences", async () => {
-    const viewer = await Viewer.create(null, {
-      adapter: createInMemoryAdapter(),
-    });
-    const scene = await viewer.createScene();
-
-    const mapView = scene.Map.add(
-      LayerBuilder.createS57WmsTemplate({
-        id: "s57-template",
-        urlTemplate: "https://example.test/s57/{z}/{x}/{y}.png",
-        extents: {
-          minX: 0,
-          minY: 0,
-          maxX: 10,
-          maxY: 10,
-        },
-        discardMode: MapDiscardMode.None,
-      }),
-    );
-
-    await expect(mapView.initialized()).resolves.toBe(true);
-    expect((scene.layers.get("s57-template")?.spec.extensions?.cogs as Record<string, unknown>))
-      .toMatchObject({
-        discardMode: MapDiscardMode.None,
-      });
-
-    mapView.setDiscardMode(MapDiscardMode.MaskLayerAlphaZero);
-    await expect(mapView.initialized()).resolves.toBe(true);
-    expect((scene.layers.get("s57-template")?.spec.extensions?.cogs as Record<string, unknown>))
-      .toMatchObject({
-        discardMode: MapDiscardMode.MaskLayerAlphaZero,
-      });
 
     await viewer.destroy();
   });
@@ -299,20 +273,20 @@ describe("createS100Viewer", () => {
           maxX: 10,
           maxY: 10,
         },
-        discardMode: MapDiscardMode.None,
+        discardMode: ProjectedMapDiscardMode.None,
       }),
     );
 
     await map.controllers.map.setAlpha(0.4);
     await map.controllers.map.setVisibility(false);
-    await map.controllers.map.setDiscardMode(MapDiscardMode.MaskLayerAlphaOne);
+    await map.controllers.map.setDiscardMode(ProjectedMapDiscardMode.MaskLayerAlphaOne);
 
     expect(map.controllers.map.alpha).toBe(0.4);
-    expect(map.controllers.map.discardMode).toBe(MapDiscardMode.MaskLayerAlphaOne);
+    expect(map.controllers.map.discardMode).toBe(ProjectedMapDiscardMode.MaskLayerAlphaOne);
     expect(map.opacity).toBe(0.4);
     expect(map.visible).toBe(false);
     expect(map.spec.extensions?.cogs).toMatchObject({
-      discardMode: MapDiscardMode.MaskLayerAlphaOne,
+      discardMode: ProjectedMapDiscardMode.MaskLayerAlphaOne,
     });
 
     await map.update({
@@ -321,12 +295,12 @@ describe("createS100Viewer", () => {
         ...map.spec.extensions,
         cogs: {
           ...((map.spec.extensions?.cogs as Record<string, unknown> | undefined) ?? {}),
-          discardMode: MapDiscardMode.None,
+          discardMode: ProjectedMapDiscardMode.None,
         },
       },
     });
     expect(map.controllers.map.alpha).toBe(0.8);
-    expect(map.controllers.map.discardMode).toBe(MapDiscardMode.None);
+    expect(map.controllers.map.discardMode).toBe(ProjectedMapDiscardMode.None);
 
     const vessel = await scene.layers.add(
       LayerBuilder.createVessel({

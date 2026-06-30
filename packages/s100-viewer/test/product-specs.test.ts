@@ -6,8 +6,8 @@ import {
   isServiceReadySource,
   LayerBuilder,
   mapSpecificationToLayerSpec,
-  MapDiscardMode,
-  MapLayerType,
+  ProjectedMapDiscardMode,
+  ProjectedMapLayerType,
   S100SupportedProductVersions,
   S100ProductSpecificationVersions,
   S100ProductType,
@@ -267,7 +267,7 @@ describe("@ecc/s100-viewer product specs", () => {
       },
       minLevel: 2,
       maxLevel: 12,
-      discardMode: MapDiscardMode.MaskLayerAlphaZero,
+      discardMode: ProjectedMapDiscardMode.MaskLayerAlphaZero,
     });
 
     expect(s101).toMatchObject({
@@ -350,7 +350,7 @@ describe("@ecc/s100-viewer product specs", () => {
         cogs: {
           minLevel: 2,
           maxLevel: 12,
-          discardMode: MapDiscardMode.MaskLayerAlphaZero,
+          discardMode: ProjectedMapDiscardMode.MaskLayerAlphaZero,
         },
       },
     });
@@ -362,7 +362,7 @@ describe("@ecc/s100-viewer product specs", () => {
     const spec = mapSpecificationToLayerSpec(
       {
         id: "s57WMS",
-        type: MapLayerType.Base,
+        type: ProjectedMapLayerType.Base,
         encStandard: "S-57",
         corners: {
           upperLeft: [0, 10],
@@ -387,7 +387,7 @@ describe("@ecc/s100-viewer product specs", () => {
         urlTemplate:
           "https://example.test/wms?bbox={xmin},{ymin},{xmax},{ymax}&SRS=EPSG:32633",
       },
-      MapDiscardMode.MaskLayerAlphaZero,
+      ProjectedMapDiscardMode.MaskLayerAlphaZero,
     );
 
     expect(spec).toMatchObject({
@@ -415,7 +415,7 @@ describe("@ecc/s100-viewer product specs", () => {
         cogs: {
           minLevel: 2,
           maxLevel: 12,
-          discardMode: MapDiscardMode.MaskLayerAlphaZero,
+          discardMode: ProjectedMapDiscardMode.MaskLayerAlphaZero,
         },
       },
     });

@@ -37,15 +37,20 @@ LayerBuilder.createS57Wms({ url, layers: ["enc_cells"] });
 LayerBuilder.createS57Wmts({ url, layer: "s57", tileMatrixSet: "utm" });
 ```
 
-For application-style WMS URL templates, use the package-owned runtime helpers
-instead of carrying adapter-native map specifications in application code:
+For application-style WMS URL templates, use the package-owned projected-map
+helpers instead of carrying adapter-native map specifications in application
+code:
 
 ```ts
-import { MapDiscardMode, MapLayerType, mapSpecificationToLayerSpec } from "@ecc/s100-viewer";
+import {
+  ProjectedMapDiscardMode,
+  ProjectedMapLayerType,
+  mapSpecificationToLayerSpec,
+} from "@ecc/s100-viewer";
 
 const encLayer = mapSpecificationToLayerSpec({
   id: "s57WMS",
-  type: MapLayerType.Base,
+  type: ProjectedMapLayerType.Base,
   encStandard: "S-57",
   dataset: {
     mapSubset: { min: [0, 0], max: [1000, 1000] },
@@ -55,7 +60,7 @@ const encLayer = mapSpecificationToLayerSpec({
   },
   corners,
   urlTemplate: "https://example.test/wms?bbox={xmin},{ymin},{xmax},{ymax}&SRS=EPSG:32633",
-}, MapDiscardMode.Transparent);
+}, ProjectedMapDiscardMode.Transparent);
 ```
 
 That produces a normal `EncLayerSpec` with `source.kind: "wms-template"`.

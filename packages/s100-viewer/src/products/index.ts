@@ -11,6 +11,7 @@ export * from "./iho-builders.js";
 export * from "./simulated-water-level-builders.js";
 export * from "./viewer-feature-builders.js";
 export * from "./layer-builder.js";
+export * from "./map-specification-converter.js";
 
 export {
   S100ProductType,

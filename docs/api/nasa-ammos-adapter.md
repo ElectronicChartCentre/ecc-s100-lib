@@ -38,10 +38,9 @@ water-level layers are not IHO S-100 product-specification versioned.
 `staticObjects.THREE`, and links for Three.js and NASA-AMMOS 3D Tiles renderer
 docs.
 
-`scene.getEngineHandles()` returns the compatibility `ViewerScene` as
-`engineInstance`, with `instances.viewerScene`, `cameraNavigation`, `picking`,
-`pickingRay`, `hoverPrism`, and render-context entries (`renderer`, `scene`,
-`camera`, `canvas`) when available.
+`scene.getEngineHandles()` returns adapter-owned NASA-AMMOS scene internals as
+borrowed native handles. Use the canonical `S100Scene` APIs for application
+code; these handles are only for diagnostics and adapter-level integration.
 
 All native handles are borrowed references and become invalid after the owning
 scene or viewer is destroyed.
