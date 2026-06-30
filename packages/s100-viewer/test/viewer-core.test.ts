@@ -154,16 +154,12 @@ describe("createS100Viewer", () => {
       LayerBuilder.createS102({
         id: "controlled-s102",
         url: "https://example.test/s102/tileset.json",
+        detailFactor: 250,
         style: {
           unsafeDepth: -1,
           contours: {
             visible: false,
             intervalMeters: 5,
-          },
-        },
-        extensions: {
-          nasaAmmos: {
-            detailFactor: 250,
           },
         },
       }),
@@ -192,6 +188,9 @@ describe("createS100Viewer", () => {
       detailFactor: 700,
     });
     expect(terrain.spec.extensions?.cogs).toMatchObject({
+      detailFactor: 700,
+    });
+    expect(terrain.spec.extensions?.cesium).toMatchObject({
       detailFactor: 700,
     });
 
@@ -323,6 +322,13 @@ describe("createS100Viewer", () => {
           port: 10,
           starboard: 12,
         },
+        model: {
+          orientation: [0, 0, 0, 1],
+          boundingBox: {
+            min: [-10, -30, -8],
+            max: [12, 40, 4],
+          },
+        },
         style: {
           showSeaLevelIndicator: true,
           transformControls: "translate",
@@ -377,6 +383,24 @@ describe("createS100Viewer", () => {
       showOceanSurface: true,
       oceanSurface: true,
       transformControls: "rotate",
+    });
+    expect(vessel.spec.extensions?.nasaAmmos).toMatchObject({
+      model: {
+        orientation: [0, 0, 0, 1],
+        boundingBox: {
+          min: [-10, -30, -8],
+          max: [12, 40, 4],
+        },
+      },
+    });
+    expect(vessel.spec.extensions?.cesium).toMatchObject({
+      model: {
+        orientation: [0, 0, 0, 1],
+        boundingBox: {
+          min: [-10, -30, -8],
+          max: [12, 40, 4],
+        },
+      },
     });
     expect(vessel.spec.extensions?.nasaAmmos).toMatchObject({
       dimensions: {

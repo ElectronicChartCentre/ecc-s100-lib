@@ -352,7 +352,7 @@ class CoreTerrainLayerController implements TerrainLayerController {
         this.layer.spec.extensions,
         "detailFactor",
         this.settingsState.detailFactor,
-        ["nasaAmmos", "cogs"],
+        ["nasaAmmos", "cogs", "cesium"],
       ),
     });
   }

@@ -29,6 +29,7 @@ export type CreateS102LayerOptions = LayerBuilderCommonOptions<S102BathymetrySty
     verticalDatum?: string;
     ellipsoid?: "WGS84";
     sourceFrame?: ThreeDTilesSource["sourceFrame"];
+    detailFactor?: number;
   };
 
 export type CreateS111LayerOptions<TData = unknown> =
@@ -77,23 +78,61 @@ const mergeS111Style = (
   },
 });
 
-export const createS102 = (options: CreateS102LayerOptions): S102LayerSpec => ({
-  id: options.id ?? "s102-bathymetry",
-  product: S100ProductType.S102,
-  ...productSpecificationVersionField(options),
-  ...commonLayerFields(options),
-  source: {
-    kind: "3d-tiles",
-    url: options.url,
-    ...requestOptions(options),
-    ...(options.crs !== undefined ? { crs: options.crs } : {}),
-    ...(options.verticalDatum !== undefined ? { verticalDatum: options.verticalDatum } : {}),
-    ...(options.ellipsoid !== undefined ? { ellipsoid: options.ellipsoid } : {}),
-    ...(options.sourceFrame !== undefined ? { sourceFrame: options.sourceFrame } : {}),
-    ...(options.sourceMetadata !== undefined ? { metadata: options.sourceMetadata } : {}),
-  },
-  style: mergeS102Style(options.style),
-});
+export const createS102 = (options: CreateS102LayerOptions): S102LayerSpec => {
+  const commonOptions =
+    options.detailFactor === undefined
+      ? options
+      : {
+          ...options,
+          extensions: withNamespacedExtensionValue(
+            options.extensions,
+            "detailFactor",
+            options.detailFactor,
+            ["nasaAmmos", "cogs", "cesium"],
+          ),
+        };
+
+  return {
+    id: options.id ?? "s102-bathymetry",
+    product: S100ProductType.S102,
+    ...productSpecificationVersionField(options),
+    ...commonLayerFields(commonOptions),
+    source: {
+      kind: "3d-tiles",
+      url: options.url,
+      ...requestOptions(options),
+      ...(options.crs !== undefined ? { crs: options.crs } : {}),
+      ...(options.verticalDatum !== undefined ? { verticalDatum: options.verticalDatum } : {}),
+      ...(options.ellipsoid !== undefined ? { ellipsoid: options.ellipsoid } : {}),
+      ...(options.sourceFrame !== undefined ? { sourceFrame: options.sourceFrame } : {}),
+      ...(options.sourceMetadata !== undefined ? { metadata: options.sourceMetadata } : {}),
+    },
+    style: mergeS102Style(options.style),
+  };
+};
+
+const withNamespacedExtensionValue = (
+  extensions: Record<string, unknown> | undefined,
+  key: string,
+  value: number | boolean,
+  namespaces: readonly string[],
+): Record<string, unknown> => {
+  const next: Record<string, unknown> = {
+    ...extensions,
+  };
+
+  for (const namespace of namespaces) {
+    next[namespace] = {
+      ...(isRecord(extensions?.[namespace]) ? extensions?.[namespace] : {}),
+      [key]: value,
+    };
+  }
+
+  return next;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object";
 
 export const createS111 = <TData = unknown>(options: CreateS111LayerOptions<TData>): S111LayerSpec => ({
   id: options.id ?? "s111-currents",
