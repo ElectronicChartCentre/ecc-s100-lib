@@ -64,6 +64,9 @@ export interface S100Layer<TSpec extends BaseLayerSpec = BaseLayerSpec> {
 export interface LayerCollection {
   readonly size: number;
   add<TSpec extends BaseLayerSpec>(spec: TSpec): Promise<S100Layer<TSpec>>;
+  addMany<TSpec extends BaseLayerSpec>(
+    specs: readonly TSpec[],
+  ): Promise<Array<S100Layer<TSpec>>>;
   get<TSpec extends BaseLayerSpec = BaseLayerSpec>(id: string): S100Layer<TSpec> | undefined;
   has(id: string): boolean;
   remove(idOrLayer: string | S100Layer): Promise<boolean>;

@@ -5,6 +5,7 @@ import {
   getLayerDisplayTitle,
   isServiceReadySource,
   LayerBuilder,
+  ProjectedMap,
   mapSpecificationToLayerSpec,
   ProjectedMapDiscardMode,
   ProjectedMapLayerType,
@@ -207,6 +208,119 @@ describe("@ecc/s100-viewer product specs", () => {
       visible: false,
     });
     expect(spec.style?.depthColors).toBe("s102-depth-default");
+  });
+
+  it("builds projected map templates from center and extent", () => {
+    const template = ProjectedMap.fromCenterExtent({
+      center: {
+        easting: 500000,
+        northing: 7000000,
+        epsgCrs: "EPSG:32633",
+      },
+      widthMeters: 1000,
+      scale: 2,
+      discardMode: ProjectedMap.DiscardMode.None,
+    });
+
+    expect(template).toMatchObject({
+      crs: "EPSG:32633",
+      mapSubset: {
+        min: [0, 0],
+        max: [1, 1],
+      },
+      extents: {
+        minX: 499000,
+        maxX: 501000,
+        minY: 6999000,
+        maxY: 7001000,
+        crs: "EPSG:32633",
+      },
+      minLevel: 0,
+      maxLevel: 10,
+      discardMode: ProjectedMapDiscardMode.None,
+    });
+  });
+
+  it("builds transparent and opaque ENC WMS-template layer pairs", () => {
+    const pair = LayerBuilder.createEncWmsPair({
+      standard: LayerBuilder.EncStandard.S101,
+      center: {
+        x: 500000,
+        y: 7000000,
+        crs: "EPSG:32633",
+      },
+      widthMeters: 1000,
+      transparent: {
+        id: "s101-transparent",
+        urlTemplate: "https://example.test/s101-transparent/{z}/{x}/{y}.png",
+        visible: false,
+      },
+      opaque: {
+        id: "s101-opaque",
+        urlTemplate: "https://example.test/s101-opaque/{z}/{x}/{y}.png",
+        scale: 4,
+      },
+    });
+
+    expect(pair.transparent).toMatchObject({
+      id: "s101-transparent",
+      product: "S-101",
+      role: "overlay",
+      visible: false,
+      projectedMap: {
+        dataset: {
+          extents: {
+            minX: 499500,
+            maxX: 500500,
+          },
+        },
+      },
+    });
+    expect(pair.opaque).toMatchObject({
+      id: "s101-opaque",
+      product: "S-101",
+      role: "basemap",
+      projectedMap: {
+        dataset: {
+          extents: {
+            minX: 498000,
+            maxX: 502000,
+          },
+        },
+      },
+    });
+  });
+
+  it("prepares static S-111 layers with derived timeline metadata", () => {
+    const prepared = LayerBuilder.prepareStaticS111({
+      id: "s111-prepared",
+      data: {
+        dateTimeOfFirstRecord: "20260529T120000Z",
+        timeRecordInterval: 1800,
+        numberOfTimes: 3,
+      },
+      crs: "EPSG:32633",
+    });
+
+    expect(prepared.layer).toMatchObject({
+      id: "s111-prepared",
+      product: "S-111",
+      source: {
+        kind: "static-json",
+        crs: "EPSG:32633",
+      },
+    });
+    expect(prepared.timeline).toEqual({
+      startTime: Date.UTC(2026, 4, 29, 12, 0, 0),
+      endTime: Date.UTC(2026, 4, 29, 13, 0, 0),
+      stepSeconds: 1800,
+      recordCount: 3,
+      times: [
+        Date.UTC(2026, 4, 29, 12, 0, 0),
+        Date.UTC(2026, 4, 29, 12, 30, 0),
+        Date.UTC(2026, 4, 29, 13, 0, 0),
+      ],
+    });
   });
 
   it("builds common ENC, IHO, simulated water-level, vessel, and map overlay layers", () => {

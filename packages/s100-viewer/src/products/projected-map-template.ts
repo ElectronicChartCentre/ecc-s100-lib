@@ -33,6 +33,31 @@ export type ProjectedMapTemplateOptions = {
   discardMode?: number;
 };
 
+export type ProjectedMapCenter =
+  | {
+      x: number;
+      y: number;
+      crs?: string;
+    }
+  | {
+      easting: number;
+      northing: number;
+      epsgCrs?: string;
+    };
+
+export type ProjectedMapCenterExtentOptions =
+  Omit<ProjectedMapTemplateOptions, "corners" | "extents"> & {
+    center: ProjectedMapCenter;
+    widthMeters: number;
+    heightMeters?: number;
+    scale?: number;
+    crs?: string;
+  };
+
+export type ProjectedMapCenterExtentTemplate = ProjectedMapTemplateOptions & {
+  crs?: string;
+};
+
 export type ProjectedMapSpecification = {
   id: string;
   type: number;
@@ -97,6 +122,46 @@ export const projectedMapSpecification = (
   return specification;
 };
 
+export const projectedMapFromCenterExtent = (
+  options: ProjectedMapCenterExtentOptions,
+): ProjectedMapCenterExtentTemplate => {
+  const center = projectedMapCenter(options.center);
+  const scale = positiveNumber(options.scale, 1);
+  const width = positiveNumber(options.widthMeters, 1) * scale;
+  const height = positiveNumber(options.heightMeters ?? options.widthMeters, 1) * scale;
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const crs = options.crs ?? center.crs;
+  const extents: ProjectedMapExtents = {
+    minX: center.x - halfWidth,
+    maxX: center.x + halfWidth,
+    minY: center.y - halfHeight,
+    maxY: center.y + halfHeight,
+    ...(crs !== undefined ? { crs } : {}),
+  };
+
+  return {
+    ...(crs !== undefined ? { crs } : {}),
+    corners: projectedCornersFromExtents(extents),
+    mapSubset: options.mapSubset ?? {
+      min: [0, 0],
+      max: [1, 1],
+    },
+    extents,
+    minLevel: options.minLevel ?? 0,
+    maxLevel: options.maxLevel ?? 10,
+    ...(options.quality !== undefined ? { quality: options.quality } : {}),
+    ...(options.mapLayerType !== undefined ? { mapLayerType: options.mapLayerType } : {}),
+    ...(options.discardMode !== undefined ? { discardMode: options.discardMode } : {}),
+  };
+};
+
+export const ProjectedMap = {
+  DiscardMode: ProjectedMapDiscardMode,
+  LayerType: ProjectedMapLayerType,
+  fromCenterExtent: projectedMapFromCenterExtent,
+} as const;
+
 const projectedCornersFromExtents = (
   extents: ProjectedMapExtents,
 ): ProjectedMapCorners => ({
@@ -112,3 +177,19 @@ const projectedMapSubsetFromExtents = (
   min: [extents.minX, extents.minY],
   max: [extents.maxX, extents.maxY],
 });
+
+const projectedMapCenter = (
+  center: ProjectedMapCenter,
+): { x: number; y: number; crs?: string } => {
+  if ("easting" in center) {
+    return {
+      x: center.easting,
+      y: center.northing,
+      ...(center.epsgCrs !== undefined ? { crs: center.epsgCrs } : {}),
+    };
+  }
+  return center;
+};
+
+const positiveNumber = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;

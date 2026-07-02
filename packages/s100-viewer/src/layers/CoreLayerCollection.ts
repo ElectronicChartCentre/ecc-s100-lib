@@ -59,6 +59,21 @@ export class CoreLayerCollection implements LayerCollection {
     return layer;
   }
 
+  async addMany<TSpec extends BaseLayerSpec>(
+    specs: readonly TSpec[],
+  ): Promise<Array<S100Layer<TSpec>>> {
+    const added: Array<S100Layer<TSpec>> = [];
+    try {
+      for (const spec of specs) {
+        added.push(await this.add(spec));
+      }
+      return added;
+    } catch (error) {
+      await Promise.allSettled([...added].reverse().map((layer) => this.remove(layer)));
+      throw error;
+    }
+  }
+
   get<TSpec extends BaseLayerSpec = BaseLayerSpec>(id: string): S100Layer<TSpec> | undefined {
     return this.layers.get(id) as S100Layer<TSpec> | undefined;
   }

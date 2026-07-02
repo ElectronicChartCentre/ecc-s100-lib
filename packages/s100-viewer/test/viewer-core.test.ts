@@ -142,6 +142,71 @@ describe("createS100Viewer", () => {
     await viewer.destroy();
   });
 
+  it("adds related layer specs as a group and rolls back partial failures", async () => {
+    const viewer = await createS100Viewer({
+      adapter: createInMemoryAdapter({
+        failAddLayerIds: ["bad-map"],
+      }),
+    });
+    const scene = await viewer.createScene();
+
+    const added = await scene.layers.addMany([
+      LayerBuilder.createS101WmsTemplate({
+        id: "map-a",
+        urlTemplate: "https://example.test/s101/{z}/{x}/{y}.png",
+        extents: {
+          minX: 0,
+          minY: 0,
+          maxX: 10,
+          maxY: 10,
+        },
+      }),
+      LayerBuilder.createS101WmsTemplate({
+        id: "map-b",
+        urlTemplate: "https://example.test/s101-b/{z}/{x}/{y}.png",
+        extents: {
+          minX: 0,
+          minY: 0,
+          maxX: 10,
+          maxY: 10,
+        },
+      }),
+    ]);
+
+    expect(added.map((layer) => layer.id)).toEqual(["map-a", "map-b"]);
+    expect(scene.layers.size).toBe(2);
+
+    await expect(
+      scene.layers.addMany([
+        LayerBuilder.createS101WmsTemplate({
+          id: "rollback-map",
+          urlTemplate: "https://example.test/rollback/{z}/{x}/{y}.png",
+          extents: {
+            minX: 0,
+            minY: 0,
+            maxX: 10,
+            maxY: 10,
+          },
+        }),
+        LayerBuilder.createS101WmsTemplate({
+          id: "bad-map",
+          urlTemplate: "https://example.test/bad/{z}/{x}/{y}.png",
+          extents: {
+            minX: 0,
+            minY: 0,
+            maxX: 10,
+            maxY: 10,
+          },
+        }),
+      ]),
+    ).rejects.toThrow("configured to fail");
+
+    expect(scene.layers.has("rollback-map")).toBe(false);
+    expect(scene.layers.size).toBe(2);
+
+    await viewer.destroy();
+  });
+
   it("exposes typed controllers from canonical product layers", async () => {
     const viewer = await createS100Viewer({
       adapter: createInMemoryAdapter(),

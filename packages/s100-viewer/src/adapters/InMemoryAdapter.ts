@@ -40,6 +40,7 @@ export type InMemoryAdapterOptions = {
   onClearHoverPrism?: () => void;
   onLayerPatchListener?: (listener: EngineLayerPatchListener | null) => void;
   onCameraChangeListener?: (listener: EngineCameraChangeListener | null) => void;
+  failAddLayerIds?: readonly string[];
 };
 
 const defaultCameraPose = (): EngineCameraPose => ({
@@ -104,6 +105,7 @@ export const createInMemoryAdapter = (options: InMemoryAdapterOptions = {}): S10
             options.onClearHoverPrism,
             options.onLayerPatchListener,
             options.onCameraChangeListener,
+            options.failAddLayerIds,
           );
         },
         destroy(): void {
@@ -149,6 +151,7 @@ class InMemoryEngineScene implements EngineScene {
     private readonly onCameraChangeListener:
       | ((listener: EngineCameraChangeListener | null) => void)
       | undefined,
+    private readonly failAddLayerIds: readonly string[] | undefined,
   ) {}
 
   getEngineHandles(): EngineHandleBundle {
@@ -207,6 +210,9 @@ class InMemoryEngineScene implements EngineScene {
   }
 
   async addLayer(spec: BaseLayerSpec): Promise<EngineLayerHandle> {
+    if (this.failAddLayerIds?.includes(spec.id)) {
+      throw new Error(`In-memory adapter configured to fail layer '${spec.id}'.`);
+    }
     const handle: EngineLayerHandle = {
       id: spec.id,
       native: {

@@ -3,15 +3,21 @@ import {
   S101Styles,
   S57Styles,
   type EncLayerRole,
+  type EncLayerSpec,
+  type EncStandard as EncStandardValue,
   type S101EncLayerSpec,
   type S57EncLayerSpec,
 } from "./enc.js";
 import type { WmsSource } from "./sources.js";
 import type { S101EncStyle, S57EncStyle } from "./style.js";
 import {
+  ProjectedMap,
+  ProjectedMapDiscardMode,
   ProjectedMapLayerType,
+  projectedMapFromCenterExtent,
   projectedMapSpecification,
   projectedSpatialExtent,
+  type ProjectedMapCenterExtentOptions,
   type ProjectedMapTemplateOptions,
 } from "./projected-map-template.js";
 import {
@@ -73,6 +79,29 @@ export type CreateS57WmsLayerOptions = CreateEncWmsLayerBaseOptions<S57EncStyle>
 export type CreateS57WmtsLayerOptions = CreateEncWmtsLayerBaseOptions<S57EncStyle>;
 
 export type CreateS57WmsTemplateLayerOptions = CreateEncWmsTemplateLayerBaseOptions<S57EncStyle>;
+
+export type CreateEncWmsPairLayerOptions = {
+  id?: string;
+  urlTemplate: string;
+  role?: EncLayerRole;
+  visible?: boolean;
+  opacity?: number;
+  layers?: readonly string[];
+  scale?: number;
+};
+
+export type CreateEncWmsPairOptions =
+  ProductSpecificationVersionOptions &
+    Omit<ProjectedMapCenterExtentOptions, "scale" | "mapLayerType"> & {
+      standard: EncStandardValue;
+      transparent: CreateEncWmsPairLayerOptions;
+      opaque?: CreateEncWmsPairLayerOptions;
+    };
+
+export type EncWmsPairLayerSpecs<TSpec extends EncLayerSpec = EncLayerSpec> = {
+  transparent: TSpec;
+  opaque?: TSpec;
+};
 
 const mergeS101Style = (style: Partial<S101EncStyle> | undefined): S101EncStyle => ({
   ...S101Styles.DEFAULT,
@@ -247,10 +276,32 @@ export const createS57Wmts = (options: CreateS57WmtsLayerOptions): S57EncLayerSp
   style: mergeS57Style(options.style),
 });
 
+export function createEncWmsPair(
+  options: CreateEncWmsPairOptions & { standard: typeof EncStandard.S101 },
+): EncWmsPairLayerSpecs<S101EncLayerSpec>;
+export function createEncWmsPair(
+  options: CreateEncWmsPairOptions & { standard: typeof EncStandard.S57 },
+): EncWmsPairLayerSpecs<S57EncLayerSpec>;
+export function createEncWmsPair(options: CreateEncWmsPairOptions): EncWmsPairLayerSpecs {
+  const transparent = createEncWmsTemplateFromPairLayer(options, options.transparent, "overlay");
+  const opaque = options.opaque
+    ? createEncWmsTemplateFromPairLayer(options, options.opaque, "basemap")
+    : undefined;
+
+  return {
+    transparent,
+    ...(opaque !== undefined ? { opaque } : {}),
+  };
+}
+
 export const EncLayerBuilder = {
   EncStandard,
+  ProjectedMap,
+  ProjectedMapDiscardMode,
+  ProjectedMapLayerType,
   S101Styles,
   S57Styles,
+  createEncWmsPair,
   createS101Wms,
   createS101WmsTemplate,
   createS101Wmts,
@@ -263,3 +314,41 @@ const mapLayerTypeForRole = (role: EncLayerRole): number =>
   role === "basemap"
     ? ProjectedMapLayerType.Base
     : ProjectedMapLayerType.BaseTransparent;
+
+const createEncWmsTemplateFromPairLayer = (
+  options: CreateEncWmsPairOptions,
+  layer: CreateEncWmsPairLayerOptions,
+  defaultRole: EncLayerRole,
+): EncLayerSpec => {
+  const role = layer.role ?? defaultRole;
+  const geometry = projectedMapFromCenterExtent({
+    center: options.center,
+    widthMeters: options.widthMeters,
+    ...(options.heightMeters !== undefined ? { heightMeters: options.heightMeters } : {}),
+    ...(options.crs !== undefined ? { crs: options.crs } : {}),
+    ...(options.mapSubset !== undefined ? { mapSubset: options.mapSubset } : {}),
+    ...(options.minLevel !== undefined ? { minLevel: options.minLevel } : {}),
+    ...(options.maxLevel !== undefined ? { maxLevel: options.maxLevel } : {}),
+    ...(options.quality !== undefined ? { quality: options.quality } : {}),
+    ...(options.discardMode !== undefined ? { discardMode: options.discardMode } : {}),
+    ...(layer.scale !== undefined ? { scale: layer.scale } : {}),
+    mapLayerType: mapLayerTypeForRole(role),
+  });
+  const templateOptions = {
+    urlTemplate: layer.urlTemplate,
+    role,
+    ...(layer.id !== undefined ? { id: layer.id } : {}),
+    ...(layer.visible !== undefined ? { visible: layer.visible } : {}),
+    ...(layer.opacity !== undefined ? { opacity: layer.opacity } : {}),
+    ...(layer.layers !== undefined ? { layers: layer.layers } : {}),
+    ...(options.productSpecificationVersion !== undefined
+      ? { productSpecificationVersion: options.productSpecificationVersion }
+      : {}),
+    ...geometry,
+  };
+
+  if (options.standard === EncStandard.S57) {
+    return createS57WmsTemplate(templateOptions);
+  }
+  return createS101WmsTemplate(templateOptions);
+};
