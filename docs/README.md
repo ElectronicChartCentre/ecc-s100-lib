@@ -6,4 +6,5 @@ shape.
 - [Package readiness](./package-readiness.md)
 - [Developer ergonomics review](./developer-ergonomics-review.md)
 - [Cogs adapter extraction plan](./cogs-adapter-extraction-plan.md)
-- [API docs](./api/README.md)
+- [API docs](./api/README.md), including the
+  [canonical app integration guide](./api/canonical-app-integration.md)

@@ -3,6 +3,7 @@
 Current hand-written API notes for Phase 8:
 
 - [Core API](./core.md)
+- [Canonical App Integration](./canonical-app-integration.md)
 - [Product Specs](./products.md)
 - [NASA-AMMOS Adapter](./nasa-ammos-adapter.md)
 - [Cesium Adapter](./cesium-adapter.md)
