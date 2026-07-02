@@ -2105,7 +2105,7 @@ class CesiumEngineScene implements EngineScene {
   private createProjectedWmsDefinition(
     spec: EncLayerSpec | MapOverlayLayerSpec,
   ): ProjectedWmsDefinition | null {
-    const mapSpec = getMapSpecificationExtension(spec);
+    const mapSpec = spec.projectedMap ?? getMapSpecificationExtension(spec);
     if (mapSpec?.urlTemplate && mapSpec.dataset?.extents) {
       const crs = mapSpec.dataset.extents.crs ?? spec.source.crs ?? this.sceneCrs();
       return {
@@ -6624,6 +6624,9 @@ function getVesselOceanSurfaceOptions(spec: VesselLayerSpec): {
   roughness?: number;
   reflectivity?: number;
 } {
+  if (typeof spec.rendering?.oceanSurfaceVisible === "boolean") {
+    return { enabled: spec.rendering.oceanSurfaceVisible };
+  }
   const style = spec.style?.oceanSurface;
   if (typeof style === "boolean") {
     return { enabled: style };
@@ -6648,6 +6651,9 @@ function getVesselShadowOptions(spec: VesselLayerSpec): {
   opacity?: number;
   color?: unknown;
 } {
+  if (typeof spec.rendering?.shadowVisible === "boolean") {
+    return { enabled: spec.rendering.shadowVisible };
+  }
   const style = spec.style?.shadow;
   if (typeof style === "boolean") {
     return { enabled: style };
@@ -6665,7 +6671,7 @@ function getVesselShadowOptions(spec: VesselLayerSpec): {
 }
 
 function getVesselModelRootOffset(spec: VesselLayerSpec): Vector3Fields {
-  const model = getExtension<Record<string, unknown>>(spec, "nasaAmmos", "model") ?? {};
+  const model = spec.model ?? getExtension<Record<string, unknown>>(spec, "nasaAmmos", "model") ?? {};
   const bounds = parseVesselBoundingBox(model.boundingBox);
   if (!bounds) {
     return { x: 0, y: 0, z: 0 };

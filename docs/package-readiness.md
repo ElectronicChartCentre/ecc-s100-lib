@@ -37,20 +37,22 @@ npm run pack:release-target:dry-run
 
 ## Consumer Dependency References
 
-During the current private alpha integration, S-100 Explorer should use local
-`file:` dependencies that point at the parent repo's pinned `libs/ecc-s100-lib`
-submodule:
+During the current public alpha integration, S-100 Explorer should consume
+immutable GitHub release tarballs for the maintained package set:
 
 ```json
 {
-  "@ecc/s100-viewer": "file:../../../libs/ecc-s100-lib/packages/s100-viewer",
-  "@ecc/s100-viewer-adapter-nasa-ammos": "file:../../../libs/ecc-s100-lib/packages/s100-viewer-adapter-nasa-ammos",
-  "@ecc/s100-viewer-adapter-cesium": "file:../../../libs/ecc-s100-lib/packages/s100-viewer-adapter-cesium"
+  "@ecc/s100-viewer": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.4/ecc-s100-viewer-0.1.0-alpha.4.tgz",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.4/ecc-s100-viewer-adapter-nasa-ammos-0.1.0-alpha.4.tgz",
+  "@ecc/s100-viewer-adapter-cesium": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.4/ecc-s100-viewer-adapter-cesium-0.1.0-alpha.4.tgz"
 }
 ```
 
-Those references are intentionally local for now. They are not the intended
-long-term consumption shape once the packages are public.
+Those references are intentionally release-pinned so a fresh checkout resolves
+the same API surface that the webapp was validated against. Local `file:`
+dependencies can still be used as a development shortcut inside the
+superproject, but they should not be committed as the normal Explorer
+dependency mode while the app is validating release tarballs.
 
 The source repo already exists at
 `https://github.com/ElectronicChartCentre/ecc-s100-lib`, and each package
@@ -60,8 +62,7 @@ installable from a dependency entry. A plain dependency such as
 `github:ElectronicChartCentre/ecc-s100-lib` makes npm install the repository
 root, not an individual workspace package under `packages/*`.
 
-If the packages need to be consumed outside this parent checkout before public
-npm publication, use package tarballs attached to immutable GitHub releases:
+The previous alpha.1 release used this same tarball pattern:
 
 ```json
 {
@@ -75,9 +76,9 @@ After public npm publication, S-100 Explorer should consume registry versions:
 
 ```json
 {
-  "@ecc/s100-viewer": "0.1.0-alpha.1",
-  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.1",
-  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.1"
+  "@ecc/s100-viewer": "0.1.0-alpha.4",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.4",
+  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.4"
 }
 ```
 

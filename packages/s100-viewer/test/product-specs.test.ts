@@ -156,6 +156,9 @@ describe("@ecc/s100-viewer product specs", () => {
     const spec: S102LayerSpec = LayerBuilder.createS102({
       url: "https://example.test/s102/tileset.json",
       crs: "EPSG:32633",
+      rendering: {
+        detailFactor: 250,
+      },
     });
 
     expect(spec).toMatchObject({
@@ -167,6 +170,9 @@ describe("@ecc/s100-viewer product specs", () => {
         kind: "3d-tiles",
         url: "https://example.test/s102/tileset.json",
         crs: "EPSG:32633",
+      },
+      rendering: {
+        detailFactor: 250,
       },
       style: LayerBuilder.S102Styles.DEFAULT,
     });
@@ -342,20 +348,18 @@ describe("@ecc/s100-viewer product specs", () => {
         maxX: 10,
         maxY: 10,
       },
-      extensions: {
-        nasaAmmos: {
+      projectedMap: {
+        id: "s101-template",
+        dataset: {
           minLevel: 2,
           maxLevel: 12,
-        },
-        cogs: {
-          minLevel: 2,
-          maxLevel: 12,
-          discardMode: ProjectedMapDiscardMode.MaskLayerAlphaZero,
         },
       },
+      mapRendering: {
+        discardMode: ProjectedMapDiscardMode.MaskLayerAlphaZero,
+      },
     });
-    expect("mapSpecification" in ((s101Template.extensions?.nasaAmmos ?? {}) as Record<string, unknown>))
-      .toBe(true);
+    expect(s101Template.projectedMap?.urlTemplate).toContain("bbox={xmin},{ymin},{xmax},{ymax}");
   });
 
   it("converts runtime map specifications into canonical ENC WMS-template layers", () => {
@@ -407,19 +411,17 @@ describe("@ecc/s100-viewer product specs", () => {
         maxX: 10,
         maxY: 10,
       },
-      extensions: {
-        nasaAmmos: {
+      projectedMap: {
+        id: "s57WMS",
+        dataset: {
           minLevel: 2,
           maxLevel: 12,
-        },
-        cogs: {
-          minLevel: 2,
-          maxLevel: 12,
-          discardMode: ProjectedMapDiscardMode.MaskLayerAlphaZero,
         },
       },
+      mapRendering: {
+        discardMode: ProjectedMapDiscardMode.MaskLayerAlphaZero,
+      },
     });
-    expect("mapSpecification" in ((spec.extensions?.nasaAmmos ?? {}) as Record<string, unknown>))
-      .toBe(true);
+    expect(spec.projectedMap?.urlTemplate).toContain("bbox={xmin},{ymin},{xmax},{ymax}");
   });
 });

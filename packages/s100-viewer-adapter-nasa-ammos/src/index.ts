@@ -491,7 +491,7 @@ class NasaAmmosEngineScene implements EngineScene {
     } = {
       baseURL: spec.source.url,
       additionalURLParameters: buildAdditionalUrlParameters(spec),
-      detailFactor: getNumberExtension(spec, "detailFactor", 1),
+      detailFactor: getS102DetailFactor(spec),
     };
     const accessToken = getAuthorizationBearer(spec.source);
     if (accessToken !== undefined) {
@@ -790,7 +790,7 @@ function applyVisibility(
 }
 
 function createMapSpecification(spec: EncLayerSpec | MapOverlayLayerSpec): MapSpecification {
-  const nativeSpec = getNasaAmmosExtension<MapSpecification>(spec, "mapSpecification");
+  const nativeSpec = spec.projectedMap ?? getNasaAmmosExtension<MapSpecification>(spec, "mapSpecification");
   if (nativeSpec) {
     return nativeSpec;
   }
@@ -1063,11 +1063,12 @@ function getVesselDimensions(spec: VesselLayerSpec): VesselDimensions {
 }
 
 function getVesselModel(spec: VesselLayerSpec): Partial<ModelAssetSpecification> {
-  return getNasaAmmosExtension<Partial<ModelAssetSpecification>>(spec, "model") ?? {};
+  return spec.model ?? getNasaAmmosExtension<Partial<ModelAssetSpecification>>(spec, "model") ?? {};
 }
 
 function applyVesselPresentation(view: VesselView, spec: VesselLayerSpec): void {
-  view.seaLevelIndicator.mode = spec.style?.showSeaLevelIndicator
+  const seaLevelIndicator = spec.rendering?.seaLevelIndicator ?? spec.style?.showSeaLevelIndicator;
+  view.seaLevelIndicator.mode = seaLevelIndicator !== false
     ? SeaLevelIndicatorMode.Circle
     : SeaLevelIndicatorMode.Off;
   view.seaLevelIndicator.seaSurfaceVisible = getVesselOceanSurfaceEnabled(spec);
@@ -1075,6 +1076,9 @@ function applyVesselPresentation(view: VesselView, spec: VesselLayerSpec): void 
 }
 
 function getVesselOceanSurfaceEnabled(spec: VesselLayerSpec): boolean {
+  if (typeof spec.rendering?.oceanSurfaceVisible === "boolean") {
+    return spec.rendering.oceanSurfaceVisible;
+  }
   if (typeof spec.style?.oceanSurface === "boolean") {
     return spec.style.oceanSurface;
   }
@@ -1088,6 +1092,9 @@ function getVesselOceanSurfaceEnabled(spec: VesselLayerSpec): boolean {
 }
 
 function getVesselShadowEnabled(spec: VesselLayerSpec): boolean {
+  if (typeof spec.rendering?.shadowVisible === "boolean") {
+    return spec.rendering.shadowVisible;
+  }
   if (typeof spec.style?.shadow === "boolean") {
     return spec.style.shadow;
   }
@@ -1131,6 +1138,10 @@ function getNasaAmmosExtension<T>(spec: BaseLayerSpec, key: string): T | undefin
     return undefined;
   }
   return (extension as Record<string, unknown>)[key] as T | undefined;
+}
+
+function getS102DetailFactor(spec: S102BathymetryLayerSpec): number {
+  return spec.rendering?.detailFactor ?? getNumberExtension(spec, "detailFactor", 1);
 }
 
 function getNumberExtension(spec: BaseLayerSpec, key: string, fallback: number): number {

@@ -1,6 +1,7 @@
 import type { BaseLayerSpec } from "../layers/types.js";
 import { S100ProductType } from "../layers/types.js";
 import type { S100ProductSpecificationVersion } from "./iho-s100.js";
+import type { ProjectedMapSpecification } from "./projected-map-template.js";
 import type { MvtSource, WmsSource, WmsTemplateSource, WmtsSource } from "./sources.js";
 import type { EncCommonStyle, S101EncStyle, S57EncStyle } from "./style.js";
 
@@ -12,6 +13,9 @@ export const EncStandard = {
 export type EncStandard = (typeof EncStandard)[keyof typeof EncStandard];
 export type EncLayerRole = "basemap" | "overlay" | "chart";
 export type EncSource = WmsSource | WmsTemplateSource | WmtsSource | MvtSource;
+export type EncMapRenderingOptions = {
+  discardMode?: number;
+};
 
 export interface BaseEncLayerSpec<
   TStandard extends EncStandard = EncStandard,
@@ -21,6 +25,8 @@ export interface BaseEncLayerSpec<
   standard: TStandard;
   source: EncSource;
   role?: EncLayerRole;
+  projectedMap?: ProjectedMapSpecification;
+  mapRendering?: EncMapRenderingOptions;
   style?: TStyle;
 }
 

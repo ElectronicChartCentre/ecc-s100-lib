@@ -80,6 +80,7 @@ export type {
   SurfaceCurrentLayerController,
   SurfaceCurrentTimeController,
   TerrainContourOptions,
+  TerrainDebugPatch,
   TerrainDisplayController,
   TerrainDisplayPatch,
   TerrainLayerController,

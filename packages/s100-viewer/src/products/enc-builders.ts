@@ -11,7 +11,6 @@ import type { S101EncStyle, S57EncStyle } from "./style.js";
 import {
   ProjectedMapLayerType,
   projectedMapSpecification,
-  projectedMapTemplateExtensions,
   projectedSpatialExtent,
   type ProjectedMapTemplateOptions,
 } from "./projected-map-template.js";
@@ -160,7 +159,8 @@ export const createS101WmsTemplate = (
     role,
     ...common,
     spatialExtent: options.spatialExtent ?? projectedSpatialExtent(options.extents),
-    extensions: projectedMapTemplateExtensions(common.extensions, mapSpecification, options),
+    projectedMap: mapSpecification,
+    ...(options.discardMode !== undefined ? { mapRendering: { discardMode: options.discardMode } } : {}),
     source: {
       kind: "wms-template",
       urlTemplate: options.urlTemplate,
@@ -213,7 +213,8 @@ export const createS57WmsTemplate = (
     role,
     ...common,
     spatialExtent: options.spatialExtent ?? projectedSpatialExtent(options.extents),
-    extensions: projectedMapTemplateExtensions(common.extensions, mapSpecification, options),
+    projectedMap: mapSpecification,
+    ...(options.discardMode !== undefined ? { mapRendering: { discardMode: options.discardMode } } : {}),
     source: {
       kind: "wms-template",
       urlTemplate: options.urlTemplate,

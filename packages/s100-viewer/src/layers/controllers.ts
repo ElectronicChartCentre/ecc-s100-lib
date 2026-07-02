@@ -21,19 +21,23 @@ export type LayerControllerContext = {
   getSceneTime?(): Date;
 };
 
+type Mutable<T> = {
+  -readonly [K in keyof T]: T[K];
+};
+
 export type TerrainDisplayController = {
-  unsafeDepth: number;
-  seaLevel: number;
-  seaContour: boolean;
-  showContour: boolean;
-  contourInterval: number;
+  readonly unsafeDepth: number;
+  readonly seaLevel: number;
+  readonly seaContour: boolean;
+  readonly showContour: boolean;
+  readonly contourInterval: number;
 };
 
 export type TerrainSettingsController = {
-  renderBBoxes: boolean;
-  detailFactor: number;
-  neverDiscardRootNodes: boolean;
-  waitForSiblings: boolean;
+  readonly renderBBoxes: boolean;
+  readonly detailFactor: number;
+  readonly neverDiscardRootNodes: boolean;
+  readonly waitForSiblings: boolean;
 };
 
 export type TerrainContourOptions = {
@@ -48,6 +52,10 @@ export type TerrainDisplayPatch = {
   contours?: TerrainContourOptions;
 };
 
+export type TerrainDebugPatch = {
+  showTileBounds?: boolean;
+};
+
 export type TerrainLayerController = {
   readonly kind: "s102-terrain";
   readonly terrain: TerrainDisplayController;
@@ -57,6 +65,8 @@ export type TerrainLayerController = {
   setContours(options: TerrainContourOptions): Promise<void>;
   updateDisplayStyle(patch: TerrainDisplayPatch): Promise<void>;
   setDetailFactor(value: number): Promise<void>;
+  setTileBoundsVisible(visible: boolean): Promise<void>;
+  updateDebugOptions(patch: TerrainDebugPatch): Promise<void>;
 };
 
 export type SurfaceCurrentTimeController = {
@@ -67,9 +77,9 @@ export type SurfaceCurrentTimeController = {
 
 export type SurfaceCurrentLayerController = {
   readonly kind: "s111-surface-current";
-  disableAutoScaling: boolean;
-  scalingMode: "auto" | "custom";
-  customScale: number;
+  readonly disableAutoScaling: boolean;
+  readonly scalingMode: "auto" | "custom";
+  readonly customScale: number;
   readonly time: SurfaceCurrentTimeController;
   setCustomScale(scale: number): Promise<void>;
   setAutoScaling(enabled: boolean): Promise<void>;
@@ -78,8 +88,8 @@ export type SurfaceCurrentLayerController = {
 
 export type MapLayerController = {
   readonly kind: "projected-map";
-  alpha: number;
-  discardMode: number;
+  readonly alpha: number;
+  readonly discardMode: number;
   setAlpha(value: number): Promise<void>;
   setVisibility(visible: boolean): Promise<void>;
   setDiscardMode(discardMode: number): Promise<void>;
@@ -88,14 +98,14 @@ export type MapLayerController = {
 export type VesselSeaLevelIndicatorMode = "off" | "circle";
 
 export type VesselSeaLevelIndicatorController = {
-  mode: VesselSeaLevelIndicatorMode;
-  oceanSurfaceVisible: boolean;
+  readonly mode: VesselSeaLevelIndicatorMode;
+  readonly oceanSurfaceVisible: boolean;
   setMode(mode: VesselSeaLevelIndicatorMode): Promise<void>;
   setOceanSurfaceVisible(visible: boolean): Promise<void>;
 };
 
 export type VesselTransformController = {
-  mode: VesselTransformControlMode;
+  readonly mode: VesselTransformControlMode;
   setMode(mode: VesselTransformControlMode): Promise<void>;
 };
 
@@ -185,8 +195,8 @@ class CoreTerrainLayerController implements TerrainLayerController {
   readonly kind = "s102-terrain" as const;
   readonly terrain: TerrainDisplayController;
   readonly settings: TerrainSettingsController;
-  private readonly terrainState: TerrainDisplayController;
-  private readonly settingsState: TerrainSettingsController;
+  private readonly terrainState: Mutable<TerrainDisplayController>;
+  private readonly settingsState: Mutable<TerrainSettingsController>;
 
   constructor(private readonly layer: S100Layer<S102BathymetryLayerSpec>) {
     const spec = layer.spec;
@@ -199,8 +209,8 @@ class CoreTerrainLayerController implements TerrainLayerController {
       contourInterval: finiteNumber(contours?.intervalMeters, 5),
     };
     this.settingsState = {
-      renderBBoxes: false,
-      detailFactor: getNumberFromExtensions(spec.extensions, "detailFactor", 1),
+      renderBBoxes: spec.debug?.showTileBounds ?? false,
+      detailFactor: spec.rendering?.detailFactor ?? getNumberFromExtensions(spec.extensions, "detailFactor", 1),
       neverDiscardRootNodes: false,
       waitForSiblings: false,
     };
@@ -211,64 +221,38 @@ class CoreTerrainLayerController implements TerrainLayerController {
         controller.syncFromLayerSpec();
         return controller.terrainState.unsafeDepth;
       },
-      set unsafeDepth(value: number) {
-        void controller.setUnsafeDepth(value);
-      },
       get seaLevel() {
         controller.syncFromLayerSpec();
         return controller.terrainState.seaLevel;
-      },
-      set seaLevel(value: number) {
-        void controller.setSeaLevel(value);
       },
       get seaContour() {
         controller.syncFromLayerSpec();
         return controller.terrainState.seaContour;
       },
-      set seaContour(value: boolean) {
-        void controller.setContours({ seaContour: value });
-      },
       get showContour() {
         controller.syncFromLayerSpec();
         return controller.terrainState.showContour;
-      },
-      set showContour(value: boolean) {
-        void controller.setContours({ visible: value });
       },
       get contourInterval() {
         controller.syncFromLayerSpec();
         return controller.terrainState.contourInterval;
       },
-      set contourInterval(value: number) {
-        void controller.setContours({ intervalMeters: value });
-      },
     };
 
     this.settings = {
       get renderBBoxes() {
+        controller.syncFromLayerSpec();
         return controller.settingsState.renderBBoxes;
-      },
-      set renderBBoxes(value: boolean) {
-        controller.settingsState.renderBBoxes = value;
       },
       get detailFactor() {
         controller.syncFromLayerSpec();
         return controller.settingsState.detailFactor;
       },
-      set detailFactor(value: number) {
-        void controller.setDetailFactor(value);
-      },
       get neverDiscardRootNodes() {
         return controller.settingsState.neverDiscardRootNodes;
       },
-      set neverDiscardRootNodes(value: boolean) {
-        controller.settingsState.neverDiscardRootNodes = value;
-      },
       get waitForSiblings() {
         return controller.settingsState.waitForSiblings;
-      },
-      set waitForSiblings(value: boolean) {
-        controller.settingsState.waitForSiblings = value;
       },
     };
   }
@@ -289,11 +273,10 @@ class CoreTerrainLayerController implements TerrainLayerController {
       contours?.intervalMeters,
       this.terrainState.contourInterval,
     );
-    this.settingsState.detailFactor = getNumberFromExtensions(
-      spec.extensions,
-      "detailFactor",
-      this.settingsState.detailFactor,
-    );
+    this.settingsState.renderBBoxes = spec.debug?.showTileBounds ?? this.settingsState.renderBBoxes;
+    this.settingsState.detailFactor =
+      spec.rendering?.detailFactor ??
+      getNumberFromExtensions(spec.extensions, "detailFactor", this.settingsState.detailFactor);
   }
 
   setUnsafeDepth(value: number): Promise<void> {
@@ -348,12 +331,27 @@ class CoreTerrainLayerController implements TerrainLayerController {
     this.syncFromLayerSpec();
     this.settingsState.detailFactor = finiteNumber(value, this.settingsState.detailFactor);
     await this.layer.update({
-      extensions: withNamespacedExtensionValue(
-        this.layer.spec.extensions,
-        "detailFactor",
-        this.settingsState.detailFactor,
-        ["nasaAmmos", "cogs", "cesium"],
-      ),
+      rendering: {
+        ...this.layer.spec.rendering,
+        detailFactor: this.settingsState.detailFactor,
+      },
+    });
+  }
+
+  setTileBoundsVisible(visible: boolean): Promise<void> {
+    return this.updateDebugOptions({ showTileBounds: visible });
+  }
+
+  async updateDebugOptions(patch: TerrainDebugPatch): Promise<void> {
+    this.syncFromLayerSpec();
+    if (patch.showTileBounds !== undefined) {
+      this.settingsState.renderBBoxes = patch.showTileBounds;
+    }
+    await this.layer.update({
+      debug: {
+        ...this.layer.spec.debug,
+        showTileBounds: this.settingsState.renderBBoxes,
+      },
     });
   }
 }
@@ -415,26 +413,14 @@ class CoreSurfaceCurrentLayerController implements SurfaceCurrentLayerController
     return this.disableAutoScalingState;
   }
 
-  set disableAutoScaling(value: boolean) {
-    void this.setAutoScaling(!value);
-  }
-
   get scalingMode(): "auto" | "custom" {
     this.syncScaleFromLayerSpec();
     return this.scalingModeState;
   }
 
-  set scalingMode(value: "auto" | "custom") {
-    void this.setAutoScaling(value === "auto");
-  }
-
   get customScale(): number {
     this.syncScaleFromLayerSpec();
     return this.customScaleState;
-  }
-
-  set customScale(value: number) {
-    void this.setCustomScale(value);
   }
 
   async setCustomScale(scale: number): Promise<void> {
@@ -493,7 +479,7 @@ class CoreMapLayerController implements MapLayerController {
 
   constructor(private readonly layer: S100Layer<EncLayerSpec | MapOverlayLayerSpec>) {
     this.alphaState = clamp01(layer.spec.opacity ?? 1);
-    this.discardModeState = getNumberFromExtensions(layer.spec.extensions, "discardMode", 1);
+    this.discardModeState = getMapDiscardMode(layer.spec, 1);
   }
 
   get alpha(): number {
@@ -501,17 +487,9 @@ class CoreMapLayerController implements MapLayerController {
     return this.alphaState;
   }
 
-  set alpha(value: number) {
-    void this.setAlpha(value);
-  }
-
   get discardMode(): number {
     this.syncFromLayerSpec();
     return this.discardModeState;
-  }
-
-  set discardMode(value: number) {
-    void this.setDiscardMode(value);
   }
 
   async setAlpha(value: number): Promise<void> {
@@ -529,22 +507,16 @@ class CoreMapLayerController implements MapLayerController {
     this.syncFromLayerSpec();
     this.discardModeState = finiteNumber(discardMode, this.discardModeState);
     await this.layer.update({
-      extensions: withNamespacedExtensionValue(
-        this.layer.spec.extensions,
-        "discardMode",
-        this.discardModeState,
-        ["cogs"],
-      ),
+      mapRendering: {
+        ...this.layer.spec.mapRendering,
+        discardMode: this.discardModeState,
+      },
     });
   }
 
   private syncFromLayerSpec(): void {
     this.alphaState = clamp01(this.layer.spec.opacity ?? this.layer.opacity);
-    this.discardModeState = getNumberFromExtensions(
-      this.layer.spec.extensions,
-      "discardMode",
-      this.discardModeState,
-    );
+    this.discardModeState = getMapDiscardMode(this.layer.spec, this.discardModeState);
   }
 }
 
@@ -602,7 +574,8 @@ class CoreVesselLayerController implements VesselLayerController {
     this.dimensions = vesselDimensionsFromSpec(layer.spec);
     this.positionState = coordinateToVec3Tuple(layer.spec.pose.position);
     this.headingState = normalizeDegrees(layer.spec.pose.headingDegrees ?? 0);
-    this.seaLevelIndicatorModeState = layer.spec.style?.showSeaLevelIndicator === false
+    this.seaLevelIndicatorModeState = layer.spec.rendering?.seaLevelIndicator === false ||
+      layer.spec.style?.showSeaLevelIndicator === false
       ? "off"
       : "circle";
     this.oceanSurfaceVisibleState = vesselOceanSurfaceVisible(layer.spec);
@@ -614,15 +587,9 @@ class CoreVesselLayerController implements VesselLayerController {
         controller.syncFromLayerSpec(false);
         return controller.seaLevelIndicatorModeState;
       },
-      set mode(mode: VesselSeaLevelIndicatorMode) {
-        void controller.setSeaLevelIndicatorMode(mode);
-      },
       get oceanSurfaceVisible() {
         controller.syncFromLayerSpec(false);
         return controller.oceanSurfaceVisibleState;
-      },
-      set oceanSurfaceVisible(visible: boolean) {
-        void controller.setOceanSurfaceVisible(visible);
       },
       setMode(mode: VesselSeaLevelIndicatorMode) {
         return controller.setSeaLevelIndicatorMode(mode);
@@ -635,9 +602,6 @@ class CoreVesselLayerController implements VesselLayerController {
     this.transformControls = {
       get mode() {
         return controller.getTransformMode();
-      },
-      set mode(mode: VesselTransformControlMode) {
-        void controller.setTransformMode(mode);
       },
       setMode(mode: VesselTransformControlMode) {
         return controller.setTransformMode(mode);
@@ -693,12 +657,6 @@ class CoreVesselLayerController implements VesselLayerController {
         ...this.layer.spec.style,
         draughtMeters: this.dimensions.draught,
       },
-      extensions: withNamespacedExtensionObject(
-        this.layer.spec.extensions,
-        "dimensions",
-        { ...this.dimensions },
-        ["nasaAmmos", "cogs", "cesium"],
-      ),
     });
   }
 
@@ -710,6 +668,10 @@ class CoreVesselLayerController implements VesselLayerController {
   async setSeaLevelIndicatorMode(mode: VesselSeaLevelIndicatorMode): Promise<void> {
     this.seaLevelIndicatorModeState = mode;
     await this.layer.update({
+      rendering: {
+        ...this.layer.spec.rendering,
+        seaLevelIndicator: mode === "circle",
+      },
       style: {
         ...this.layer.spec.style,
         showSeaLevelIndicator: mode === "circle",
@@ -720,17 +682,15 @@ class CoreVesselLayerController implements VesselLayerController {
   async setOceanSurfaceVisible(visible: boolean): Promise<void> {
     this.oceanSurfaceVisibleState = visible;
     await this.layer.update({
+      rendering: {
+        ...this.layer.spec.rendering,
+        oceanSurfaceVisible: visible,
+      },
       style: {
         ...this.layer.spec.style,
         showOceanSurface: visible,
         oceanSurface: visible,
       },
-      extensions: withNamespacedExtensionValue(
-        this.layer.spec.extensions,
-        "seaSurfaceVisible",
-        visible,
-        ["nasaAmmos", "cogs", "cesium"],
-      ),
     });
   }
 
@@ -838,7 +798,8 @@ class CoreVesselLayerController implements VesselLayerController {
     this.positionState = nextPosition;
     this.headingState = nextHeading;
     Object.assign(this.dimensions, vesselDimensionsFromSpec(spec));
-    this.seaLevelIndicatorModeState = spec.style?.showSeaLevelIndicator === false
+    this.seaLevelIndicatorModeState = spec.rendering?.seaLevelIndicator === false ||
+      spec.style?.showSeaLevelIndicator === false
       ? "off"
       : "circle";
     this.oceanSurfaceVisibleState = vesselOceanSurfaceVisible(spec);
@@ -1103,6 +1064,9 @@ const normalizeVesselDimensions = (
 });
 
 const vesselOceanSurfaceVisible = (spec: VesselLayerSpec): boolean => {
+  if (typeof spec.rendering?.oceanSurfaceVisible === "boolean") {
+    return spec.rendering.oceanSurfaceVisible;
+  }
   if (typeof spec.style?.oceanSurface === "boolean") {
     return spec.style.oceanSurface;
   }
@@ -1114,6 +1078,15 @@ const vesselOceanSurfaceVisible = (spec: VesselLayerSpec): boolean => {
   }
   return getBooleanFromExtensions(spec.extensions, "seaSurfaceVisible", false);
 };
+
+const getMapDiscardMode = (
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+  fallback: number,
+): number =>
+  finiteNumber(
+    spec.mapRendering?.discardMode,
+    getNumberFromExtensions(spec.extensions, "discardMode", fallback),
+  );
 
 const normalizeVesselTransformMode = (
   mode: VesselTransformControlMode | undefined,
@@ -1190,49 +1163,6 @@ const getBooleanFromExtensions = (
     }
   }
   return fallback;
-};
-
-const withNamespacedExtensionValue = (
-  extensions: Record<string, unknown> | undefined,
-  key: string,
-  value: number | boolean,
-  namespaces: readonly string[],
-): Record<string, unknown> => {
-  const next: Record<string, unknown> = {
-    ...extensions,
-  };
-
-  for (const namespace of namespaces) {
-    next[namespace] = {
-      ...recordFromUnknown(extensions?.[namespace]),
-      [key]: value,
-    };
-  }
-
-  return next;
-};
-
-const withNamespacedExtensionObject = (
-  extensions: Record<string, unknown> | undefined,
-  key: string,
-  value: Record<string, unknown>,
-  namespaces: readonly string[],
-): Record<string, unknown> => {
-  const next: Record<string, unknown> = {
-    ...extensions,
-  };
-
-  for (const namespace of namespaces) {
-    next[namespace] = {
-      ...recordFromUnknown(extensions?.[namespace]),
-      [key]: {
-        ...recordFromUnknown(recordFromUnknown(extensions?.[namespace])[key]),
-        ...value,
-      },
-    };
-  }
-
-  return next;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

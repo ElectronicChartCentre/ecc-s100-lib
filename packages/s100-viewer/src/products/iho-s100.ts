@@ -18,6 +18,14 @@ export type ProductSpecificationVersionedLayerSpec = {
   productSpecificationVersion?: S100ProductSpecificationVersion;
 };
 
+export type S102RenderingOptions = {
+  detailFactor?: number;
+};
+
+export type S102DebugOptions = {
+  showTileBounds?: boolean;
+};
+
 export const S100ProductSpecificationVersions = {
   LATEST_CONFIRMED_SUPPORTED: LATEST_CONFIRMED_SUPPORTED_PRODUCT_SPEC_VERSION,
   S101: {
@@ -60,6 +68,8 @@ export interface S102BathymetryLayerSpec
   extends BaseLayerSpec<typeof S100ProductType.S102>,
     ProductSpecificationVersionedLayerSpec {
   source: ThreeDTilesSource;
+  rendering?: S102RenderingOptions;
+  debug?: S102DebugOptions;
   style?: S102BathymetryStyle;
 }
 

@@ -154,7 +154,9 @@ describe("createS100Viewer", () => {
       LayerBuilder.createS102({
         id: "controlled-s102",
         url: "https://example.test/s102/tileset.json",
-        detailFactor: 250,
+        rendering: {
+          detailFactor: 250,
+        },
         style: {
           unsafeDepth: -1,
           contours: {
@@ -170,7 +172,7 @@ describe("createS100Viewer", () => {
       visible: true,
       intervalMeters: 3,
     });
-    terrain.controllers.terrain.settings.renderBBoxes = true;
+    await terrain.controllers.terrain.setTileBoundsVisible(true);
     await terrain.controllers.terrain.setDetailFactor(700);
 
     expect(terrain.controllers.terrain.terrain.unsafeDepth).toBe(-8);
@@ -184,14 +186,11 @@ describe("createS100Viewer", () => {
         intervalMeters: 3,
       },
     });
-    expect(terrain.spec.extensions?.nasaAmmos).toMatchObject({
+    expect(terrain.spec.rendering).toMatchObject({
       detailFactor: 700,
     });
-    expect(terrain.spec.extensions?.cogs).toMatchObject({
-      detailFactor: 700,
-    });
-    expect(terrain.spec.extensions?.cesium).toMatchObject({
-      detailFactor: 700,
+    expect(terrain.spec.debug).toMatchObject({
+      showTileBounds: true,
     });
 
     await terrain.update({
@@ -284,12 +283,13 @@ describe("createS100Viewer", () => {
     expect(map.controllers.map.discardMode).toBe(ProjectedMapDiscardMode.MaskLayerAlphaOne);
     expect(map.opacity).toBe(0.4);
     expect(map.visible).toBe(false);
-    expect(map.spec.extensions?.cogs).toMatchObject({
+    expect(map.spec.mapRendering).toMatchObject({
       discardMode: ProjectedMapDiscardMode.MaskLayerAlphaOne,
     });
 
     await map.update({
       opacity: 0.8,
+      mapRendering: {},
       extensions: {
         ...map.spec.extensions,
         cogs: {
@@ -384,29 +384,16 @@ describe("createS100Viewer", () => {
       oceanSurface: true,
       transformControls: "rotate",
     });
-    expect(vessel.spec.extensions?.nasaAmmos).toMatchObject({
-      model: {
-        orientation: [0, 0, 0, 1],
-        boundingBox: {
-          min: [-10, -30, -8],
-          max: [12, 40, 4],
-        },
+    expect(vessel.spec.model).toMatchObject({
+      orientation: [0, 0, 0, 1],
+      boundingBox: {
+        min: [-10, -30, -8],
+        max: [12, 40, 4],
       },
     });
-    expect(vessel.spec.extensions?.cesium).toMatchObject({
-      model: {
-        orientation: [0, 0, 0, 1],
-        boundingBox: {
-          min: [-10, -30, -8],
-          max: [12, 40, 4],
-        },
-      },
-    });
-    expect(vessel.spec.extensions?.nasaAmmos).toMatchObject({
-      dimensions: {
-        draught: 9,
-      },
-      seaSurfaceVisible: true,
+    expect(vessel.spec.rendering).toMatchObject({
+      seaLevelIndicator: false,
+      oceanSurfaceVisible: true,
     });
 
     await vessel.controllers.vessel.setPose({

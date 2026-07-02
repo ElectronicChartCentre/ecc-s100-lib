@@ -1,10 +1,10 @@
 import type { ModelSource, WmsSource } from "./sources.js";
-import type { BoundingBoxTuple, QuatTuple } from "../math.js";
 import type {
   MapOverlayLayerSpec,
   MapOverlayStyle,
   VesselDimensions,
   VesselLayerSpec,
+  VesselModelOptions,
   VesselPose,
   VesselReferencePoint,
   VesselStyle,
@@ -13,7 +13,6 @@ import { MapOverlayStyles, VesselStyles } from "./viewer-features.js";
 import {
   ProjectedMapLayerType,
   projectedMapSpecification,
-  projectedMapTemplateExtensions,
   projectedSpatialExtent,
   type ProjectedMapTemplateOptions,
 } from "./projected-map-template.js";
@@ -33,10 +32,7 @@ export type CreateVesselLayerOptions = LayerBuilderCommonOptions<VesselStyle> &
     pose: VesselPose;
     dimensions?: VesselDimensions;
     referencePoint?: VesselReferencePoint;
-    model?: {
-      orientation?: QuatTuple;
-      boundingBox?: BoundingBoxTuple;
-    };
+    model?: VesselModelOptions;
   };
 
 export type CreateMapOverlayWmsLayerOptions = LayerBuilderCommonOptions<MapOverlayStyle> &
@@ -73,27 +69,10 @@ const mergeMapOverlayStyle = (
   ...style,
 });
 
-export const createVessel = (options: CreateVesselLayerOptions): VesselLayerSpec => {
-  const commonOptions =
-    options.model === undefined
-      ? options
-      : {
-          ...options,
-          extensions: withNamespacedExtensionObject(
-            options.extensions,
-            "model",
-            compactRecord({
-              orientation: options.model.orientation,
-              boundingBox: options.model.boundingBox,
-            }),
-            ["nasaAmmos", "cesium"],
-          ),
-        };
-
-  return {
+export const createVessel = (options: CreateVesselLayerOptions): VesselLayerSpec => ({
     id: options.id ?? "vessel",
     product: "vessel",
-    ...commonLayerFields(commonOptions),
+    ...commonLayerFields(options),
     source: {
       kind: "model",
       url: options.url,
@@ -106,9 +85,9 @@ export const createVessel = (options: CreateVesselLayerOptions): VesselLayerSpec
     pose: options.pose,
     ...(options.dimensions !== undefined ? { dimensions: options.dimensions } : {}),
     ...(options.referencePoint !== undefined ? { referencePoint: options.referencePoint } : {}),
+    ...(options.model !== undefined ? { model: compactRecord(options.model) as VesselModelOptions } : {}),
     style: mergeVesselStyle(options.style),
-  };
-};
+  });
 
 export const createMapOverlayWms = (
   options: CreateMapOverlayWmsLayerOptions,
@@ -150,7 +129,8 @@ export const createMapOverlayWmsTemplate = (
     role,
     ...common,
     spatialExtent: options.spatialExtent ?? projectedSpatialExtent(options.extents),
-    extensions: projectedMapTemplateExtensions(common.extensions, mapSpecification, options),
+    projectedMap: mapSpecification,
+    ...(options.discardMode !== undefined ? { mapRendering: { discardMode: options.discardMode } } : {}),
     source: {
       kind: "wms-template",
       urlTemplate: options.urlTemplate,
@@ -179,34 +159,7 @@ const mapLayerTypeForRole = (role: MapOverlayLayerSpec["role"]): number => {
   return ProjectedMapLayerType.BaseTransparent;
 };
 
-const withNamespacedExtensionObject = (
-  extensions: Record<string, unknown> | undefined,
-  key: string,
-  value: Record<string, unknown>,
-  namespaces: readonly string[],
-): Record<string, unknown> => {
-  const next: Record<string, unknown> = {
-    ...extensions,
-  };
-
-  for (const namespace of namespaces) {
-    const currentNamespace = recordFromUnknown(extensions?.[namespace]);
-    next[namespace] = {
-      ...currentNamespace,
-      [key]: {
-        ...recordFromUnknown(currentNamespace[key]),
-        ...value,
-      },
-    };
-  }
-
-  return next;
-};
-
 const compactRecord = (
   value: Record<string, unknown>,
 ): Record<string, unknown> =>
   Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
-
-const recordFromUnknown = (value: unknown): Record<string, unknown> =>
-  value !== null && typeof value === "object" ? value as Record<string, unknown> : {};

@@ -1,5 +1,7 @@
 import type { Coordinate } from "../coordinates/types.js";
 import type { BaseLayerSpec } from "../layers/types.js";
+import type { BoundingBoxTuple, QuatTuple } from "../math.js";
+import type { ProjectedMapSpecification } from "./projected-map-template.js";
 import type {
   ModelSource,
   MvtSource,
@@ -18,6 +20,11 @@ export type VesselPose = {
 };
 
 export type VesselReferencePoint = "transponder" | "model-origin" | "custom";
+
+export type VesselModelOptions = {
+  orientation?: QuatTuple;
+  boundingBox?: BoundingBoxTuple;
+};
 
 export type VesselDimensions = {
   /** Vertical draught below the vessel reference point, in meters. */
@@ -77,17 +84,31 @@ export type MapOverlayStyle = OpacityVisibilityStyle & {
   filters?: readonly ProductFilter[];
 };
 
+export type VesselRenderingOptions = {
+  seaLevelIndicator?: boolean;
+  oceanSurfaceVisible?: boolean;
+  shadowVisible?: boolean;
+};
+
+export type MapOverlayRenderingOptions = {
+  discardMode?: number;
+};
+
 export interface VesselLayerSpec extends BaseLayerSpec<"vessel"> {
   source: ModelSource;
   pose: VesselPose;
   dimensions?: VesselDimensions;
   referencePoint?: VesselReferencePoint;
+  model?: VesselModelOptions;
+  rendering?: VesselRenderingOptions;
   style?: VesselStyle;
 }
 
 export interface MapOverlayLayerSpec extends BaseLayerSpec<"map-overlay"> {
   source: WmsSource | WmsTemplateSource | WmtsSource | MvtSource | StaticJsonSource;
   role?: "basemap" | "overlay" | "mask" | "annotation";
+  projectedMap?: ProjectedMapSpecification;
+  mapRendering?: MapOverlayRenderingOptions;
   style?: MapOverlayStyle;
 }
 

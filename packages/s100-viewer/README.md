@@ -56,7 +56,7 @@ const terrain = await scene.layers.add(LayerBuilder.createS102({
 }));
 
 await terrain.controllers.terrain.setUnsafeDepth(-8);
-terrain.controllers.terrain.settings.renderBBoxes = true;
+await terrain.controllers.terrain.setTileBoundsVisible(true);
 
 const currents = await scene.layers.add(LayerBuilder.createStaticS111({
   id: "currents",

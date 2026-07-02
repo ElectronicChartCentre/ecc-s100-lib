@@ -97,45 +97,6 @@ export const projectedMapSpecification = (
   return specification;
 };
 
-export const projectedMapTemplateExtensions = (
-  existing: Record<string, unknown> | undefined,
-  mapSpecification: ProjectedMapSpecification,
-  options: ProjectedMapTemplateOptions,
-): Record<string, unknown> => {
-  const extents = mapSpecification.dataset.extents;
-  const minLevel = mapSpecification.dataset.minLevel;
-  const maxLevel = mapSpecification.dataset.maxLevel;
-  const quality = mapSpecification.quality;
-  const discardMode = options.discardMode;
-
-  return {
-    ...existing,
-    cesium: {
-      ...extensionRecord(existing?.cesium),
-      extents,
-      mapSpecification,
-    },
-    nasaAmmos: {
-      ...extensionRecord(existing?.nasaAmmos),
-      extents,
-      minLevel,
-      maxLevel,
-      ...(quality !== undefined ? { quality } : {}),
-      mapSpecification,
-    },
-    cogs: {
-      ...extensionRecord(existing?.cogs),
-      extents,
-      minLevel,
-      maxLevel,
-      ...(quality !== undefined ? { quality } : {}),
-      ...(discardMode !== undefined ? { discardMode } : {}),
-      mapLayerType: mapSpecification.type,
-      mapSpecification,
-    },
-  };
-};
-
 const projectedCornersFromExtents = (
   extents: ProjectedMapExtents,
 ): ProjectedMapCorners => ({
@@ -151,6 +112,3 @@ const projectedMapSubsetFromExtents = (
   min: [extents.minX, extents.minY],
   max: [extents.maxX, extents.maxY],
 });
-
-const extensionRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" ? { ...(value as Record<string, unknown>) } : {};
