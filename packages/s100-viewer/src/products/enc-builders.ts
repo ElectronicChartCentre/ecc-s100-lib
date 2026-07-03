@@ -103,6 +103,22 @@ export type EncWmsPairLayerSpecs<TSpec extends EncLayerSpec = EncLayerSpec> = {
   opaque?: TSpec;
 };
 
+export type WmsUrlTemplateParameterValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined;
+
+export type WmsUrlTemplateParameters =
+  | Record<string, WmsUrlTemplateParameterValue>
+  | readonly (readonly [string, WmsUrlTemplateParameterValue])[];
+
+export type BuildWmsUrlTemplateOptions = {
+  baseUrl: string;
+  parameters: WmsUrlTemplateParameters;
+};
+
 const mergeS101Style = (style: Partial<S101EncStyle> | undefined): S101EncStyle => ({
   ...S101Styles.DEFAULT,
   ...style,
@@ -294,6 +310,32 @@ export function createEncWmsPair(options: CreateEncWmsPairOptions): EncWmsPairLa
   };
 }
 
+export const buildWmsUrlTemplate = (
+  options: BuildWmsUrlTemplateOptions,
+): string => {
+  const parameters = Array.isArray(options.parameters)
+    ? options.parameters
+    : Object.entries(options.parameters);
+  const query = parameters
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([key, value]) => {
+      return `${encodeURIComponent(key)}=${encodeWmsTemplateParameterValue(value)}`;
+    })
+    .join("&");
+
+  if (query.length === 0) {
+    return options.baseUrl;
+  }
+
+  const separator = options.baseUrl.includes("?")
+    ? options.baseUrl.endsWith("?") || options.baseUrl.endsWith("&")
+      ? ""
+      : "&"
+    : "?";
+
+  return `${options.baseUrl}${separator}${query}`;
+};
+
 export const EncLayerBuilder = {
   EncStandard,
   ProjectedMap,
@@ -308,6 +350,7 @@ export const EncLayerBuilder = {
   createS57Wms,
   createS57WmsTemplate,
   createS57Wmts,
+  buildWmsUrlTemplate,
 };
 
 const mapLayerTypeForRole = (role: EncLayerRole): number =>
@@ -352,3 +395,13 @@ const createEncWmsTemplateFromPairLayer = (
   }
   return createS101WmsTemplate(templateOptions);
 };
+
+const encodeWmsTemplateParameterValue = (
+  value: Exclude<WmsUrlTemplateParameterValue, null | undefined>,
+): string =>
+  encodeURIComponent(String(value))
+    .replace(/%7B/gi, "{")
+    .replace(/%7D/gi, "}")
+    .replace(/%2C/gi, ",")
+    .replace(/%3A/gi, ":")
+    .replace(/%2F/gi, "/");

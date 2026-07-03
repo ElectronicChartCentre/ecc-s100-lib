@@ -9,6 +9,7 @@ import {
   mapSpecificationToLayerSpec,
   ProjectedMapDiscardMode,
   ProjectedMapLayerType,
+  S100DataCodingFormat,
   S100SupportedProductVersions,
   S100ProductSpecificationVersions,
   S100ProductType,
@@ -291,6 +292,33 @@ describe("@ecc/s100-viewer product specs", () => {
     });
   });
 
+  it("builds WMS URL templates while preserving projected-map bbox tokens", () => {
+    const urlTemplate = LayerBuilder.buildWmsUrlTemplate({
+      baseUrl: "https://example.test/wms?existing=true",
+      parameters: [
+        ["bbox", "{xmin},{ymin},{xmax},{ymax}"],
+        ["FORMAT", "image/png"],
+        ["SERVICE", "WMS"],
+        ["SRS", "EPSG:32633"],
+        ["WIDTH", 256],
+        ["HEIGHT", 256],
+        ["TRANSPARENT", true],
+        ["SKIP", null],
+      ],
+    });
+
+    expect(urlTemplate).toBe(
+      "https://example.test/wms?existing=true" +
+        "&bbox={xmin},{ymin},{xmax},{ymax}" +
+        "&FORMAT=image/png" +
+        "&SERVICE=WMS" +
+        "&SRS=EPSG:32633" +
+        "&WIDTH=256" +
+        "&HEIGHT=256" +
+        "&TRANSPARENT=true",
+    );
+  });
+
   it("prepares static S-111 layers with derived timeline metadata", () => {
     const prepared = LayerBuilder.prepareStaticS111({
       id: "s111-prepared",
@@ -320,6 +348,125 @@ describe("@ecc/s100-viewer product specs", () => {
         Date.UTC(2026, 4, 29, 12, 30, 0),
         Date.UTC(2026, 4, 29, 13, 0, 0),
       ],
+    });
+  });
+
+  it("assesses S-111 metadata with app-ready acceptance and rejection reasons", () => {
+    const accepted = LayerBuilder.assessS111Metadata({
+      datasetId: "s111-accepted",
+      maxDataPoints: 500,
+      projectedBounds: {
+        west: 0,
+        east: 1000,
+        south: 0,
+        north: 500,
+      },
+      metadata: {
+        dataCodingFormat: { value: S100DataCodingFormat.RegularGrid },
+        instanceAttributes: [
+          {
+            numberOfTimes: 2,
+            numPointsLongitudinal: 20,
+            numPointsLatitudinal: 10,
+          },
+        ],
+      },
+    });
+
+    expect(accepted).toMatchObject({
+      status: "accepted",
+      datasetId: "s111-accepted",
+      numberOfCells: 200,
+      numberOfDataPoints: 400,
+      observedGridMeters: 50,
+    });
+
+    expect(
+      LayerBuilder.assessS111Metadata({
+        datasetId: "s111-too-large",
+        maxDataPoints: 399,
+        metadata: {
+          dataCodingFormat: S100DataCodingFormat.RegularGrid,
+          instanceAttributes: [
+            {
+              numberOfTimes: 2,
+              numPointsLongitudinal: 20,
+              numPointsLatitudinal: 10,
+            },
+          ],
+        },
+      }),
+    ).toMatchObject({
+      status: "rejected",
+      code: "too-large",
+      numberOfDataPoints: 400,
+    });
+
+    expect(
+      LayerBuilder.assessS111Metadata({
+        datasetId: "s111-unsupported",
+        metadata: {
+          dataCodingFormat: 9,
+          instanceAttributes: [{ numberOfTimes: 1 }],
+        },
+      }),
+    ).toMatchObject({
+      status: "rejected",
+      code: "unsupported-dcf",
+      dataCodingFormat: 9,
+    });
+  });
+
+  it("prepares static S-111 datasets with workflow defaults and summary metadata", () => {
+    const first = LayerBuilder.prepareStaticS111Dataset({
+      datasetId: "s111-first",
+      data: {
+        dateTimeOfFirstRecord: "20260529T120000Z",
+        timeRecordInterval: 1800,
+        numberOfTimes: 2,
+      },
+      crs: "EPSG:32633",
+      observedGridMeters: 125,
+    });
+    const second = LayerBuilder.prepareStaticS111Dataset({
+      datasetId: "s111-second",
+      data: {
+        dateTimeOfFirstRecord: "20260529T123000Z",
+        timeRecordInterval: 900,
+        numberOfTimes: 2,
+      },
+      crs: "EPSG:32633",
+      observedGridMeters: 250,
+      scale: 42,
+    });
+
+    expect(first.layer).toMatchObject({
+      id: "s111-first",
+      time: {
+        interpolation: "nearest",
+      },
+      style: {
+        renderer: "arrows",
+        scale: "auto",
+      },
+    });
+    expect(second.layer.style?.scale).toBe(42);
+    expect(LayerBuilder.summarizePreparedS111Datasets([first, second])).toEqual({
+      timeline: {
+        startTime: Date.UTC(2026, 4, 29, 12, 0, 0),
+        endTime: Date.UTC(2026, 4, 29, 12, 45, 0),
+        stepSeconds: 900,
+        times: [
+          Date.UTC(2026, 4, 29, 12, 0, 0),
+          Date.UTC(2026, 4, 29, 12, 30, 0),
+          Date.UTC(2026, 4, 29, 12, 45, 0),
+        ],
+        initialTime: Date.UTC(2026, 4, 29, 12, 0, 0),
+      },
+      observedGrid: {
+        minMeters: 125,
+        maxMeters: 250,
+      },
     });
   });
 
