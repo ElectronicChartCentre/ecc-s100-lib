@@ -48,6 +48,11 @@ type FetchLike = typeof fetch;
 type CesiumObject = Record<string, unknown>;
 type CesiumConstructor = new (...args: unknown[]) => CesiumObject;
 type Vector3Fields = { x: number; y: number; z: number };
+type VesselVerticalPositionLimits = {
+  minMeters?: number;
+  maxMeters?: number;
+  reference?: "scene" | "sea-level";
+};
 type CesiumSceneDrawable =
   | { kind: "entity"; value: CesiumObject }
   | { kind: "primitive"; value: CesiumObject };
@@ -1476,7 +1481,11 @@ class CesiumEngineScene implements EngineScene {
           : { x: 0, y: 0, z: -dy * metersPerPixel };
     this.updateNativeVesselPose(native, {
       ...native.spec.pose,
-      position: offsetCoordinate(native.spec.pose.position, delta, this.sceneCrs()),
+      position: constrainVesselVerticalPosition(
+        offsetCoordinate(native.spec.pose.position, delta, this.sceneCrs()),
+        native.spec,
+        this.currentSeaLevel,
+      ),
     }, true);
   }
 
@@ -4393,6 +4402,10 @@ function finiteNumber(value: unknown, fallback: number): number {
   return getFiniteNumber(value, fallback);
 }
 
+function finiteOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 function clamp01(value: unknown): number {
   return Math.max(0, Math.min(1, finiteNumber(value, 1)));
 }
@@ -6572,6 +6585,67 @@ function offsetCoordinate(coordinate: Coordinate, offset: Vector3Fields, project
     y: coordinate.y + offset.y,
     z: coordinate.z + offset.z,
   };
+}
+
+function constrainVesselVerticalPosition(
+  coordinate: Coordinate,
+  spec: VesselLayerSpec,
+  seaLevel: number,
+): Coordinate {
+  const limits = getVesselTransformGizmoVerticalPositionLimits(spec);
+  if (!limits) {
+    return coordinate;
+  }
+
+  if (coordinate.kind === "geodetic") {
+    const height = coordinate.height ?? 0;
+    const constrainedHeight = constrainVesselPositionZ(height, limits, seaLevel);
+    return Object.is(height, constrainedHeight)
+      ? coordinate
+      : { ...coordinate, height: constrainedHeight };
+  }
+
+  const z = coordinate.z ?? 0;
+  const constrainedZ = constrainVesselPositionZ(z, limits, seaLevel);
+  return Object.is(z, constrainedZ)
+    ? coordinate
+    : { ...coordinate, z: constrainedZ };
+}
+
+function getVesselTransformGizmoVerticalPositionLimits(
+  spec: VesselLayerSpec,
+): VesselVerticalPositionLimits | null {
+  const gizmo = spec.style?.transformGizmo;
+  if (!gizmo || typeof gizmo !== "object") {
+    return null;
+  }
+  const minMeters = finiteOptionalNumber(gizmo.verticalPositionLimits?.minMeters);
+  const maxMeters = finiteOptionalNumber(gizmo.verticalPositionLimits?.maxMeters);
+  if (minMeters === undefined && maxMeters === undefined) {
+    return null;
+  }
+  const reference: "scene" | "sea-level" =
+    gizmo.verticalPositionLimits?.reference === "sea-level"
+      ? "sea-level"
+      : "scene";
+  return {
+    ...(minMeters !== undefined ? { minMeters } : {}),
+    ...(maxMeters !== undefined ? { maxMeters } : {}),
+    reference,
+  };
+}
+
+function constrainVesselPositionZ(
+  value: number,
+  limits: VesselVerticalPositionLimits,
+  seaLevel: number,
+): number {
+  const offset = limits.reference === "sea-level" ? seaLevel : 0;
+  const lower =
+    limits.minMeters !== undefined ? limits.minMeters + offset : -Infinity;
+  const upper =
+    limits.maxMeters !== undefined ? limits.maxMeters + offset : Infinity;
+  return clampNumber(value, Math.min(lower, upper), Math.max(lower, upper));
 }
 
 function rotateHeadingOffset(x: number, y: number, headingDegrees: number): { x: number; y: number } {

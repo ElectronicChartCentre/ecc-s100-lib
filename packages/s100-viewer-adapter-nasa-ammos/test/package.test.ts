@@ -223,6 +223,15 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
       style: {
         draughtMeters: 8,
         showSeaLevelIndicator: true,
+        transformGizmo: {
+          enabled: true,
+          mode: "translate",
+          verticalPositionLimits: {
+            minMeters: -30,
+            maxMeters: 8,
+            reference: "sea-level",
+          },
+        },
       },
       dimensions: {
         draught: 8,
@@ -251,6 +260,7 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
       view: {
         specification: {
           dimensions?: unknown;
+          verticalPositionLimits?: unknown;
           model: {
             boundingBox?: unknown;
             orientation?: unknown;
@@ -268,6 +278,11 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
       stern: 30,
       port: 10,
       starboard: 12,
+    });
+    expect(vesselNative?.view.specification.verticalPositionLimits).toEqual({
+      minMeters: -30,
+      maxMeters: 8,
+      reference: "sea-level",
     });
     expect(vesselNative?.view.specification.model.boundingBox).toEqual(vesselBoundingBox);
     expect(vesselNative?.view.specification.model.orientation).toEqual(vesselOrientation);

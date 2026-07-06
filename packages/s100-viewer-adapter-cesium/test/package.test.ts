@@ -707,7 +707,11 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
         style: {
           oceanSurface: { enabled: true, radiusMeters: 80, opacity: 0.5, reflectivity: 0.4, roughness: 0.096 },
           shadow: { enabled: true, opacity: 0.25 },
-          transformGizmo: { enabled: true, sizeMeters: 25 },
+          transformGizmo: {
+            enabled: true,
+            sizeMeters: 25,
+            verticalPositionLimits: { minMeters: -30, maxMeters: 8 },
+          },
         },
         dimensions: { draught: 12, bow: 195.2, stern: 30, port: 20.8, starboard: 11.2 },
         referencePoint: "transponder",
@@ -812,6 +816,21 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     expect(((sceneLayerUpdates.at(-1) as { pose: { position: { x: number } } }).pose.position.x)).toBeCloseTo(331125);
     expect(((layerChanges.at(-1) as { pose: { position: { x: number } } }).pose.position.x)).toBeCloseTo(331125);
     expect(cesium.operations.cameraViews).toHaveLength(0);
+
+    const zGizmo = cesium.operations.primitivesAdded.find((primitive) =>
+      (primitive as { __s100VesselGizmo?: { axis?: string } }).__s100VesselGizmo?.axis === "z",
+    );
+    expect(zGizmo).toBeDefined();
+    cesium.operations.pickResult = { primitive: zGizmo };
+    dispatchScreenSpace(cesium, "LEFT_DOWN", {
+      position: { x: 100, y: 100 },
+    });
+    dispatchScreenSpace(cesium, "MOUSE_MOVE", {
+      endPosition: { x: 100, y: 10 },
+    });
+    dispatchScreenSpace(cesium, "LEFT_UP", {});
+    expect(nativeVessel?.view?.getPosition?.()[2]).toBeCloseTo(8);
+    expect(((vessel.spec as { pose: { position: { z: number } } }).pose.position.z)).toBeCloseTo(8);
 
     await vessel.update({
       style: {

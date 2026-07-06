@@ -208,9 +208,14 @@ export type ModelAssetSpecification = {
 export type VesselSpecification = {
   model: ModelAssetSpecification;
   dimensions: VesselDimensions;
+  verticalPositionLimits?: VesselVerticalPositionLimits;
 };
 
 export type CustomModelScale = number | Vec3Tuple;
+
+export type CustomModelTransformPositionConstraint = (
+  position: Vec3Tuple,
+) => Vec3Tuple;
 
 export type CustomModelSpecification = ModelAssetSpecification & {
   position?: Vec3Tuple;
@@ -226,6 +231,7 @@ export type CustomModelSpecification = ModelAssetSpecification & {
   environmentIntensity?: number;
   materialBrightness?: number;
   transformControls?: boolean | CustomModelTransformControlsOptions;
+  transformPositionConstraint?: CustomModelTransformPositionConstraint;
   verticalShadow?: boolean | VerticalShadowOptions;
 };
 
@@ -245,6 +251,12 @@ export type TransformControlAxisOptions = {
   x?: boolean;
   y?: boolean;
   z?: boolean;
+};
+
+export type VesselVerticalPositionLimits = {
+  minMeters?: number;
+  maxMeters?: number;
+  reference?: "scene" | "sea-level";
 };
 
 type NormalizedTransformControlsOptions = {
@@ -1559,6 +1571,7 @@ export class CustomModelView {
   private readonly baseOrientation: Quaternion;
   private readonly headingVector: Vector3;
   private readonly transformControlOptions: NormalizedTransformControlsOptions;
+  private readonly transformPositionConstraint: CustomModelTransformPositionConstraint | null;
   private transformControls: TransformControlHandle[] = [];
   private transformControlArbitrationCleanup: (() => void) | null = null;
   private transformControlSelectionCleanup: (() => void) | null = null;
@@ -1586,6 +1599,10 @@ export class CustomModelView {
     this.transformControlOptions = normalizeTransformControlOptions(
       specification.transformControls,
     );
+    this.transformPositionConstraint =
+      typeof specification.transformPositionConstraint === "function"
+        ? specification.transformPositionConstraint
+        : null;
     this.group.name = `s100-model:${specification.name ?? specification.path}`;
     this.group.userData[PICKABLE_OBJECT_USER_DATA_KEY] = true;
     this.visible = specification.visible !== false;
@@ -1839,11 +1856,16 @@ export class CustomModelView {
   }
 
   private syncTransformFromObject(): void {
-    const nextPosition: Vec3Tuple = [
+    const objectPosition: Vec3Tuple = [
       this.group.position.x,
       this.group.position.y,
       this.group.position.z,
     ];
+    const nextPosition = this.constrainTransformPosition(objectPosition);
+    if (!vec3TupleEquals(objectPosition, nextPosition)) {
+      this.group.position.set(nextPosition[0], nextPosition[1], nextPosition[2]);
+      this.group.updateMatrixWorld();
+    }
     if (!vec3TupleEquals(this.position, nextPosition)) {
       this.position = nextPosition;
       this.verticalShadow?.update();
@@ -1859,6 +1881,16 @@ export class CustomModelView {
       this.verticalShadow?.update();
       this.headingChanged.emit(nextHeading);
     }
+  }
+
+  private constrainTransformPosition(position: Vec3Tuple): Vec3Tuple {
+    if (!this.transformPositionConstraint) {
+      return position;
+    }
+    return normalizeVec3Tuple(
+      this.transformPositionConstraint([...position]),
+      position,
+    );
   }
 
   private enableVerticalShadowIfRequested(object: Object3D): void {
@@ -2405,6 +2437,7 @@ export class VesselView {
   private readonly seaSurface: Mesh<CircleGeometry, MeshPhysicalMaterial> | null;
   private readonly verticalShadow: VerticalShadowProjector | null;
   private position: Vec3Tuple = [0, 0, 0];
+  private verticalPositionLimits: VesselVerticalPositionLimits | null = null;
   private seaLevelIndicatorMode = SeaLevelIndicatorMode.Off;
   private seaSurfaceVisible = false;
   private verticalShadowVisible = true;
@@ -2419,6 +2452,9 @@ export class VesselView {
   ) {
     this.coreScene = coreScene;
     this.model = specification.dimensions;
+    this.verticalPositionLimits = normalizeVesselVerticalPositionLimits(
+      specification.verticalPositionLimits,
+    );
     const vessel = this;
     this.seaLevelIndicator = {
       get mode() {
@@ -2478,6 +2514,8 @@ export class VesselView {
             z: true,
           },
         },
+        transformPositionConstraint: (position) =>
+          vessel.constrainTransformRenderPosition(position),
       },
       coreScene,
       config,
@@ -2548,6 +2586,10 @@ export class VesselView {
 
   setDimensions(dimensions: VesselDimensions): void {
     Object.assign(this.model, dimensions);
+  }
+
+  setVerticalPositionLimits(limits: VesselVerticalPositionLimits | undefined): void {
+    this.verticalPositionLimits = normalizeVesselVerticalPositionLimits(limits);
   }
 
   setWidth(width: number): void {
@@ -2654,6 +2696,23 @@ export class VesselView {
       this.position[0],
       this.position[1],
       this.position[2] + this.coreScene.seaLevel,
+    ];
+  }
+
+  private constrainTransformRenderPosition(renderPosition: Vec3Tuple): Vec3Tuple {
+    const positionZ = renderPosition[2] - this.coreScene.seaLevel;
+    const constrainedPositionZ = constrainVesselPositionZ(
+      positionZ,
+      this.verticalPositionLimits,
+      this.coreScene.seaLevel,
+    );
+    if (Object.is(positionZ, constrainedPositionZ)) {
+      return renderPosition;
+    }
+    return [
+      renderPosition[0],
+      renderPosition[1],
+      constrainedPositionZ + this.coreScene.seaLevel,
     ];
   }
 }
@@ -3623,6 +3682,40 @@ function getS111ZOffset(seaLevel: number): number {
 function normalizeOptionalNumber(value: unknown): number | undefined {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeVesselVerticalPositionLimits(
+  value: VesselVerticalPositionLimits | undefined,
+): VesselVerticalPositionLimits | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const minMeters = normalizeOptionalNumber(value.minMeters);
+  const maxMeters = normalizeOptionalNumber(value.maxMeters);
+  if (minMeters === undefined && maxMeters === undefined) {
+    return null;
+  }
+  return {
+    ...(minMeters !== undefined ? { minMeters } : {}),
+    ...(maxMeters !== undefined ? { maxMeters } : {}),
+    reference: value.reference === "sea-level" ? "sea-level" : "scene",
+  };
+}
+
+function constrainVesselPositionZ(
+  value: number,
+  limits: VesselVerticalPositionLimits | null,
+  seaLevel: number,
+): number {
+  if (!limits) {
+    return value;
+  }
+  const offset = limits.reference === "sea-level" ? seaLevel : 0;
+  const lower =
+    limits.minMeters !== undefined ? limits.minMeters + offset : -Infinity;
+  const upper =
+    limits.maxMeters !== undefined ? limits.maxMeters + offset : Infinity;
+  return Math.min(Math.max(value, Math.min(lower, upper)), Math.max(lower, upper));
 }
 
 function detailFactorToErrorTarget(detailFactor: number): number {

@@ -515,6 +515,17 @@ describe("@ecc/s100-viewer product specs", () => {
         starboard: 12,
       },
       referencePoint: "transponder",
+      style: {
+        transformGizmo: {
+          enabled: true,
+          mode: "translate",
+          verticalPositionLimits: {
+            minMeters: -30,
+            maxMeters: 8,
+            reference: "sea-level",
+          },
+        },
+      },
     });
     const mapOverlay = LayerBuilder.createMapOverlayWms({
       url: "https://example.test/map",
@@ -586,7 +597,18 @@ describe("@ecc/s100-viewer product specs", () => {
         starboard: 12,
       },
       referencePoint: "transponder",
-      style: LayerBuilder.VesselStyles.DEFAULT,
+      style: {
+        ...LayerBuilder.VesselStyles.DEFAULT,
+        transformGizmo: {
+          enabled: true,
+          mode: "translate",
+          verticalPositionLimits: {
+            minMeters: -30,
+            maxMeters: 8,
+            reference: "sea-level",
+          },
+        },
+      },
     });
     expect(mapOverlay).toMatchObject({
       id: "map-overlay",

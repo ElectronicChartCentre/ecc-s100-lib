@@ -538,6 +538,7 @@ class NasaAmmosEngineScene implements EngineScene {
   private createVesselLayer(spec: VesselLayerSpec): NasaLayerNative {
     assertSourceKind(spec, "model");
     const model = getVesselModel(spec);
+    const verticalPositionLimits = getVesselTransformGizmoVerticalPositionLimits(spec);
     const view = this.scene.VesselFeature.add({
       model: {
         path: spec.source.url,
@@ -546,6 +547,7 @@ class NasaAmmosEngineScene implements EngineScene {
         orientation: model.orientation,
       },
       dimensions: getVesselDimensions(spec),
+      ...(verticalPositionLimits !== undefined ? { verticalPositionLimits } : {}),
     });
     const position = coordinateToVec3(spec.pose.position);
     view.setPosition([position.x, position.y, position.z]);
@@ -595,6 +597,9 @@ class NasaAmmosEngineScene implements EngineScene {
         applyVisibility(native.view, vesselPatch.visible);
       }
       if (vesselPatch.style !== undefined || vesselPatch.extensions !== undefined) {
+        native.view.setVerticalPositionLimits(
+          getVesselTransformGizmoVerticalPositionLimits(native.spec),
+        );
         applyVesselPresentation(native.view, native.spec);
       }
     }
@@ -1064,6 +1069,16 @@ function getVesselDimensions(spec: VesselLayerSpec): VesselDimensions {
 
 function getVesselModel(spec: VesselLayerSpec): Partial<ModelAssetSpecification> {
   return spec.model ?? getNasaAmmosExtension<Partial<ModelAssetSpecification>>(spec, "model") ?? {};
+}
+
+function getVesselTransformGizmoVerticalPositionLimits(
+  spec: VesselLayerSpec,
+) {
+  const transformGizmo = spec.style?.transformGizmo;
+  if (!transformGizmo || typeof transformGizmo !== "object") {
+    return undefined;
+  }
+  return transformGizmo.verticalPositionLimits;
 }
 
 function applyVesselPresentation(view: VesselView, spec: VesselLayerSpec): void {

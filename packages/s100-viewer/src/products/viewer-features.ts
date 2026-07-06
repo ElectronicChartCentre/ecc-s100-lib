@@ -41,12 +41,25 @@ export type VesselDimensions = {
 
 export type VesselTransformControlMode = "none" | "translate" | "rotate" | "translate-rotate";
 
+export type VesselVerticalPositionLimits = {
+  /** Minimum permitted vessel pose z, in meters. */
+  minMeters?: number;
+  /** Maximum permitted vessel pose z, in meters. */
+  maxMeters?: number;
+  /**
+   * `scene` clamps directly against the vessel pose z value. `sea-level`
+   * offsets min/max by the current scene sea level before clamping.
+   */
+  reference?: "scene" | "sea-level";
+};
+
 export type VesselTransformGizmoStyle =
   | boolean
   | {
       enabled?: boolean;
       mode?: VesselTransformControlMode;
       sizeMeters?: number;
+      verticalPositionLimits?: VesselVerticalPositionLimits;
     };
 
 export type VesselOceanSurfaceStyle =
