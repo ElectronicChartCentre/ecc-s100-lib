@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Integration workspace for S-100 Interoperability Project viewer packages.",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "examples/*"
   ],
   "scripts": {
     "build": "npm run build -w @ecc/s100-viewer && npm run build -w @ecc/s100-viewer-adapter-nasa-ammos && npm run build -w @ecc/s100-viewer-adapter-cesium",
@@ -15,6 +16,9 @@
     "test": "npm run test -w @ecc/s100-viewer && npm run test -w @ecc/s100-viewer-adapter-nasa-ammos && npm run test -w @ecc/s100-viewer-adapter-cesium",
     "test:release-target": "npm run test -w @ecc/s100-viewer && npm run test -w @ecc/s100-viewer-adapter-nasa-ammos && npm run test -w @ecc/s100-viewer-adapter-cesium",
     "pack:release-target:dry-run": "npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-adapter-nasa-ammos && npm pack --dry-run --cache /tmp/ecc-s100-viewer-npm-cache -w @ecc/s100-viewer-adapter-cesium",
+    "demo:engine-switcher": "npm run dev -w @ecc/s100-engine-adapter-switcher",
+    "build:demo:engine-switcher": "npm run build -w @ecc/s100-engine-adapter-switcher",
+    "check:demo:engine-switcher": "npm run check -w @ecc/s100-engine-adapter-switcher",
     "clean": "npm run clean --workspaces --if-present"
   },
   "devDependencies": {

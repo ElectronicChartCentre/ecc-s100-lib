@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>S-100 Engine Adapter Switcher</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="toolbar">
+        <div class="toolbar__group">
+          <label for="engine-select">Engine</label>
+          <select id="engine-select"></select>
+        </div>
+        <div class="toolbar__group">
+          <label for="recipe-select">Scene</label>
+          <select id="recipe-select"></select>
+        </div>
+        <button id="reload-button" type="button">Reload</button>
+        <span id="status-pill" class="status-pill">Idle</span>
+      </header>
+      <main class="workspace">
+        <section id="viewer" class="viewer-surface" aria-label="S-100 viewer"></section>
+        <aside class="side-panel" aria-label="Adapter diagnostics">
+          <section>
+            <h2>Capabilities</h2>
+            <pre id="capability-panel"></pre>
+          </section>
+          <section>
+            <h2>Camera</h2>
+            <pre id="camera-panel"></pre>
+          </section>
+          <section class="log-section">
+            <h2>Events</h2>
+            <ol id="log-panel" class="log-list"></ol>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
