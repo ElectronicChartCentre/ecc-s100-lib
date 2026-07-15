@@ -145,6 +145,7 @@ export type TerrainDataset = {
   additionalURLParameters: string;
   accessToken?: string;
   detailFactor: number;
+  originOffset?: Vec3Tuple;
 };
 
 export type TerrainSettings = {
@@ -186,7 +187,10 @@ export type MapSpecification = {
     minLevel: number;
     maxLevel: number;
   };
-  quality?: unknown;
+  originOffset?: Vec3Tuple;
+  quality?: number;
+  alphaMode?: "source" | "binary";
+  alphaCutoff?: number;
   urlTemplate: string;
 };
 
@@ -333,6 +337,10 @@ export type SurfaceCurrentDataset = {
   numberOfTimes?: number;
   dataCodingFormat?: DataFormat;
   [key: string]: unknown;
+};
+
+export type S111ViewOptions = {
+  originOffset?: readonly [number, number, number] | undefined;
 };
 
 type TerrainUnloadTilesPlugin = UnloadTilesPlugin & {
@@ -1137,6 +1145,10 @@ export class TerrainView {
     const { camera, renderer, scene } = this.renderContext;
     const tiles = new TilesRenderer(this.tilesetURL);
     tiles.group.name = `s100-terrain:${this.tilesetURL}`;
+    if (this.dataset.originOffset) {
+      tiles.group.position.fromArray(this.dataset.originOffset);
+      tiles.group.updateMatrixWorld(true);
+    }
     tiles.group.userData[PICKABLE_OBJECT_USER_DATA_KEY] = true;
     tiles.group.visible = this.visible;
     const unloadTilesPlugin = configureTerrainTilesRenderer(tiles);
@@ -1216,8 +1228,8 @@ export class S111Feature {
 
   constructor(private readonly coreScene: CoreS100Scene) {}
 
-  add(dataset: SurfaceCurrentDataset): S111View {
-    const view = new S111View(dataset, this.coreScene, () => {
+  add(dataset: SurfaceCurrentDataset, options: S111ViewOptions = {}): S111View {
+    const view = new S111View(dataset, options, this.coreScene, () => {
       this.views.delete(view);
     });
     this.views.add(view);
@@ -1237,9 +1249,6 @@ export class S111Feature {
 
 export class S111View {
   visible = true;
-  disableAutoScaling = false;
-  scalingMode = "custom";
-  customScale = 1;
   readonly time: {
     startTime: number;
     endTime: number;
@@ -1248,10 +1257,14 @@ export class S111View {
   private readonly overlay: SeaCurrentsOverlay | null;
   private readonly seaLevelSubscription: Subscription | null = null;
   private currentTime: number;
+  private disableAutoScalingState = false;
+  private scalingModeState: "auto" | "custom" = "auto";
+  private customScaleState = 1;
   private destroyed = false;
 
   constructor(
     readonly dataset: SurfaceCurrentDataset,
+    options: S111ViewOptions,
     coreScene: CoreS100Scene,
     private readonly onDestroy: () => void,
   ) {
@@ -1280,8 +1293,10 @@ export class S111View {
     if (renderContext) {
       this.overlay = new SeaCurrentsOverlay(dataset, renderContext.scene, {
         currentTimeMs: this.currentTime,
-        customScale: this.customScale,
+        customScale: this.customScaleState,
+        autoScaling: !this.disableAutoScalingState,
         zOffset: getS111ZOffset(coreScene.seaLevel),
+        originOffset: options.originOffset,
       });
       this.overlay.setVisible(this.visible);
       this.seaLevelSubscription = coreScene.seaLevelChanged.subscribe(
@@ -1294,9 +1309,43 @@ export class S111View {
     }
   }
 
+  get disableAutoScaling(): boolean {
+    return this.disableAutoScalingState;
+  }
+
+  set disableAutoScaling(disableAutoScaling: boolean) {
+    const disabled = Boolean(disableAutoScaling);
+    if (disabled === this.disableAutoScalingState) {
+      return;
+    }
+    this.disableAutoScalingState = disabled;
+    this.scalingModeState = disabled ? "custom" : "auto";
+    this.overlay?.setAutoScaling(!disabled);
+  }
+
+  get scalingMode(): "auto" | "custom" {
+    return this.scalingModeState;
+  }
+
+  set scalingMode(mode: "auto" | "custom" | string) {
+    this.disableAutoScaling = mode !== "auto";
+  }
+
+  get customScale(): number {
+    return this.customScaleState;
+  }
+
+  set customScale(scale: number) {
+    this.setCustomScale(scale);
+  }
+
   setCustomScale(scale: number): void {
-    this.customScale = scale;
-    this.overlay?.setCustomScale(scale);
+    const nextScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+    this.customScaleState = nextScale;
+    this.disableAutoScalingState = true;
+    this.scalingModeState = "custom";
+    this.overlay?.setAutoScaling(false);
+    this.overlay?.setCustomScale(nextScale);
   }
 
   setVisibility(visible: boolean): void {

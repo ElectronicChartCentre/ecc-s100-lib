@@ -11,13 +11,15 @@ import {
 } from "@ecc/s100-viewer";
 import type { DemoEngineDefinition } from "./engineRegistry";
 import {
+  getDemoLookAtTarget,
+  getDemoSceneSettings,
+} from "./demoConfig";
+import {
   assessRecipeSupport,
-  demoCrs,
-  demoLookAtTarget,
-  demoOrigin,
   type DemoRecipeSupport,
   type DemoSceneRecipe,
 } from "./sceneRecipes";
+import { loadDemoEnvironment } from "./staticAssets";
 
 export type DemoLogLevel = "info" | "warn" | "error";
 
@@ -46,6 +48,7 @@ export const createViewerSession = async (
   options.log("info", `Loading ${options.engine.label} adapter.`);
   const adapter = await options.engine.load(logger);
   const recipeSupport = assessRecipeSupport(options.recipe, adapter.capabilities);
+  const sceneSettings = getDemoSceneSettings();
 
   if (!recipeSupport.supported) {
     throw new Error(`Recipe is not supported by ${adapter.displayName}: ${recipeSupport.reasons.join("; ")}`);
@@ -64,8 +67,8 @@ export const createViewerSession = async (
 
   const scene = await viewer.createScene({
     georeference: SceneBuilder.projectedLocal({
-      crs: demoCrs,
-      origin: demoOrigin,
+      crs: sceneSettings.crs,
+      origin: sceneSettings.origin,
     }),
     metadata: {
       recipe: options.recipe.id,
@@ -89,23 +92,20 @@ export const createViewerSession = async (
   ];
 
   try {
-    scene.environment.setState({
-      background: "skybox",
-      backgroundIntensity: 0.8,
-      lighting: {
-        ambientIntensity: 0.2,
-        directionalIntensity: 0.7,
-      },
-    });
+    scene.environment.setState(await loadDemoEnvironment(options.engine.id));
+    options.log("info", "Applied static demo environment.");
   } catch (error) {
     options.log("warn", `Environment setup skipped: ${errorMessage(error)}`);
   }
 
-  await options.recipe.apply(scene, { log: options.log });
+  await options.recipe.apply(scene, {
+    engineId: options.engine.id,
+    log: options.log,
+  });
 
   try {
     scene.camera.lookAt({
-      target: demoLookAtTarget,
+      target: getDemoLookAtTarget(),
       rangeMeters: 900,
       headingDegrees: 25,
       pitchDegrees: 62,

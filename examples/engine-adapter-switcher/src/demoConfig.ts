@@ -1,0 +1,131 @@
+export type DemoSceneSettings = {
+  crs: string;
+  origin: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  mapWidthMeters: number;
+};
+
+export type DemoServiceConfig = DemoSceneSettings & {
+  primarApiKey: string | undefined;
+  licenseeKey: string | undefined;
+  s102TilesEndpoint: string | undefined;
+  s102DatasetIds: readonly string[];
+  s111Endpoint: string | undefined;
+  s111DatasetIds: readonly string[];
+  s101WmsBaseUrl: string | undefined;
+  s101WmsStyleId: string | undefined;
+  s101WmsBasemapStyleId: string | undefined;
+  s101WmsLayers: readonly string[];
+};
+
+export type DemoServiceRequirement =
+  | "primarApiKey"
+  | "licenseeKey"
+  | "s102TilesEndpoint"
+  | "s102DatasetIds"
+  | "s111Endpoint"
+  | "s111DatasetIds"
+  | "s101WmsBaseUrl";
+
+export const getDemoSceneSettings = (): DemoSceneSettings => ({
+  crs: readEnv("VITE_DEMO_CRS") ?? "EPSG:32619",
+  origin: {
+    x: readNumberEnv("VITE_DEMO_ORIGIN_X", 331100),
+    y: readNumberEnv("VITE_DEMO_ORIGIN_Y", 5186420),
+    z: readNumberEnv("VITE_DEMO_ORIGIN_Z", 0),
+  },
+  mapWidthMeters: readNumberEnv("VITE_DEMO_MAP_WIDTH_METERS", 5000),
+});
+
+export const getDemoLookAtTarget = () => {
+  const settings = getDemoSceneSettings();
+  return {
+    kind: "projected",
+    crs: settings.crs,
+    x: settings.origin.x,
+    y: settings.origin.y,
+    z: settings.origin.z,
+  } as const;
+};
+
+export const getDemoServiceConfig = (): DemoServiceConfig => {
+  const settings = getDemoSceneSettings();
+  return {
+    ...settings,
+    primarApiKey: readFirstEnv(["VITE_DEMO_PRIMAR_API_KEY", "VITE_S111_PRIMAR_API_KEY"]),
+    licenseeKey: readFirstEnv([
+      "VITE_DEMO_LICENSEE_KEY",
+      "VITE_DEMO_LICENSEE_ID",
+      "VITE_LICENSEE_KEY",
+    ]),
+    s102TilesEndpoint: readFirstEnv([
+      "VITE_DEMO_S102_3D_TILES_ENDPOINT",
+      "VITE_S102_PRIMAR_3D_TILES_ENDPOINT",
+    ]),
+    s102DatasetIds: readCsvEnv("VITE_DEMO_S102_DATASET_IDS"),
+    s111Endpoint: readFirstEnv(["VITE_DEMO_S111_ENDPOINT", "VITE_S111_PRIMAR_ENDPOINT"]),
+    s111DatasetIds: readCsvEnv("VITE_DEMO_S111_DATASET_IDS"),
+    s101WmsBaseUrl: readFirstEnv([
+      "VITE_DEMO_PRIMAR_WMS_URL_BASE",
+      "VITE_PRIMAR_WMS_URL_BASE",
+    ]),
+    s101WmsStyleId: readFirstEnv(["VITE_DEMO_S101_WMS_STYLE_ID"]) ?? "transparentLand",
+    s101WmsBasemapStyleId: readFirstEnv(["VITE_DEMO_S101_WMS_BASEMAP_STYLE_ID"]) ?? "default",
+    s101WmsLayers: readCsvEnv("VITE_DEMO_S101_WMS_LAYERS", ["s100dataSets.101"]),
+  };
+};
+
+export const requireDemoServiceConfig = (
+  requirements: readonly DemoServiceRequirement[],
+): DemoServiceConfig => {
+  const config = getDemoServiceConfig();
+  const missing = requirements.filter((requirement) => {
+    const value = config[requirement];
+    return Array.isArray(value) ? value.length === 0 : !value;
+  });
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing demo service configuration: ${missing.join(", ")}. Copy .env.example to .env.local and fill in the required values.`,
+    );
+  }
+
+  return config;
+};
+
+const readFirstEnv = (keys: readonly string[]): string | undefined => {
+  for (const key of keys) {
+    const value = readEnv(key);
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const readEnv = (key: string): string | undefined => {
+  const value = import.meta.env[key];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+};
+
+const readCsvEnv = (key: string, fallback: readonly string[] = []): readonly string[] => {
+  const value = readEnv(key);
+  if (!value) {
+    return fallback;
+  }
+
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+};
+
+const readNumberEnv = (key: string, fallback: number): number => {
+  const value = readEnv(key);
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};

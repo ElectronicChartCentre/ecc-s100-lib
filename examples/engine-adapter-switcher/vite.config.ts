@@ -1,7 +1,7 @@
 import { createReadStream, cpSync, existsSync, statSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin, type ProxyOptions } from "vite";
 
 const demoRoot = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(demoRoot, "../..");
@@ -49,13 +49,43 @@ const cesiumAssets = (): Plugin => ({
   },
 });
 
-export default defineConfig({
-  define: {
-    CESIUM_BASE_URL: JSON.stringify(cesiumPublicPath),
-  },
-  plugins: [cesiumAssets()],
-  build: {
-    sourcemap: true,
-    target: "es2022",
-  },
+const createS102TileProxy = (endpoint: string | undefined): Record<string, string | ProxyOptions> => {
+  if (!endpoint) {
+    return {};
+  }
+
+  try {
+    const url = new URL(endpoint);
+    const endpointPath = url.pathname.replace(/\/$/, "");
+    return {
+      "/demo-proxy/s102-tiles": {
+        target: url.origin,
+        changeOrigin: true,
+        rewrite: (path) =>
+          `${endpointPath}${path.replace(/^\/demo-proxy\/s102-tiles/, "")}`,
+      },
+    };
+  } catch {
+    return {};
+  }
+};
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, demoRoot, "");
+  const s102Endpoint =
+    env.VITE_DEMO_S102_3D_TILES_ENDPOINT ?? env.VITE_S102_PRIMAR_3D_TILES_ENDPOINT;
+
+  return {
+    define: {
+      CESIUM_BASE_URL: JSON.stringify(cesiumPublicPath),
+    },
+    plugins: [cesiumAssets()],
+    server: {
+      proxy: createS102TileProxy(s102Endpoint),
+    },
+    build: {
+      sourcemap: true,
+      target: "es2022",
+    },
+  };
 });

@@ -1,12 +1,28 @@
 import {
+  createBoundingBox,
+  createQuatIdentity,
   LayerBuilder,
   type AdapterCapabilities,
   type S100Scene,
+  type VesselDimensions,
 } from "@ecc/s100-viewer";
+import {
+  getDemoSceneSettings,
+  getDemoLookAtTarget,
+  requireDemoServiceConfig,
+} from "./demoConfig";
+import {
+  appendWmsTemplateParameters,
+  buildS101WmsUrlTemplate,
+  buildS102TilesUrl,
+  fetchS111Dataset,
+} from "./serviceData";
+import { demoVesselModelUrl } from "./staticAssets";
 
-export type DemoRecipeId = "minimal" | "s102-terrain" | "s111-time" | "vessel" | "map-overlay";
+export type DemoRecipeId = "minimal" | "s101-enc" | "s102-terrain" | "s111-time" | "vessel";
 
 export type DemoSceneRecipeContext = {
+  engineId: string;
   log(level: "info" | "warn" | "error", message: string): void;
 };
 
@@ -25,52 +41,78 @@ export type DemoRecipeSupport = {
   reasons: readonly string[];
 };
 
-export const demoCrs = "EPSG:32619";
-export const demoOrigin = { x: 331100, y: 5186420, z: 0 };
-export const demoLookAtTarget = {
-  kind: "projected",
-  crs: demoCrs,
-  x: demoOrigin.x,
-  y: demoOrigin.y,
-  z: demoOrigin.z,
-} as const;
+const demoVesselDimensions: VesselDimensions = {
+  draught: 12,
+  bow: 195.2,
+  stern: 30,
+  port: 20.8,
+  starboard: 11.2,
+};
 
-const emptyVesselGltfUrl =
-  `data:model/gltf+json,${encodeURIComponent(JSON.stringify({
-    asset: { version: "2.0", generator: "@ecc/s100-engine-adapter-switcher" },
-    scene: 0,
-    scenes: [{ nodes: [] }],
-    nodes: [],
-  }))}`;
+const demoVesselBoundingBox = createBoundingBox(
+  [-demoVesselDimensions.port, -demoVesselDimensions.stern, -40.2],
+  [demoVesselDimensions.starboard, demoVesselDimensions.bow, 6.4],
+);
+
+const demoEncMapMinLevel = 3;
+const demoEncMapMaxLevel = 5;
+const demoEncMapQuality = 2;
+const demoEncMapScale = 1;
+const demoEncWmsImageSizePixels = 2048;
 
 export const sceneRecipes = {
   minimal: {
     id: "minimal",
     label: "Minimal Scene",
-    description: "Creates a projected-local scene with no product layers.",
-    async apply(_scene, context) {
-      context.log("info", "Created an empty projected-local scene.");
+    description: "Creates a projected-local scene with a service-backed S-101 ENC basemap.",
+    requiredProducts: ["S-101"],
+    requiredDataSources: ["wms"],
+    async apply(scene, context) {
+      await scene.layers.add(createS101BasemapLayer());
+      context.log("info", "Added S-101 ENC WMS basemap for the projected-local scene.");
+    },
+  },
+  "s101-enc": {
+    id: "s101-enc",
+    label: "S-101 ENC",
+    description: "Adds a service-backed S-101 WMS layer using Explorer-compatible PRIMAR settings.",
+    requiredProducts: ["S-101"],
+    requiredDataSources: ["wms"],
+    async apply(scene, context) {
+      await addTransparentS101Overlay(scene, context);
     },
   },
   "s102-terrain": {
     id: "s102-terrain",
     label: "S-102 Terrain",
-    description: "Adds an S-102 3D Tiles terrain layer through LayerBuilder.",
-    requiredProducts: ["S-102"],
-    requiredDataSources: ["3d-tiles"],
+    description: "Adds service-backed S-102 3D Tiles terrain with a transparent S-101 ENC overlay.",
+    requiredProducts: ["S-102", "S-101"],
+    requiredDataSources: ["3d-tiles", "wms"],
     async apply(scene, context) {
+      const config = requireDemoServiceConfig([
+        "primarApiKey",
+        "s102TilesEndpoint",
+        "s102DatasetIds",
+      ]);
+      await addTransparentS101Overlay(scene, context);
+      const datasetLabel = config.s102DatasetIds.join(",");
       const terrain = await scene.layers.add(
         LayerBuilder.createS102({
-          id: "demo-s102",
+          id: datasetLabel,
           title: "Demo S-102 bathymetry",
-          url: "https://example.test/s102/tileset.json",
-          crs: demoCrs,
+          url: buildS102TilesUrl(config),
+          crs: config.crs,
+          query: { crs: config.crs },
+          rendering: {
+            detailFactor: 500,
+          },
           style: {
             unsafeDepth: 8,
             shading: "hypsometric",
           },
           metadata: {
-            description: "Replace the example URL with a real S-102 3D Tiles endpoint.",
+            datasetId: datasetLabel,
+            description: "Service-backed S-102 3D Tiles dataset.",
           },
         }),
       );
@@ -82,118 +124,105 @@ export const sceneRecipes = {
   "s111-time": {
     id: "s111-time",
     label: "S-111 Time Scene",
-    description: "Adds static S-111 current data and exercises the time controller.",
-    requiredProducts: ["S-111"],
-    requiredDataSources: ["static-json"],
+    description: "Fetches S-111 data and adds a transparent S-101 ENC overlay.",
+    requiredProducts: ["S-111", "S-101"],
+    requiredDataSources: ["static-json", "wms"],
     async apply(scene, context) {
-      const firstStep = new Date("2026-05-29T12:00:00Z");
-      const secondStep = new Date("2026-05-29T13:00:00Z");
-      const currents = await scene.layers.add(
-        LayerBuilder.createStaticS111({
-          id: "demo-s111",
-          title: "Demo S-111 currents",
-          crs: demoCrs,
-          data: {
-            dateTimeOfFirstRecord: "20260529T120000Z",
-            timeRecordInterval: 3600,
-            numberOfTimes: 2,
-            positions: [
-              [331020, 5186380],
-              [331150, 5186460],
-              [331280, 5186540],
-            ],
-            data: [
-              { speed: [0.35, 0.55, 0.42], direction: [75, 110, 145] },
-              { speed: [0.5, 0.7, 0.63], direction: [95, 130, 160] },
-            ],
+      const config = requireDemoServiceConfig([
+        "licenseeKey",
+        "s111Endpoint",
+        "s111DatasetIds",
+      ]);
+      await addTransparentS101Overlay(scene, context);
+      let initialTime: number | null = null;
+
+      for (const datasetId of config.s111DatasetIds) {
+        const fetched = await fetchS111Dataset(config, datasetId);
+        const prepared = LayerBuilder.prepareStaticS111({
+          id: datasetId,
+          title: `S-111 ${datasetId}`,
+          crs: config.crs,
+          data: fetched.data,
+          sourceMetadata: {
+            id: datasetId,
+            title: `S-111 ${datasetId}`,
+            values: {
+              metadata: fetched.metadata,
+            },
           },
           time: {
-            availability: [{ start: firstStep, end: secondStep }],
             interpolation: "nearest",
           },
           style: {
             renderer: "arrows",
             scale: "auto",
           },
-        }),
-      );
+        });
+        const currents = await scene.layers.add(prepared.layer);
+        await currents.controllers.surfaceCurrent.setAutoScaling(true);
 
-      scene.time.setCurrent(secondStep);
-      currents.controllers.surfaceCurrent.setCurrentTime(secondStep);
-      await currents.controllers.surfaceCurrent.setCustomScale(1.8);
-      context.log("info", "Added S-111 currents and set scene time through product controllers.");
+        if (initialTime === null && prepared.timeline.times.length > 0) {
+          initialTime = prepared.timeline.times[0] ?? null;
+        }
+      }
+
+      if (initialTime !== null) {
+        const current = new Date(initialTime);
+        scene.time.setCurrent(current);
+        for (const layer of scene.layers.all()) {
+          layer.controllers.surfaceCurrent?.setCurrentTime(current);
+        }
+      }
+
+      context.log("info", `Fetched and added ${config.s111DatasetIds.length} S-111 dataset(s).`);
     },
   },
   vessel: {
     id: "vessel",
     label: "Vessel",
-    description: "Adds a demo vessel layer and uses vessel controller handles.",
-    requiredProducts: ["vessel"],
-    requiredDataSources: ["model"],
+    description: "Adds a demo vessel layer over a transparent S-101 ENC overlay.",
+    requiredProducts: ["vessel", "S-101"],
+    requiredDataSources: ["model", "wms"],
     requiredVisualFeatures: ["vesselTransformGizmo"],
     async apply(scene, context) {
+      const showOceanSurface = context.engineId !== "cesium";
+      await addTransparentS101Overlay(scene, context);
       const vessel = await scene.layers.add(
         LayerBuilder.createVessel({
           id: "demo-vessel",
           title: "Demo vessel",
-          url: emptyVesselGltfUrl,
-          format: "gltf",
-          crs: demoCrs,
+          url: demoVesselModelUrl,
+          format: "glb",
+          crs: getDemoLookAtTarget().crs,
           pose: {
-            position: demoLookAtTarget,
+            position: getDemoLookAtTarget(),
             headingDegrees: 35,
           },
-          dimensions: {
-            draught: 8,
-            bow: 48,
-            stern: 28,
-            port: 10,
-            starboard: 12,
+          dimensions: demoVesselDimensions,
+          model: {
+            boundingBox: demoVesselBoundingBox,
+            orientation: createQuatIdentity(),
           },
           referencePoint: "transponder",
           style: {
+            draughtMeters: demoVesselDimensions.draught,
             showSeaLevelIndicator: true,
             transformControls: "translate-rotate",
             transformGizmo: {
               enabled: true,
               mode: "translate-rotate",
-              sizeMeters: 25,
+              sizeMeters: 45,
               verticalPositionLimits: { minMeters: -30, maxMeters: 12 },
             },
-            oceanSurface: { enabled: true, radiusMeters: 120, opacity: 0.35 },
+            oceanSurface: { enabled: showOceanSurface, radiusMeters: 260, opacity: 0.35 },
             shadow: { enabled: true, opacity: 0.2 },
           },
         }),
       );
 
-      await vessel.controllers.vessel.setOceanSurfaceVisible(true);
+      await vessel.controllers.vessel.setOceanSurfaceVisible(showOceanSurface);
       await vessel.controllers.vessel.setTransformMode("translate-rotate");
       context.log("info", "Added vessel and configured transform/ocean-surface controllers.");
-    },
-  },
-  "map-overlay": {
-    id: "map-overlay",
-    label: "Map Overlay",
-    description: "Adds a WMS map overlay through the generic map layer builder.",
-    requiredProducts: ["map-overlay"],
-    requiredDataSources: ["wms"],
-    async apply(scene, context) {
-      const map = await scene.layers.add(
-        LayerBuilder.createMapOverlayWms({
-          id: "demo-map-overlay",
-          title: "Demo WMS overlay",
-          url: "https://example.test/wms",
-          layers: ["demo"],
-          crs: demoCrs,
-          opacity: 0.72,
-          metadata: {
-            description: "Replace the example URL with a real WMS endpoint.",
-          },
-        }),
-      );
-
-      await map.controllers.map.setAlpha(0.72);
-      context.log("info", "Added WMS overlay and set opacity through map controllers.");
     },
   },
 } satisfies Record<DemoRecipeId, DemoSceneRecipe>;
@@ -203,15 +232,116 @@ export const allSceneRecipes = Object.values(sceneRecipes);
 export const getSceneRecipe = (id: string): DemoSceneRecipe => {
   if (
     id === "minimal" ||
+    id === "s101-enc" ||
     id === "s102-terrain" ||
     id === "s111-time" ||
-    id === "vessel" ||
-    id === "map-overlay"
+    id === "vessel"
   ) {
     return sceneRecipes[id];
   }
 
   return sceneRecipes.minimal;
+};
+
+const createS101BasemapLayer = () => {
+  const settings = getDemoSceneSettings();
+  const config = requireDemoServiceConfig([
+    "licenseeKey",
+    "s101WmsBaseUrl",
+  ]);
+  const urlTemplate = buildS101WmsUrlTemplate(config, {
+    imageSizePixels: demoEncWmsImageSizePixels,
+    styleId: config.s101WmsBasemapStyleId,
+    transparent: false,
+  });
+  const projectedMap = LayerBuilder.ProjectedMap.fromCenterExtent({
+    center: {
+      x: settings.origin.x,
+      y: settings.origin.y,
+      crs: settings.crs,
+    },
+    widthMeters: settings.mapWidthMeters,
+    heightMeters: settings.mapWidthMeters,
+    crs: settings.crs,
+    minLevel: demoEncMapMinLevel,
+    maxLevel: demoEncMapMaxLevel,
+    quality: demoEncMapQuality,
+    scale: demoEncMapScale,
+    discardMode: LayerBuilder.ProjectedMapDiscardMode.None,
+  });
+
+  return LayerBuilder.createS101WmsTemplate({
+    id: "demo-s101-basemap",
+    title: "S-101 ENC basemap",
+    urlTemplate,
+    layers: config.s101WmsLayers,
+    role: "basemap",
+    ...projectedMap,
+    style: {
+      visible: true,
+      opacity: 1,
+      cutout: {
+        enabled: false,
+      },
+    },
+    metadata: {
+      description: "Service-backed S-101 WMS basemap for the current projected-local scene.",
+    },
+  });
+};
+
+const addTransparentS101Overlay = async (
+  scene: S100Scene,
+  context: DemoSceneRecipeContext,
+): Promise<void> => {
+  await scene.layers.add(createTransparentS101OverlayLayer());
+  context.log("info", "Added transparent S-101 ENC overlay.");
+};
+
+const createTransparentS101OverlayLayer = () => {
+  const config = requireDemoServiceConfig([
+    "licenseeKey",
+    "s101WmsBaseUrl",
+  ]);
+  const baseTemplate = buildS101WmsUrlTemplate(config, {
+    imageSizePixels: demoEncWmsImageSizePixels,
+    styleId: config.s101WmsStyleId,
+    transparent: true,
+  });
+  const transparentTemplate = appendWmsTemplateParameters(baseTemplate, [
+    ["IGNORE", "DepthArea,DepthContour,DredgedArea"],
+    ["HIDE", "90010,90020"],
+  ]);
+
+  const mapPair = LayerBuilder.createEncWmsPair({
+    standard: LayerBuilder.EncStandard.S101,
+    center: {
+      x: config.origin.x,
+      y: config.origin.y,
+      crs: config.crs,
+    },
+    widthMeters: config.mapWidthMeters,
+    crs: config.crs,
+    minLevel: demoEncMapMinLevel,
+    maxLevel: demoEncMapMaxLevel,
+    quality: demoEncMapQuality,
+    discardMode: LayerBuilder.ProjectedMapDiscardMode.None,
+    transparent: {
+      id: "demo-s101-enc",
+      urlTemplate: transparentTemplate,
+      layers: config.s101WmsLayers,
+      role: "overlay",
+      visible: true,
+      opacity: 1,
+      style: {
+        alphaMode: "binary",
+        alphaCutoff: 0.01,
+      },
+      scale: demoEncMapScale,
+    },
+  });
+
+  return mapPair.transparent;
 };
 
 export const assessRecipeSupport = (

@@ -37,6 +37,10 @@ export type MapOverlaySpecification = {
     minLevel: number;
     maxLevel: number;
   };
+  originOffset?: [number, number, number];
+  quality?: number;
+  alphaMode?: MapOverlayAlphaMode;
+  alphaCutoff?: number;
   urlTemplate: string;
 };
 
@@ -93,6 +97,7 @@ export type FlatMapOverlayOptions = MapOverlayGridOptions & {
 };
 
 type NormalizedExtents = MapOverlayExtents;
+type MapOverlayAlphaMode = "source" | "binary";
 
 const MAP_OVERLAY_TILE_SIDE_LENGTH_SCALE = 2;
 const DEFAULT_TARGET_TILE_SIZE_METERS = 4096 * MAP_OVERLAY_TILE_SIDE_LENGTH_SCALE;
@@ -101,10 +106,12 @@ const DETAIL_TARGET_TILE_SIZE_METERS = 96 * MAP_OVERLAY_TILE_SIDE_LENGTH_SCALE;
 const DETAIL_MAX_TILES_PER_AXIS = 64 / MAP_OVERLAY_TILE_SIDE_LENGTH_SCALE;
 const DETAIL_DISTANCE_FACTOR = 0.25 * MAP_OVERLAY_TILE_SIDE_LENGTH_SCALE;
 const DETAIL_WMS_IMAGE_SIZE = 256;
+const MAX_WMS_IMAGE_SIZE = 2048;
 const REFINEMENT_PARENT_REQUEST_BUDGET = 4;
 const REFINEMENT_FOCUS_RADIUS_FACTOR = 4;
 const MIN_OPACITY = 0;
 const MAX_OPACITY = 1;
+const DEFAULT_ALPHA_CUTOFF = 0.01;
 const BASE_LAYER_TYPE = 0;
 const BASE_RENDER_ORDER = 1000;
 const MAP_LAYER_Z_OFFSET = -0.1;
@@ -149,6 +156,8 @@ export class FlatMapOverlay {
   private disposed = false;
   private loadingPaused = false;
   private currentOpacity = 1;
+  private readonly alphaMode: MapOverlayAlphaMode;
+  private readonly alphaCutoff: number;
   private targetLevel: number;
   private readonly progressiveRefinement: boolean;
 
@@ -167,6 +176,11 @@ export class FlatMapOverlay {
       options.maxTextureAnisotropy,
     );
     this.logger = options.logger;
+    this.alphaMode = normalizeAlphaMode(specification.alphaMode);
+    this.alphaCutoff = normalizeAlphaCutoff(
+      specification.alphaCutoff,
+      this.alphaMode,
+    );
     this.targetLevel = normalizeLevel(
       specification.dataset.minLevel,
       specification,
@@ -179,7 +193,12 @@ export class FlatMapOverlay {
     this.group.renderOrder = getLayerRenderOrder(specification.type);
 
     this.origin = getOverlayOrigin(specification);
-    this.group.position.set(this.origin[0], this.origin[1], 0);
+    const originOffset = specification.originOffset ?? [0, 0, 0];
+    this.group.position.set(
+      this.origin[0] + originOffset[0],
+      this.origin[1] + originOffset[1],
+      originOffset[2],
+    );
     this.setTiles(buildMapTileGrid(specification, this.getInitialGridOptions(options)));
 
     this.scene.add(this.group);
@@ -414,7 +433,8 @@ export class FlatMapOverlay {
       map: texture,
       opacity: this.currentOpacity,
       side: DoubleSide,
-      transparent: true,
+      transparent: shouldUseTransparentMaterial(this.alphaMode, this.currentOpacity),
+      alphaTest: this.alphaCutoff,
     });
     material.polygonOffset = true;
     material.polygonOffsetFactor = -1;
@@ -480,6 +500,11 @@ export class FlatMapOverlay {
       resource.mesh.visible = visible;
       resource.material.visible = visible;
       resource.material.opacity = this.currentOpacity;
+      resource.material.transparent = shouldUseTransparentMaterial(
+        this.alphaMode,
+        this.currentOpacity,
+      );
+      resource.material.alphaTest = this.alphaCutoff;
       resource.material.needsUpdate = true;
       return;
     }
@@ -736,7 +761,7 @@ export function buildMapTileGrid(
 
         tiles.push({
           ...tileWithoutUrl,
-          url: formatMapTileURL(specification.urlTemplate, tileWithoutUrl),
+          url: formatMapTileURL(specification, tileWithoutUrl),
         });
       }
     }
@@ -783,7 +808,7 @@ function buildMapTileChildren(
       };
       children.push({
         ...tileWithoutUrl,
-        url: formatMapTileURL(specification.urlTemplate, tileWithoutUrl),
+        url: formatMapTileURL(specification, tileWithoutUrl),
       });
     }
   }
@@ -848,10 +873,10 @@ function getTileGridSignature(tiles: MapOverlayTile[]): string {
 }
 
 export function formatMapTileURL(
-  template: string,
+  specification: Pick<MapOverlaySpecification, "quality" | "urlTemplate">,
   tile: Pick<MapOverlayTile, "bounds" | "column" | "level" | "row">,
 ): string {
-  const url = template
+  const url = specification.urlTemplate
     .replace(/\{x\}/g, String(tile.column))
     .replace(/\{y\}/g, String(tile.row))
     .replace(/\{z\}/g, String(tile.level))
@@ -859,7 +884,7 @@ export function formatMapTileURL(
     .replace(/\{ymin\}/g, formatCoordinate(tile.bounds.ymin))
     .replace(/\{xmax\}/g, formatCoordinate(tile.bounds.xmax))
     .replace(/\{ymax\}/g, formatCoordinate(tile.bounds.ymax));
-  return setWmsImageSize(url, DETAIL_WMS_IMAGE_SIZE);
+  return setWmsImageSize(url, getWmsImageSize(specification));
 }
 
 function createTextureLoader(): TextureLoader {
@@ -1312,6 +1337,40 @@ function setWmsImageSize(url: string, size: number): string {
   return url
     .replace(widthPattern, `$1${normalizedSize}`)
     .replace(heightPattern, `$1${normalizedSize}`);
+}
+
+function getWmsImageSize(
+  specification: Pick<MapOverlaySpecification, "quality">,
+): number {
+  const quality = specification.quality;
+  if (typeof quality !== "number" || !Number.isFinite(quality) || quality <= 0) {
+    return DETAIL_WMS_IMAGE_SIZE;
+  }
+  return Math.round(clamp(DETAIL_WMS_IMAGE_SIZE * quality, DETAIL_WMS_IMAGE_SIZE, MAX_WMS_IMAGE_SIZE));
+}
+
+function normalizeAlphaMode(value: unknown): MapOverlayAlphaMode {
+  return value === "binary" ? "binary" : "source";
+}
+
+function normalizeAlphaCutoff(
+  value: unknown,
+  alphaMode: MapOverlayAlphaMode,
+): number {
+  if (alphaMode !== "binary") {
+    return 0;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_ALPHA_CUTOFF;
+  }
+  return clamp(value, 0, 1);
+}
+
+function shouldUseTransparentMaterial(
+  alphaMode: MapOverlayAlphaMode,
+  opacity: number,
+): boolean {
+  return alphaMode !== "binary" || opacity < 1;
 }
 
 function subtractClipExtents(

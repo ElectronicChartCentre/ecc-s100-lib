@@ -30,6 +30,18 @@ export type OpacityVisibilityStyle = {
   opacity?: number;
 };
 
+export type RasterAlphaMode = "source" | "binary";
+
+export type RasterAlphaStyle = {
+  /**
+   * `source` preserves raster alpha exactly. `binary` treats alpha as a
+   * coverage mask, rendering non-transparent pixels at the layer opacity.
+   */
+  alphaMode?: RasterAlphaMode;
+  /** Alpha threshold used when alphaMode is `binary`; defaults are adapter-defined. */
+  alphaCutoff?: number;
+};
+
 export type ProductFilter = {
   property: string;
   operator: "eq" | "neq" | "in" | "not-in" | "lt" | "lte" | "gt" | "gte" | "contains";
@@ -46,7 +58,7 @@ export type ContourStyle = {
 
 export type DepthColorStyle = ColorRampRef | readonly ColorStop[];
 
-export type EncCommonStyle = OpacityVisibilityStyle & {
+export type EncCommonStyle = OpacityVisibilityStyle & RasterAlphaStyle & {
   displayCategories?: readonly string[];
   ignoredCategories?: readonly string[];
   filters?: readonly ProductFilter[];

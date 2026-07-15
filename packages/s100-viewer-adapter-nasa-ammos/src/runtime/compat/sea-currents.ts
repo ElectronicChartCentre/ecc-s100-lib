@@ -47,7 +47,9 @@ type SurfaceCurrentRecord = {
 type SeaCurrentsOverlayOptions = {
   currentTimeMs?: number;
   customScale?: number;
+  autoScaling?: boolean;
   zOffset?: number;
+  originOffset?: readonly [number, number, number] | undefined;
 };
 
 const DEFAULT_INTERVAL_SECONDS = 1;
@@ -103,6 +105,7 @@ export class SeaCurrentsOverlay {
   private readonly origin: SurfaceCurrentPosition;
   private currentTimeMs: number;
   private customScale: number;
+  private autoScaling: boolean;
   private zOffset: number;
   private currentRecordIndex = -1;
   private disposed = false;
@@ -118,12 +121,18 @@ export class SeaCurrentsOverlay {
       normalizeFiniteNumber(options.currentTimeMs) ??
       this.parsedDataset.startTime;
     this.customScale = normalizePositiveScale(options.customScale);
+    this.autoScaling = options.autoScaling ?? false;
     this.zOffset = normalizeFiniteNumber(options.zOffset) ?? DEFAULT_Z_OFFSET;
     this.group.name = `s100-s111:${this.parsedDataset.id}`;
     this.group.renderOrder = 1300;
     this.group.frustumCulled = false;
     this.origin = getSurfaceCurrentOrigin(this.parsedDataset.positions);
-    this.group.position.set(this.origin[0], this.origin[1], 0);
+    const originOffset = options.originOffset ?? [0, 0, 0];
+    this.group.position.set(
+      this.origin[0] + originOffset[0],
+      this.origin[1] + originOffset[1],
+      originOffset[2],
+    );
 
     this.outlineGeometry = createArrowGeometry(
       this.parsedDataset.positions.length,
@@ -183,6 +192,14 @@ export class SeaCurrentsOverlay {
       return;
     }
     this.customScale = nextScale;
+    this.updateInstances(true);
+  }
+
+  setAutoScaling(enabled: boolean): void {
+    if (enabled === this.autoScaling) {
+      return;
+    }
+    this.autoScaling = enabled;
     this.updateInstances(true);
   }
 
@@ -297,6 +314,7 @@ export class SeaCurrentsOverlay {
         getArrowScale(
           speedKnots,
           this.customScale,
+          this.autoScaling,
           this.parsedDataset,
         );
       const angle = MathUtils.degToRad(90 - direction);
@@ -766,8 +784,16 @@ function getBaseArrowScale(customScale: number, gridSize: number): number {
 function getArrowScale(
   speedKnots: number,
   customScale: number,
+  autoScaling: boolean,
   dataset: ParsedSurfaceCurrentDataset,
 ): number {
+  if (autoScaling) {
+    const gridScale = dataset.gridSize > 0
+      ? dataset.gridSize * ARROW_MAX_LOCAL_SPACING_FACTOR
+      : 250;
+    return gridScale * getSpeedScaleFactor(speedKnots, dataset);
+  }
+
   if (customScale > 1) {
     return getExplicitArrowScale(speedKnots, customScale);
   }

@@ -12,6 +12,7 @@ The engine adapter switcher is a private workspace app that exercises the
 public package imports a future standalone consumer would use:
 
 ```sh
+cp examples/engine-adapter-switcher/.env.example examples/engine-adapter-switcher/.env.local
 npm run demo:engine-switcher
 npm run build:demo:engine-switcher
 ```

@@ -10,7 +10,7 @@ import type {
   WmsTemplateSource,
   WmtsSource,
 } from "./sources.js";
-import type { ColorValue, OpacityVisibilityStyle, ProductFilter } from "./style.js";
+import type { ColorValue, OpacityVisibilityStyle, ProductFilter, RasterAlphaStyle } from "./style.js";
 
 export type VesselPose = {
   position: Coordinate;
@@ -92,7 +92,7 @@ export type VesselStyle = OpacityVisibilityStyle & {
   shadow?: VesselShadowStyle;
 };
 
-export type MapOverlayStyle = OpacityVisibilityStyle & {
+export type MapOverlayStyle = OpacityVisibilityStyle & RasterAlphaStyle & {
   blendMode?: "normal" | "multiply" | "screen" | "overlay";
   filters?: readonly ProductFilter[];
 };

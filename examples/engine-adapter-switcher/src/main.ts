@@ -61,9 +61,15 @@ async function rebuild(): Promise<void> {
   setBusy(true, `Loading ${engine.label}`);
   appendLog("info", `Starting ${engine.label} with ${recipe.label}.`);
 
-  await destroyViewerSession(activeSession);
+  const previousSession = activeSession;
   activeSession = null;
-  viewerElement.replaceChildren();
+  try {
+    await destroyViewerSession(previousSession);
+  } catch (error) {
+    appendLog("warn", `Previous viewer teardown reported: ${errorMessage(error)}`);
+  } finally {
+    viewerElement.replaceChildren();
+  }
   lastCameraPose = null;
   cameraPanel.textContent = formatCameraPose(null);
   capabilityPanel.textContent = formatCapabilities(null, null);
@@ -134,4 +140,8 @@ function getElement<TElement extends HTMLElement>(id: string): TElement {
   }
 
   return element as TElement;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

@@ -9,7 +9,7 @@ import {
   type S57EncLayerSpec,
 } from "./enc.js";
 import type { WmsSource } from "./sources.js";
-import type { S101EncStyle, S57EncStyle } from "./style.js";
+import type { EncCommonStyle, S101EncStyle, S57EncStyle } from "./style.js";
 import {
   ProjectedMap,
   ProjectedMapDiscardMode,
@@ -86,6 +86,7 @@ export type CreateEncWmsPairLayerOptions = {
   role?: EncLayerRole;
   visible?: boolean;
   opacity?: number;
+  style?: Partial<EncCommonStyle>;
   layers?: readonly string[];
   scale?: number;
 };
@@ -383,6 +384,7 @@ const createEncWmsTemplateFromPairLayer = (
     ...(layer.id !== undefined ? { id: layer.id } : {}),
     ...(layer.visible !== undefined ? { visible: layer.visible } : {}),
     ...(layer.opacity !== undefined ? { opacity: layer.opacity } : {}),
+    ...(layer.style !== undefined ? { style: layer.style } : {}),
     ...(layer.layers !== undefined ? { layers: layer.layers } : {}),
     ...(options.productSpecificationVersion !== undefined
       ? { productSpecificationVersion: options.productSpecificationVersion }

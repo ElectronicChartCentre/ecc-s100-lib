@@ -60,7 +60,24 @@ import {
   type VesselView,
 } from "./runtime/compat/s100-viewer.js";
 import * as THREE from "three";
-import { Raycaster, Vector2, Vector3, type Camera, type Object3D, type Scene, type WebGLRenderer } from "three";
+import {
+  AmbientLight,
+  Color,
+  CubeTextureLoader,
+  DirectionalLight,
+  EquirectangularReflectionMapping,
+  PMREMGenerator,
+  Raycaster,
+  TextureLoader,
+  Vector2,
+  Vector3,
+  type Camera,
+  type Object3D,
+  type Scene,
+  type Texture,
+  type WebGLRenderer,
+} from "three";
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 
 type FetchLike = typeof fetch;
 const SIMULATED_WATER_LEVEL_PRODUCT = "simulated-water-level";
@@ -188,7 +205,10 @@ class NasaAmmosViewerHost implements EngineViewerHost {
 
     const coreScene = await this.viewer.createScene(sceneOptions);
     const scene = new ViewerScene(coreScene, this.options);
-    return new NasaAmmosEngineScene(scene, this.options);
+    return new NasaAmmosEngineScene(scene, this.options, {
+      ...(sceneOptions.crs !== undefined ? { crs: sceneOptions.crs } : {}),
+      ...(origin !== undefined ? { origin } : {}),
+    });
   }
 
   destroy(): void {
@@ -203,10 +223,14 @@ class NasaAmmosEngineScene implements EngineScene {
   private livePickingSubscription: SubscriptionLike | null = null;
   private cameraChangeListener: EngineCameraChangeListener | null = null;
   private cameraChangeSubscription: SubscriptionLike | null = null;
+  private environmentLoadSerial = 0;
+  private environmentTextures: Texture[] = [];
+  private disposed = false;
 
   constructor(
     private readonly scene: ViewerScene,
     private readonly options: NasaAmmosAdapterOptions,
+    private readonly georeference: { crs?: string; origin?: Vec3 },
   ) {
     this.cameraChangeSubscription = this.scene.cameraChanged.subscribe((pose) => {
       this.cameraChangeListener?.(tupleCameraPoseToObjectPose(pose));
@@ -278,7 +302,7 @@ class NasaAmmosEngineScene implements EngineScene {
   }
 
   lookAt(view: CameraLookAt): void {
-    const target = coordinateToVec3(view.target);
+    const target = this.coordinateToEngineVec3(view.target);
     this.scene.cameraNavigation.lookAt(
       [target.x, target.y, target.z],
       view.rangeMeters,
@@ -318,8 +342,27 @@ class NasaAmmosEngineScene implements EngineScene {
     return this.scene.seaLevel;
   }
 
-  setEnvironment(_state: EnvironmentState): void {
-    // The existing NASA-AMMOS runtime owns lighting/environment setup at viewer creation.
+  setEnvironment(state: EnvironmentState): void {
+    const renderContext = getRenderContext(this.scene);
+    if (!renderContext) {
+      return;
+    }
+
+    applyNasaLighting(renderContext.scene, state.lighting);
+    applyNasaBackground(renderContext, state);
+
+    if (state.background === "skybox" && state.skyboxFaces) {
+      this.loadCubeSkybox(renderContext, state);
+      return;
+    }
+
+    if (state.background === "skybox" && (state.skyboxUrl || state.lighting?.environmentMapUrl)) {
+      this.loadEquirectangularSkybox(renderContext, state);
+      return;
+    }
+
+    this.environmentLoadSerial += 1;
+    this.clearEnvironmentTexture();
   }
 
   async addLayer(spec: BaseLayerSpec): Promise<EngineLayerHandle> {
@@ -439,11 +482,14 @@ class NasaAmmosEngineScene implements EngineScene {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.environmentLoadSerial += 1;
     this.cameraChangeSubscription?.unsubscribe();
     this.cameraChangeSubscription = null;
     this.cameraChangeListener = null;
     this.livePickingSubscription?.unsubscribe();
     this.livePickingSubscription = null;
+    this.clearEnvironmentTexture();
     this.scene.PickingRay.enabled = false;
     this.clearHoverPrism();
     for (const handle of [...this.layers.keys()]) {
@@ -454,6 +500,154 @@ class NasaAmmosEngineScene implements EngineScene {
     }
     this.layers.clear();
     this.scene.destroy();
+  }
+
+  private loadCubeSkybox(renderContext: NasaRenderContext, state: EnvironmentState): void {
+    const faces = state.skyboxFaces;
+    if (!faces) {
+      return;
+    }
+
+    const serial = ++this.environmentLoadSerial;
+    new CubeTextureLoader().load(
+      [
+        faces.positiveX,
+        faces.negativeX,
+        faces.positiveY,
+        faces.negativeY,
+        faces.positiveZ,
+        faces.negativeZ,
+      ],
+      (texture) => {
+        if (this.disposed || serial !== this.environmentLoadSerial) {
+          texture.dispose();
+          return;
+        }
+
+        this.replaceEnvironmentTextures([texture]);
+        applyNasaEnvironmentTexture(renderContext, texture, texture, state);
+      },
+      undefined,
+      (error) => {
+        if (!this.disposed && serial === this.environmentLoadSerial) {
+          this.options.logger?.warn?.("Failed to load NASA-AMMOS skybox faces", error);
+        }
+      },
+    );
+  }
+
+  private loadEquirectangularSkybox(renderContext: NasaRenderContext, state: EnvironmentState): void {
+    const url = state.lighting?.environmentMapUrl ?? state.skyboxUrl;
+    if (!url) {
+      return;
+    }
+
+    if (isHdrEnvironmentMap(url)) {
+      this.loadHdrSkybox(renderContext, state, url);
+      return;
+    }
+
+    const serial = ++this.environmentLoadSerial;
+    new TextureLoader().load(
+      url,
+      (texture) => {
+        if (this.disposed || serial !== this.environmentLoadSerial) {
+          texture.dispose();
+          return;
+        }
+
+        texture.mapping = EquirectangularReflectionMapping;
+        const pmremGenerator = new PMREMGenerator(renderContext.renderer);
+        const environmentTexture = pmremGenerator.fromEquirectangular(texture).texture;
+        pmremGenerator.dispose();
+        this.replaceEnvironmentTextures([texture, environmentTexture]);
+        applyNasaEnvironmentTexture(renderContext, texture, environmentTexture, state);
+      },
+      undefined,
+      (error) => {
+        if (!this.disposed && serial === this.environmentLoadSerial) {
+          this.options.logger?.warn?.("Failed to load NASA-AMMOS skybox image", error);
+        }
+      },
+    );
+  }
+
+  private loadHdrSkybox(
+    renderContext: NasaRenderContext,
+    state: EnvironmentState,
+    url: string,
+  ): void {
+    const serial = ++this.environmentLoadSerial;
+    new RGBELoader().load(
+      url,
+      (texture) => {
+        if (this.disposed || serial !== this.environmentLoadSerial) {
+          texture.dispose();
+          return;
+        }
+
+        texture.mapping = EquirectangularReflectionMapping;
+        const pmremGenerator = new PMREMGenerator(renderContext.renderer);
+        const environmentTexture = pmremGenerator.fromEquirectangular(texture).texture;
+        pmremGenerator.dispose();
+        this.replaceEnvironmentTextures([texture, environmentTexture]);
+        applyNasaEnvironmentTexture(renderContext, texture, environmentTexture, state);
+      },
+      undefined,
+      (error) => {
+        if (!this.disposed && serial === this.environmentLoadSerial) {
+          this.options.logger?.warn?.("Failed to load NASA-AMMOS HDR environment map", error);
+        }
+      },
+    );
+  }
+
+  private replaceEnvironmentTextures(textures: Texture[]): void {
+    this.clearEnvironmentTexture();
+    this.environmentTextures = textures;
+  }
+
+  private clearEnvironmentTexture(): void {
+    for (const texture of this.environmentTextures) {
+      texture.dispose();
+    }
+    this.environmentTextures = [];
+  }
+
+  private coordinateToEngineVec3(coordinate: Coordinate): Vec3 {
+    const position = coordinateToVec3(coordinate);
+    if (coordinate.kind !== "projected") {
+      return position;
+    }
+
+    const origin = this.georeference.origin;
+    const sceneCrs = this.georeference.crs;
+    if (!origin || !sceneCrs || coordinate.crs.toUpperCase() !== sceneCrs.toUpperCase()) {
+      return position;
+    }
+
+    return {
+      x: position.x - origin.x,
+      y: position.y - origin.y,
+      z: position.z - origin.z,
+    };
+  }
+
+  private getTerrainOriginOffset(
+    spec: S102BathymetryLayerSpec,
+  ): { originOffset?: [number, number, number] } {
+    if (spec.source.sourceFrame === "engine-local") {
+      return {};
+    }
+
+    const origin = this.georeference.origin;
+    if (!origin) {
+      return {};
+    }
+
+    return {
+      originOffset: [-origin.x, -origin.y, -origin.z],
+    };
   }
 
   private async createNativeLayer(spec: BaseLayerSpec): Promise<NasaLayerNative> {
@@ -488,10 +682,12 @@ class NasaAmmosEngineScene implements EngineScene {
       additionalURLParameters: string;
       accessToken?: string;
       detailFactor: number;
+      originOffset?: [number, number, number];
     } = {
       baseURL: spec.source.url,
       additionalURLParameters: buildAdditionalUrlParameters(spec),
       detailFactor: getS102DetailFactor(spec),
+      ...this.getTerrainOriginOffset(spec),
     };
     const accessToken = getAuthorizationBearer(spec.source);
     if (accessToken !== undefined) {
@@ -506,7 +702,9 @@ class NasaAmmosEngineScene implements EngineScene {
 
   private async createS111Layer(spec: S111SurfaceCurrentLayerSpec): Promise<NasaLayerNative> {
     const data = await loadJsonSource(spec.source, this.options.fetchHandler);
-    const view = this.scene.S111.add(data as SurfaceCurrentDataset);
+    const view = this.scene.S111.add(data as SurfaceCurrentDataset, {
+      originOffset: getS111OriginOffset(spec, this.georeference),
+    });
     applyS111Style(view, spec);
     applyVisibility(view, spec.visible);
     view.time.currentTime = this.currentTime.getTime();
@@ -527,7 +725,7 @@ class NasaAmmosEngineScene implements EngineScene {
   }
 
   private createMapLayer(spec: EncLayerSpec | MapOverlayLayerSpec): NasaLayerNative {
-    const mapSpecification = createMapSpecification(spec);
+    const mapSpecification = createMapSpecification(spec, this.georeference);
     const view = this.scene.Map.add(mapSpecification);
     view.alpha = spec.opacity ?? 1;
     view.setVisibility(spec.visible ?? true);
@@ -549,7 +747,7 @@ class NasaAmmosEngineScene implements EngineScene {
       dimensions: getVesselDimensions(spec),
       ...(verticalPositionLimits !== undefined ? { verticalPositionLimits } : {}),
     });
-    const position = coordinateToVec3(spec.pose.position);
+    const position = this.coordinateToEngineVec3(spec.pose.position);
     view.setPosition([position.x, position.y, position.z]);
     view.setHeading(spec.pose.headingDegrees ?? 0);
     view.setVisibility(spec.visible ?? true);
@@ -582,7 +780,7 @@ class NasaAmmosEngineScene implements EngineScene {
     if (native.kind === "vessel") {
       const vesselPatch = patch as LayerPatch<VesselLayerSpec>;
       if (vesselPatch.pose) {
-        const position = coordinateToVec3(native.spec.pose.position);
+        const position = this.coordinateToEngineVec3(native.spec.pose.position);
         native.view.setPosition([position.x, position.y, position.z]);
         native.view.setHeading(native.spec.pose.headingDegrees ?? native.view.getHeading());
       }
@@ -794,18 +992,29 @@ function applyVisibility(
   }
 }
 
-function createMapSpecification(spec: EncLayerSpec | MapOverlayLayerSpec): MapSpecification {
+function createMapSpecification(
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+  georeference: { crs?: string; origin?: Vec3 },
+): MapSpecification {
   const nativeSpec = spec.projectedMap ?? getNasaAmmosExtension<MapSpecification>(spec, "mapSpecification");
   if (nativeSpec) {
-    return nativeSpec;
+    return withMapOriginOffset(
+      {
+        ...nativeSpec,
+        ...getMapAlphaOptions(spec),
+      },
+      spec,
+      georeference,
+    );
   }
 
   const extents = getProjectedExtents(spec);
   const source = spec.source;
   const minLevel = getNumberExtension(spec, "minLevel", 0);
   const maxLevel = getNumberExtension(spec, "maxLevel", 18);
+  const originOffset = getMapOriginOffset(spec, georeference);
 
-  return {
+  const mapSpecification: MapSpecification = {
     id: spec.id,
     type: getMapLayerType(spec),
     corners: {
@@ -823,8 +1032,93 @@ function createMapSpecification(spec: EncLayerSpec | MapOverlayLayerSpec): MapSp
       minLevel,
       maxLevel,
     },
+    ...getMapAlphaOptions(spec),
     urlTemplate: createMapUrlTemplate(source),
   };
+  if (originOffset !== undefined) {
+    mapSpecification.originOffset = originOffset;
+  }
+  return mapSpecification;
+}
+
+function withMapOriginOffset(
+  specification: MapSpecification,
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+  georeference: { crs?: string; origin?: Vec3 },
+): MapSpecification {
+  const originOffset = getMapOriginOffset(spec, georeference);
+  if (originOffset === undefined) {
+    return specification;
+  }
+  return {
+    ...specification,
+    originOffset,
+  };
+}
+
+function getMapAlphaOptions(
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+): Pick<MapSpecification, "alphaMode" | "alphaCutoff"> {
+  const style = spec.style as { alphaMode?: unknown; alphaCutoff?: unknown } | undefined;
+  const alphaMode = normalizeMapAlphaMode(style?.alphaMode);
+  const alphaCutoff = normalizeMapAlphaCutoff(style?.alphaCutoff, alphaMode);
+  return {
+    ...(alphaMode !== undefined ? { alphaMode } : {}),
+    ...(alphaCutoff !== undefined ? { alphaCutoff } : {}),
+  };
+}
+
+function normalizeMapAlphaMode(value: unknown): MapSpecification["alphaMode"] {
+  return value === "binary" || value === "source" ? value : undefined;
+}
+
+function normalizeMapAlphaCutoff(
+  value: unknown,
+  alphaMode: MapSpecification["alphaMode"],
+): number | undefined {
+  if (alphaMode !== "binary") {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0.01;
+  }
+  return Math.max(0, Math.min(1, value));
+}
+
+function getMapOriginOffset(
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+  georeference: { crs?: string; origin?: Vec3 },
+): [number, number, number] | undefined {
+  const origin = georeference.origin;
+  const sceneCrs = georeference.crs;
+  if (!origin || !sceneCrs) {
+    return undefined;
+  }
+
+  const mapCrs = spec.projectedMap?.dataset.extents.crs ?? spec.spatialExtent?.crs ?? spec.source.crs;
+  if (mapCrs !== undefined && mapCrs.toUpperCase() !== sceneCrs.toUpperCase()) {
+    return undefined;
+  }
+
+  return [-origin.x, -origin.y, -origin.z];
+}
+
+function getS111OriginOffset(
+  spec: S111SurfaceCurrentLayerSpec,
+  georeference: { crs?: string; origin?: Vec3 },
+): [number, number, number] | undefined {
+  const origin = georeference.origin;
+  const sceneCrs = georeference.crs;
+  if (!origin || !sceneCrs) {
+    return undefined;
+  }
+
+  const sourceCrs = spec.source.crs;
+  if (sourceCrs !== undefined && sourceCrs.toUpperCase() !== sceneCrs.toUpperCase()) {
+    return undefined;
+  }
+
+  return [-origin.x, -origin.y, -origin.z];
 }
 
 function getMapLayerType(spec: EncLayerSpec | MapOverlayLayerSpec): MapLayerType {
@@ -1231,6 +1525,122 @@ function legacyPickToPickResult(pick: PickedInfo): PickResult | null {
     result.depthMeters = pick.xyz[2] - (pick.seaLevel ?? 0);
   }
   return result;
+}
+
+function applyNasaBackground(renderContext: NasaRenderContext, state: EnvironmentState): void {
+  const { renderer, scene } = renderContext;
+  const backgroundIntensity = normalizeOptionalPositiveNumber(state.backgroundIntensity);
+  if (backgroundIntensity !== null) {
+    scene.backgroundIntensity = backgroundIntensity;
+  }
+
+  if (state.background === "transparent") {
+    scene.background = null;
+    scene.environment = null;
+    renderer.setClearColor(new Color(0x000000), 0);
+    return;
+  }
+
+  if (state.background === "solid") {
+    const color = new Color(0x102033);
+    scene.background = color;
+    scene.environment = null;
+    renderer.setClearColor(color, 1);
+    return;
+  }
+
+  if (state.background === "skybox") {
+    renderer.setClearColor(new Color(0x102033), 1);
+  }
+}
+
+function applyNasaLighting(scene: Scene, lighting: EnvironmentState["lighting"]): void {
+  if (!lighting) {
+    return;
+  }
+
+  const ambientIntensity = normalizeOptionalPositiveNumber(lighting.ambientIntensity);
+  if (ambientIntensity !== null) {
+    getOrCreateAmbientLight(scene).intensity = ambientIntensity;
+  }
+
+  const directionalIntensity = normalizeOptionalPositiveNumber(lighting.directionalIntensity);
+  const sunDirection = lighting.sunDirection;
+  if (directionalIntensity !== null || sunDirection !== undefined) {
+    const directionalLight = getOrCreateDirectionalLight(scene);
+    if (directionalIntensity !== null) {
+      directionalLight.intensity = directionalIntensity;
+    }
+    if (sunDirection !== undefined) {
+      const direction = new Vector3(sunDirection.x, sunDirection.y, sunDirection.z);
+      if (direction.lengthSq() > 0) {
+        directionalLight.position.copy(direction.normalize().multiplyScalar(1000));
+      }
+    }
+  }
+
+  const environmentIntensity = normalizeOptionalPositiveNumber(lighting.environmentIntensity);
+  if (environmentIntensity !== null) {
+    scene.environmentIntensity = environmentIntensity;
+  }
+}
+
+function applyNasaEnvironmentTexture(
+  renderContext: NasaRenderContext,
+  backgroundTexture: Texture,
+  environmentTexture: Texture,
+  state: EnvironmentState,
+): void {
+  renderContext.scene.background = backgroundTexture;
+  renderContext.scene.environment = environmentTexture;
+  renderContext.scene.backgroundIntensity = normalizePositiveNumber(
+    state.backgroundIntensity,
+    renderContext.scene.backgroundIntensity,
+  );
+  renderContext.scene.environmentIntensity = normalizePositiveNumber(
+    state.lighting?.environmentIntensity,
+    renderContext.scene.environmentIntensity,
+  );
+  renderContext.renderer.setClearColor(new Color(0x102033), 1);
+}
+
+function isHdrEnvironmentMap(url: string): boolean {
+  return /\.hdr(?:[?#].*)?$/i.test(url);
+}
+
+function getOrCreateAmbientLight(scene: Scene): AmbientLight {
+  const existing = scene.children.find((child): child is AmbientLight => child instanceof AmbientLight);
+  if (existing) {
+    return existing;
+  }
+
+  const light = new AmbientLight(0xffffff, 0);
+  scene.add(light);
+  return light;
+}
+
+function getOrCreateDirectionalLight(scene: Scene): DirectionalLight {
+  const existing = scene.children.find((child): child is DirectionalLight => child instanceof DirectionalLight);
+  if (existing) {
+    return existing;
+  }
+
+  const light = new DirectionalLight(0xffffff, 0);
+  light.position.set(150, -200, 300);
+  scene.add(light);
+  return light;
+}
+
+function normalizePositiveNumber(value: unknown, fallback: number): number {
+  const normalized = normalizeOptionalPositiveNumber(value);
+  return normalized ?? fallback;
+}
+
+function normalizeOptionalPositiveNumber(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return value;
 }
 
 function getRenderContext(scene: ViewerScene): NasaRenderContext | null {

@@ -1,0 +1,22 @@
+{
+  "background": "skybox",
+  "backgroundIntensity": 0.85,
+  "skyboxFaces": {
+    "positiveX": "/demo-assets/environment/skybox/positive-x.png",
+    "negativeX": "/demo-assets/environment/skybox/negative-x.png",
+    "positiveY": "/demo-assets/environment/skybox/positive-y.png",
+    "negativeY": "/demo-assets/environment/skybox/negative-y.png",
+    "positiveZ": "/demo-assets/environment/skybox/positive-z.png",
+    "negativeZ": "/demo-assets/environment/skybox/negative-z.png"
+  },
+  "lighting": {
+    "sunDirection": { "x": -0.35, "y": 0.45, "z": 0.82 },
+    "ambientIntensity": 0.18,
+    "directionalIntensity": 0.72,
+    "environmentIntensity": 0.28
+  },
+  "metadata": {
+    "name": "Demo harbor daylight",
+    "description": "Small static environment config for adapter-switching examples."
+  }
+}

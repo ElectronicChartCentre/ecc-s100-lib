@@ -62,6 +62,45 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     await overrideViewer.destroy();
   });
 
+  it("patches nonconstructible browser Image globals on the viewer window", async () => {
+    const cesium = createMockCesium();
+    const createdImages: Array<{ tagName: string; width?: number; height?: number; src: string }> = [];
+    function HTMLImageElement() {
+      throw new TypeError("Illegal constructor");
+    }
+    const ownerWindow = {
+      HTMLImageElement,
+      Image: HTMLImageElement as unknown as new (width?: number, height?: number) => {
+        height?: number;
+        src: string;
+        tagName: string;
+        width?: number;
+      },
+    };
+    const ownerDocument = {
+      defaultView: ownerWindow,
+      createElement(tagName: string) {
+        const image = { tagName, src: "" };
+        createdImages.push(image);
+        return image;
+      },
+    };
+    const viewer = await createS100Viewer({
+      container: {
+        ownerDocument,
+        appendChild() {
+          return undefined;
+        },
+      } as unknown as HTMLElement,
+      adapter: createCesiumAdapter({ cesiumModule: cesium }),
+    });
+
+    const image = new ownerWindow.Image(12, 13);
+    expect(image).toMatchObject({ tagName: "img", width: 12, height: 13 });
+    expect(createdImages).toHaveLength(1);
+    await viewer.destroy();
+  });
+
   it("keeps Cesium dynamic lighting off until the scene opts in", async () => {
     const cesium = createMockCesium();
     const viewer = await createS100Viewer({
@@ -510,6 +549,14 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     expect(scene.camera.getPose().position).toEqual({ x: 331200, y: 5186520, z: 250 });
     expect(scene.camera.getPose().rotation).toEqual({ x: 0, y: 0, z: 0, w: 1 });
 
+    const nativeCamera = scene.getEngineHandles().instances?.camera as {
+      position?: unknown;
+      positionWC?: unknown;
+    };
+    nativeCamera.position = { x: 9_999_999, y: 9_999_999, z: 9_999_999 };
+    nativeCamera.positionWC = { frame: "enu", x: 100, y: 100, z: 250 };
+    expect(scene.camera.getPose().position).toEqual({ x: 331200, y: 5186520, z: 250 });
+
     dispatchScreenSpace(cesium, "MIDDLE_DOWN", {
       position: { x: 100, y: 100 },
     });
@@ -520,7 +567,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
       position: { x: 112, y: 108 },
     });
 
-    expect(cesium.operations.cameraViews).toHaveLength(1);
+    expect(cesium.operations.cameraViews).toHaveLength(2);
     expect(scene.camera.getPose().position).toEqual({ x: 331152, y: 5186552, z: 250 });
 
     dispatchScreenSpace(cesium, "LEFT_DOWN", {
@@ -530,7 +577,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
       endPosition: { x: 130, y: 116 },
     });
 
-    expect(cesium.operations.cameraViews).toHaveLength(2);
+    expect(cesium.operations.cameraViews).toHaveLength(3);
     expect(scene.camera.getPose().position).toEqual({ x: 331152, y: 5186552, z: 250 });
     expect(scene.camera.getPose().rotation.w).toBeLessThan(1);
     await viewer.destroy();
@@ -1068,6 +1115,10 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
         url: "https://example.test/transparent?bbox={xmin},{ymin},{xmax},{ymax}&WIDTH=256&HEIGHT=256&IGNORE=DepthArea,DepthContour&HIDE=90010,90020",
         layers: ["s100dataSets.101"],
         crs: "EPSG:32619",
+        style: {
+          alphaMode: "binary",
+          alphaCutoff: 0.01,
+        },
         spatialExtent: {
           crs: "EPSG:32619",
           minX: 331100,
@@ -1084,6 +1135,8 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
         url: "https://example.test/opaque?bbox={xmin},{ymin},{xmax},{ymax}&WIDTH=256&HEIGHT=256&HIDE=90010,90020",
         layers: ["s100dataSets.101"],
         crs: "EPSG:32619",
+        opacity: 1,
+        transparent: false,
         spatialExtent: {
           crs: "EPSG:32619",
           minX: 330100,
@@ -1094,17 +1147,65 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
       }),
     );
 
+    const getPrimitiveMaterial = (value: unknown): {
+      uniforms?: { image?: unknown; alphaCutoff?: unknown };
+      options?: { fabric?: { type?: string; uniforms?: { image?: unknown; alphaCutoff?: unknown } } };
+    } | undefined =>
+      (value as {
+        options?: {
+          appearance?: {
+            options?: {
+              material?: {
+                uniforms?: { image?: unknown; alphaCutoff?: unknown };
+                options?: { fabric?: { type?: string; uniforms?: { image?: unknown; alphaCutoff?: unknown } } };
+              };
+            };
+          };
+        };
+      }).options?.appearance?.options?.material;
+    const getPrimitiveMaterialImage = (value: unknown): unknown => {
+      const material = getPrimitiveMaterial(value);
+      return material?.uniforms?.image ?? material?.options?.fabric?.uniforms?.image;
+    };
+
     const opaquePrimitives = cesium.operations.primitivesAdded.filter((value) =>
-      String((value as {
-        options?: { appearance?: { options?: { material?: { uniforms?: { image?: string } } } } };
-      }).options?.appearance?.options?.material?.uniforms?.image ?? "").includes("/opaque"),
+      String(getPrimitiveMaterialImage(value) ?? "").includes("/opaque"),
     ) as Array<{
       options?: {
         geometryInstances?: { geometry?: { attributes?: { position?: { values?: Float64Array } } } };
-        appearance?: { options?: { material?: { uniforms?: { image?: string } } } };
+        appearance?: { options?: { material?: { uniforms?: { image?: string } }; translucent?: boolean } };
       };
     }>;
+    const transparentPrimitive = cesium.operations.primitivesAdded.find((value) =>
+      String(getPrimitiveMaterialImage(value) ?? "").includes("/transparent"),
+    ) as {
+      options?: {
+        appearance?: {
+          options?: {
+            material?: {
+              options?: {
+                fabric?: {
+                  type?: string;
+                  uniforms?: { alphaCutoff?: number };
+                };
+              };
+            };
+            translucent?: boolean;
+          };
+        };
+      };
+    } | undefined;
+    expect(transparentPrimitive?.options?.appearance?.options?.translucent).toBe(true);
+    expect(transparentPrimitive?.options?.appearance?.options?.material?.options?.fabric).toMatchObject({
+      type: "S100ProjectedWmsBinaryImage",
+      uniforms: {
+        alphaCutoff: 0.01,
+      },
+    });
     expect(opaquePrimitives).toHaveLength(4);
+    expect(opaquePrimitives.every((primitive) =>
+      primitive.options?.appearance?.options?.translucent === false,
+    )).toBe(true);
     expect(Array.from(opaquePrimitives[0]?.options?.geometryInstances?.geometry?.attributes?.position?.values ?? [])).toEqual([
       -1000, -1000, 0.5,
       0, -1000, 0.5,
@@ -1778,6 +1879,7 @@ function createMockCesium() {
     };
     camera = {
       position: { x: 0, y: 0, z: 0 },
+      positionWC: { x: 0, y: 0, z: 0 },
       positionCartographic: { height: 1000 },
       rightWC: { x: 1, y: 0, z: 0 },
       upWC: { x: 0, y: 1, z: 0 },
@@ -1797,6 +1899,7 @@ function createMockCesium() {
         operations.cameraViews.push(value);
         if (value.destination && typeof value.destination === "object") {
           this.position = value.destination as { x: number; y: number; z: number };
+          this.positionWC = value.destination as { x: number; y: number; z: number };
         }
         const orientation = value.orientation as
           | { direction?: { x: number; y: number; z: number }; up?: { x: number; y: number; z: number } }

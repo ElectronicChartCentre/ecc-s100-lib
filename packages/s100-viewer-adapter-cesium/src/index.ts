@@ -146,19 +146,36 @@ type S111ArrowGlyph = {
 
 type BrowserImageLike = {
   crossOrigin?: string | null;
+  height?: number;
   src: string;
+  width?: number;
   complete?: boolean;
   naturalWidth?: number;
-  onload?: (() => void) | null;
-  onerror?: (() => void) | null;
+  onload?: unknown;
+  onerror?: unknown;
   addEventListener?: (type: "load" | "error", listener: () => void, options?: { once?: boolean }) => void;
   removeEventListener?: (type: "load" | "error", listener: () => void) => void;
+};
+
+type BrowserImageGlobalLike = {
+  HTMLImageElement?: { prototype?: unknown };
+  Image?: new (width?: number, height?: number) => BrowserImageLike;
+};
+
+type BrowserDocumentLike = {
+  createElement?: (tagName: string) => unknown;
+  defaultView?: BrowserImageGlobalLike | null;
 };
 
 type DeferredImageSource = {
   image: string | BrowserImageLike;
   readonly ready: boolean;
   onLoad(callback: () => void): void;
+};
+
+type ProjectedWmsAlphaOptions = {
+  mode: "source" | "binary";
+  cutoff: number;
 };
 
 type S102HeightCoordinate = {
@@ -326,6 +343,7 @@ export const createCesiumAdapter = (
   async createViewerHost(hostOptions) {
     const cesium = await resolveCesiumModule(options.cesiumModule);
     const parent = getHtmlElement(hostOptions.container);
+    ensureConstructibleBrowserImageGlobal(parent?.ownerDocument);
     if (options.accessToken !== undefined) {
       setCesiumAccessToken(cesium, options.accessToken);
     }
@@ -518,7 +536,7 @@ class CesiumEngineScene implements EngineScene {
 
   getCamera(): EngineCameraPose {
     const camera = getObject(this.viewer, "camera");
-    const position = getObject(camera, "position");
+    const position = camera ? getCameraWorldPosition(camera) : null;
     if (!camera || !position) {
       return cloneCameraPose(this.lastCameraPose);
     }
@@ -1869,6 +1887,12 @@ class CesiumEngineScene implements EngineScene {
 
     if (native.kind === "projected-wms") {
       native.spec = mergeLayerSpecPatch(native.spec, patch);
+      if (patch.visible !== undefined && patch.opacity === undefined && patch.style === undefined) {
+        for (const drawable of native.drawables) {
+          setDrawableVisible(drawable, patch.visible);
+        }
+        return;
+      }
       this.rebuildProjectedWmsLayer(native);
       return;
     }
@@ -2068,13 +2092,16 @@ class CesiumEngineScene implements EngineScene {
     const crs = extent.crs ?? getCrsFromUrl(urlTemplate) ?? this.sceneCrs();
     const rectangle = projectedExtentToRectangle(this.cesium, projectedExtent, crs);
     const params = new URLSearchParams(urlTemplate.split("?")[1] ?? "");
+    const imageSize = projectedWmsImageSize(spec, params);
     const imageUrl = fillWmsTemplate(
       urlTemplate,
       projectedExtent,
-      Math.max(getPositiveInteger(params.get("WIDTH"), 2048), 2048),
-      Math.max(getPositiveInteger(params.get("HEIGHT"), 2048), 2048),
+      imageSize.width,
+      imageSize.height,
     );
     const opacity = spec.opacity ?? spec.style?.opacity ?? 1;
+    const translucent = isProjectedWmsTranslucent(spec, params, opacity);
+    const alphaOptions = getProjectedWmsAlphaOptions(spec);
     const visible = spec.visible ?? spec.style?.visible ?? true;
     const height =
       this.currentSeaLevel +
@@ -2091,7 +2118,14 @@ class CesiumEngineScene implements EngineScene {
         this.projectedPairToCartesian(projectedExtent.maxX, projectedExtent.maxY, height, crs),
         this.projectedPairToCartesian(projectedExtent.minX, projectedExtent.maxY, height, crs),
       ];
-      const primitive = this.createTexturedQuadPrimitive(positions, imageUrl, opacity, visible);
+      const primitive = this.createTexturedQuadPrimitive(
+        positions,
+        imageUrl,
+        opacity,
+        visible,
+        translucent,
+        alphaOptions,
+      );
       if (primitive) {
         return this.addPrimitiveDrawable(primitive);
       }
@@ -2489,6 +2523,8 @@ class CesiumEngineScene implements EngineScene {
     imageUrl: string,
     opacity: number,
     visible: boolean,
+    translucent: boolean,
+    alphaOptions: ProjectedWmsAlphaOptions,
   ): CesiumObject | null {
     const Geometry = this.cesium.Geometry as CesiumConstructor | undefined;
     const GeometryAttribute = this.cesium.GeometryAttribute as CesiumConstructor | undefined;
@@ -2498,10 +2534,10 @@ class CesiumEngineScene implements EngineScene {
       | (CesiumConstructor & { MaterialSupport?: Record<string, unknown> })
       | undefined;
     const Material = this.cesium.Material as
-      | {
+      | (CesiumConstructor & {
           fromType?: (type: string, uniforms?: Record<string, unknown>) => unknown;
           ImageType?: string;
-        }
+        })
       | undefined;
     if (
       !Geometry ||
@@ -2540,16 +2576,18 @@ class CesiumEngineScene implements EngineScene {
       boundingSphere: createBoundingSphere(this.cesium, positions, positionValues),
     });
     const imageSource = createDeferredImageSource(imageUrl);
-    const material = Material.fromType(Material.ImageType ?? "Image", {
-      image: imageSource.image,
-      color: toCesiumColor(this.cesium, { r: 1, g: 1, b: 1, a: clamp01(opacity) }),
-      repeat: createCartesian2(this.cesium, 1, 1),
-    });
+    const material = createProjectedWmsPrimitiveMaterial(
+      this.cesium,
+      Material,
+      imageSource.image,
+      opacity,
+      alphaOptions,
+    );
     const appearance = new MaterialAppearance({
       material,
       flat: true,
       faceForward: true,
-      translucent: opacity < 1,
+      translucent,
       closed: false,
       materialSupport: MaterialAppearance.MaterialSupport?.TEXTURED,
       renderState: {
@@ -3291,7 +3329,7 @@ class CesiumEngineScene implements EngineScene {
 
   private orbitProjectedLocalCamera(dx: number, dy: number, orbitSpeed: number): void {
     const camera = getObject(this.viewer, "camera");
-    const position = getObject(camera, "position");
+    const position = camera ? getCameraWorldPosition(camera) : null;
     if (!camera || !position || !hasFunction(camera, "setView")) {
       return;
     }
@@ -3352,7 +3390,7 @@ class CesiumEngineScene implements EngineScene {
 
   private panProjectedLocalCamera(dx: number, dy: number, panSpeed: number): void {
     const camera = getObject(this.viewer, "camera");
-    const position = getObject(camera, "position");
+    const position = camera ? getCameraWorldPosition(camera) : null;
     if (!camera || !position) {
       return;
     }
@@ -3382,9 +3420,11 @@ class CesiumEngineScene implements EngineScene {
       this.sceneCrs(),
     );
 
-    if (!assignCameraPosition(camera, destination) && hasFunction(camera, "setView")) {
+    if (hasFunction(camera, "setView")) {
       const orientation = createCameraDirectionUpOrientation(camera);
       camera.setView?.(orientation ? { destination, orientation } : { destination });
+    } else {
+      assignCameraPosition(camera, destination);
     }
 
     const scene = getObject(this.viewer, "scene");
@@ -4332,6 +4372,10 @@ function getObject(value: unknown, key: string): CesiumObject | null {
   return child && typeof child === "object" ? (child as CesiumObject) : null;
 }
 
+function setDrawableVisible(drawable: CesiumSceneDrawable, visible: boolean): void {
+  drawable.value.show = visible;
+}
+
 function hasFunction(value: unknown, key: string): value is Record<string, (...args: unknown[]) => unknown> {
   return Boolean(value && typeof value === "object" && typeof (value as Record<string, unknown>)[key] === "function");
 }
@@ -4419,8 +4463,8 @@ function lerpNumber(start: number, end: number, t: number): number {
 }
 
 function createDeferredImageSource(imageUrl: string): DeferredImageSource {
-  const ImageConstructor = (globalThis as { Image?: new () => BrowserImageLike }).Image;
-  if (typeof ImageConstructor !== "function") {
+  const image = createBrowserImageElement();
+  if (!image) {
     return {
       image: imageUrl,
       ready: true,
@@ -4430,7 +4474,6 @@ function createDeferredImageSource(imageUrl: string): DeferredImageSource {
     };
   }
 
-  const image = new ImageConstructor();
   const loadCallbacks: Array<() => void> = [];
   let ready = false;
   let failed = false;
@@ -4482,6 +4525,93 @@ function createDeferredImageSource(imageUrl: string): DeferredImageSource {
       }
     },
   };
+}
+
+function createBrowserImageElement(): BrowserImageLike | null {
+  const ImageConstructor = (globalThis as { Image?: new () => BrowserImageLike }).Image;
+  if (typeof ImageConstructor === "function") {
+    try {
+      return new ImageConstructor();
+    } catch {
+      // Some embedded contexts expose HTMLImageElement as Image; that constructor is not directly constructible.
+    }
+  }
+
+  const documentLike = (globalThis as {
+    document?: { createElement?: (tagName: string) => unknown };
+  }).document;
+  const image = documentLike?.createElement?.("img");
+  return image && typeof image === "object" ? (image as BrowserImageLike) : null;
+}
+
+function ensureConstructibleBrowserImageGlobal(
+  documentLike?: BrowserDocumentLike,
+): void {
+  const globals = globalThis as BrowserImageGlobalLike & { document?: BrowserDocumentLike };
+  const imageDocument = documentLike ?? globals.document;
+  if (typeof imageDocument?.createElement !== "function") {
+    return;
+  }
+
+  patchImageConstructor(globals, imageDocument);
+  const windowTarget = imageDocument.defaultView;
+  if (windowTarget && windowTarget !== globals) {
+    patchImageConstructor(windowTarget, imageDocument);
+  }
+}
+
+function patchImageConstructor(
+  target: BrowserImageGlobalLike,
+  imageDocument: BrowserDocumentLike,
+): void {
+  const ImageConstructor = target.Image;
+  if (typeof ImageConstructor !== "function" || isConstructibleImageConstructor(ImageConstructor)) {
+    return;
+  }
+  const createElement = imageDocument.createElement;
+  if (typeof createElement !== "function") {
+    return;
+  }
+  const CompatibleImage = function Image(width?: number, height?: number) {
+    const image = createElement.call(imageDocument, "img") as BrowserImageLike;
+    if (typeof width === "number") {
+      image.width = width;
+    }
+    if (typeof height === "number") {
+      image.height = height;
+    }
+    return image;
+  } as unknown as {
+    new (width?: number, height?: number): BrowserImageLike;
+    prototype?: unknown;
+  };
+  if (target.HTMLImageElement?.prototype) {
+    CompatibleImage.prototype = target.HTMLImageElement.prototype;
+  }
+
+  try {
+    Object.defineProperty(target, "Image", {
+      configurable: true,
+      writable: true,
+      value: CompatibleImage,
+    });
+  } catch {
+    try {
+      target.Image = CompatibleImage;
+    } catch {
+      // Leave the host global untouched if it is non-writable.
+    }
+  }
+}
+
+function isConstructibleImageConstructor(
+  ImageConstructor: new () => BrowserImageLike,
+): boolean {
+  try {
+    return Boolean(new ImageConstructor());
+  } catch {
+    return false;
+  }
 }
 
 type LocalPoint2D = readonly [number, number];
@@ -4832,6 +4962,10 @@ function createCameraDirectionUpOrientation(camera: CesiumObject): { direction: 
   const direction = getObject(camera, "directionWC") ?? getObject(camera, "direction");
   const up = getObject(camera, "upWC") ?? getObject(camera, "up");
   return direction && up ? { direction, up } : undefined;
+}
+
+function getCameraWorldPosition(camera: CesiumObject): CesiumObject | null {
+  return getObject(camera, "positionWC") ?? getObject(camera, "position") ?? null;
 }
 
 function assignCameraPosition(camera: CesiumObject, destination: CesiumObject): boolean {
@@ -5884,6 +6018,52 @@ function fillWmsTemplate(
 function getPositiveInteger(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function projectedWmsImageSize(
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+  params: URLSearchParams,
+): { width: number; height: number } {
+  const baseWidth = Math.max(getPositiveInteger(params.get("WIDTH"), 2048), 2048);
+  const baseHeight = Math.max(getPositiveInteger(params.get("HEIGHT"), 2048), 2048);
+  const quality = spec.projectedMap?.quality;
+  if (typeof quality !== "number" || !Number.isFinite(quality) || quality <= 0) {
+    return { width: baseWidth, height: baseHeight };
+  }
+  return {
+    width: Math.round(clampNumber(baseWidth * quality, baseWidth, 8192)),
+    height: Math.round(clampNumber(baseHeight * quality, baseHeight, 8192)),
+  };
+}
+
+function isProjectedWmsTranslucent(
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+  params: URLSearchParams,
+  opacity: number,
+): boolean {
+  if (opacity < 1 || spec.role === "overlay") {
+    return true;
+  }
+  const transparent = params.get("TRANSPARENT") ?? params.get("transparent");
+  return transparent?.toLowerCase() === "true";
+}
+
+function getProjectedWmsAlphaOptions(
+  spec: EncLayerSpec | MapOverlayLayerSpec,
+): ProjectedWmsAlphaOptions {
+  const style = spec.style as { alphaMode?: unknown; alphaCutoff?: unknown } | undefined;
+  const mode = style?.alphaMode === "binary" ? "binary" : "source";
+  return {
+    mode,
+    cutoff: mode === "binary" ? normalizeProjectedWmsAlphaCutoff(style?.alphaCutoff) : 0,
+  };
+}
+
+function normalizeProjectedWmsAlphaCutoff(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0.01;
+  }
+  return clampNumber(value, 0, 1);
 }
 
 function normalizeProjectedExtent(
@@ -7004,6 +7184,54 @@ function createImageMaterial(cesium: CesiumModule, image: string, opacity: numbe
     });
   }
   return { image, transparent: true, color };
+}
+
+function createProjectedWmsPrimitiveMaterial(
+  cesium: CesiumModule,
+  Material: CesiumConstructor & {
+    fromType?: (type: string, uniforms?: Record<string, unknown>) => unknown;
+    ImageType?: string;
+  },
+  image: DeferredImageSource["image"],
+  opacity: number,
+  alphaOptions: ProjectedWmsAlphaOptions,
+): unknown {
+  const color = toCesiumColor(cesium, {
+    r: 1,
+    g: 1,
+    b: 1,
+    a: clamp01(opacity),
+  });
+  if (alphaOptions.mode === "binary") {
+    return new Material({
+      fabric: {
+        type: "S100ProjectedWmsBinaryImage",
+        uniforms: {
+          image,
+          color,
+          repeat: createCartesian2(cesium, 1, 1),
+          alphaCutoff: alphaOptions.cutoff,
+        },
+        source: `
+czm_material czm_getMaterial(czm_materialInput materialInput) {
+  czm_material material = czm_getDefaultMaterial(materialInput);
+  vec2 st = fract(materialInput.st * repeat);
+  vec4 imageColor = texture(image, st);
+  float coverage = step(alphaCutoff, imageColor.a);
+  material.diffuse = imageColor.rgb * color.rgb;
+  material.alpha = coverage * color.a;
+  return material;
+}`,
+      },
+      translucent: true,
+    });
+  }
+
+  return Material.fromType?.(Material.ImageType ?? "Image", {
+    image,
+    color,
+    repeat: createCartesian2(cesium, 1, 1),
+  });
 }
 
 function createColorMaterial(cesium: CesiumModule, color: unknown): unknown {
