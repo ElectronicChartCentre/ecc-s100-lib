@@ -7,9 +7,14 @@ export type TimeInterval = {
 
 export type TimePlaybackState = {
   playing: boolean;
+  /** Timesteps advanced per second while playback is running. */
   rate: number;
   loop: boolean;
+  /** Scene-time increment applied for each playback timestep. */
+  stepMs: number;
 };
+
+export type TimePlaybackOptions = Partial<Pick<TimePlaybackState, "rate" | "loop" | "stepMs">>;
 
 export interface TimeController {
   getCurrent(): Date;
@@ -17,7 +22,7 @@ export interface TimeController {
   getAvailability(): TimeInterval | null;
   setAvailability(value: TimeInterval | null): void;
   getPlaybackState(): TimePlaybackState;
-  play(options?: Partial<Pick<TimePlaybackState, "rate" | "loop">>): void;
+  play(options?: TimePlaybackOptions): void;
   pause(): void;
   onChanged(listener: (value: Date) => void): S100Unsubscribe;
 }

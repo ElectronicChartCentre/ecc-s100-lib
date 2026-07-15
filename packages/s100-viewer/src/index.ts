@@ -130,7 +130,12 @@ export type {
   S100SceneEvents,
   SceneOptions,
 } from "./scene/types.js";
-export type { TimeController, TimeInterval, TimePlaybackState } from "./time/types.js";
+export type {
+  TimeController,
+  TimeInterval,
+  TimePlaybackOptions,
+  TimePlaybackState,
+} from "./time/types.js";
 export * from "./products/index.js";
 export { createS100Viewer } from "./viewer/createS100Viewer.js";
 export type { CreateS100ViewerOptions, S100Viewer } from "./viewer/types.js";

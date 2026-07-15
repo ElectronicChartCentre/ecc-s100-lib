@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as publicApi from "../src/index.js";
 import {
   createInMemoryAdapter,
@@ -20,6 +20,10 @@ import {
 } from "../src/index.js";
 
 describe("createS100Viewer", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("keeps the root package surface canonical-only", () => {
     expect(publicApi).toHaveProperty("createS100Viewer");
     expect(publicApi).not.toHaveProperty("Viewer");
@@ -588,6 +592,59 @@ describe("createS100Viewer", () => {
     ).rejects.toMatchObject({
       code: "adapter-capability",
     });
+  });
+
+  it("plays scene time through availability with timestep rate and looping", async () => {
+    vi.useFakeTimers();
+    const viewer = await createS100Viewer({
+      adapter: createInMemoryAdapter(),
+    });
+    const scene = await viewer.createScene();
+    const timeEvents: number[] = [];
+    const playbackEvents: boolean[] = [];
+    const start = new Date("2026-05-29T12:00:00Z");
+    const middle = new Date("2026-05-29T13:00:00Z");
+    const end = new Date("2026-05-29T14:00:00Z");
+
+    scene.time.onChanged((time) => timeEvents.push(time.getTime()));
+    scene.events.on("time.playback.changed", (state) => playbackEvents.push(state.playing));
+
+    scene.time.setAvailability({ start, end });
+    scene.time.setCurrent(start);
+    scene.time.play({
+      rate: 10,
+      loop: true,
+      stepMs: 60 * 60 * 1000,
+    });
+
+    expect(scene.time.getPlaybackState()).toMatchObject({
+      playing: true,
+      rate: 10,
+      loop: true,
+      stepMs: 60 * 60 * 1000,
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(scene.time.getCurrent().getTime()).toBe(middle.getTime());
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(scene.time.getCurrent().getTime()).toBe(end.getTime());
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(scene.time.getCurrent().getTime()).toBe(start.getTime());
+
+    scene.time.pause();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(scene.time.getCurrent().getTime()).toBe(start.getTime());
+    expect(timeEvents).toEqual([
+      start.getTime(),
+      middle.getTime(),
+      end.getTime(),
+      start.getTime(),
+    ]);
+    expect(playbackEvents).toEqual([true, false]);
+
+    await viewer.destroy();
   });
 
   it("updates time, camera, sea level, environment, and picking state", async () => {

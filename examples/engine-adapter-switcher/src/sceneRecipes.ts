@@ -3,6 +3,7 @@ import {
   createQuatIdentity,
   LayerBuilder,
   type AdapterCapabilities,
+  type PreparedStaticS111Layer,
   type S100Scene,
   type VesselDimensions,
 } from "@ecc/s100-viewer";
@@ -59,6 +60,7 @@ const demoEncMapMaxLevel = 5;
 const demoEncMapQuality = 2;
 const demoEncMapScale = 1;
 const demoEncWmsImageSizePixels = 2048;
+const s111PlaybackTimestepsPerSecond = 10;
 
 export const sceneRecipes = {
   minimal: {
@@ -134,7 +136,7 @@ export const sceneRecipes = {
         "s111DatasetIds",
       ]);
       await addTransparentS101Overlay(scene, context);
-      let initialTime: number | null = null;
+      const preparedDatasets: PreparedStaticS111Layer[] = [];
 
       for (const datasetId of config.s111DatasetIds) {
         const fetched = await fetchS111Dataset(config, datasetId);
@@ -158,20 +160,31 @@ export const sceneRecipes = {
             scale: "auto",
           },
         });
+        preparedDatasets.push(prepared);
         const currents = await scene.layers.add(prepared.layer);
         await currents.controllers.surfaceCurrent.setAutoScaling(true);
-
-        if (initialTime === null && prepared.timeline.times.length > 0) {
-          initialTime = prepared.timeline.times[0] ?? null;
-        }
       }
 
-      if (initialTime !== null) {
-        const current = new Date(initialTime);
+      const playbackSummary = LayerBuilder.summarizePreparedS111Datasets(preparedDatasets);
+      if (playbackSummary.timeline !== null) {
+        const current = new Date(playbackSummary.timeline.initialTime);
+        scene.time.setAvailability({
+          start: new Date(playbackSummary.timeline.startTime),
+          end: new Date(playbackSummary.timeline.endTime),
+        });
         scene.time.setCurrent(current);
         for (const layer of scene.layers.all()) {
           layer.controllers.surfaceCurrent?.setCurrentTime(current);
         }
+        scene.time.play({
+          loop: true,
+          rate: s111PlaybackTimestepsPerSecond,
+          stepMs: playbackSummary.timeline.stepSeconds * 1000,
+        });
+        context.log(
+          "info",
+          `Started loop playback at ${s111PlaybackTimestepsPerSecond} S-111 timesteps/s.`,
+        );
       }
 
       context.log("info", `Fetched and added ${config.s111DatasetIds.length} S-111 dataset(s).`);

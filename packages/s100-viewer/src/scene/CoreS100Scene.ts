@@ -119,6 +119,7 @@ export class CoreS100Scene implements S100Scene {
     }
 
     await this.layers.clear();
+    this.time.destroy();
     this.camera.destroy();
     await this.options.engineScene.dispose();
     this.events.clear();

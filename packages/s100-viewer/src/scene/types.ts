@@ -10,7 +10,7 @@ import type { S100Error } from "../errors/S100Error.js";
 import type { S100EventBus, S100Unsubscribe } from "../events/S100EventBus.js";
 import type { LayerCollection, S100Layer } from "../layers/types.js";
 import type { DepthRayController, PickResult, PickingController } from "../picking/types.js";
-import type { TimeController } from "../time/types.js";
+import type { TimeController, TimePlaybackState } from "../time/types.js";
 
 export type SceneOptions = {
   id?: string;
@@ -54,7 +54,7 @@ export interface EnvironmentController {
 export type S100SceneEvents = {
   "camera.changed": CameraPose;
   "time.changed": Date;
-  "time.playback.changed": { playing: boolean; rate: number; loop: boolean };
+  "time.playback.changed": TimePlaybackState;
   "environment.changed": EnvironmentState;
   "seaLevel.changed": number;
   "layer.added": S100Layer;
