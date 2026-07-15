@@ -215,14 +215,15 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
       skyboxUrl: "/textures/skybox_equirectangular.png",
     });
 
+    const transparent1x1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     expect(cesium.operations.skyBoxes).toContainEqual({
       sources: {
-        positiveX: "/textures/skybox_equirectangular.png",
-        negativeX: "/textures/skybox_equirectangular.png",
-        positiveY: "/textures/skybox_equirectangular.png",
-        negativeY: "/textures/skybox_equirectangular.png",
-        positiveZ: "/textures/skybox_equirectangular.png",
-        negativeZ: "/textures/skybox_equirectangular.png",
+        positiveX: transparent1x1,
+        negativeX: transparent1x1,
+        positiveY: transparent1x1,
+        negativeY: transparent1x1,
+        positiveZ: transparent1x1,
+        negativeZ: transparent1x1,
       },
     });
 

@@ -4345,13 +4345,14 @@ function resolveCesiumSkyboxSources(state: EnvironmentState): CesiumSkyboxFaces 
     return null;
   }
 
+  const transparent1x1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
   return {
-    positiveX: url,
-    negativeX: url,
-    positiveY: url,
-    negativeY: url,
-    positiveZ: url,
-    negativeZ: url,
+    positiveX: transparent1x1,
+    negativeX: transparent1x1,
+    positiveY: transparent1x1,
+    negativeY: transparent1x1,
+    positiveZ: transparent1x1,
+    negativeZ: transparent1x1,
   };
 }
 
@@ -4411,17 +4412,28 @@ function sliceEquirectangular(
   const ImageConstructor = (globalThis as any).Image;
   const documentLike = (globalThis as any).document;
 
+  const transparent1x1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  const fallback = (err?: any) => {
+    if (err) {
+      console.error("sliceEquirectangular failed:", err);
+    }
+    onComplete([transparent1x1, transparent1x1, transparent1x1, transparent1x1, transparent1x1, transparent1x1]);
+  };
+
   if (
     typeof ImageConstructor !== "function" ||
     !documentLike ||
     typeof documentLike.createElement !== "function"
   ) {
-    setTimeout(() => onComplete([url, url, url, url, url, url]), 0);
+    setTimeout(() => fallback(), 0);
     return;
   }
 
   const img = new ImageConstructor();
-  img.crossOrigin = "anonymous";
+  const isAbsolute = /^(?:https?:)?\/\//i.test(url);
+  if (isAbsolute) {
+    img.crossOrigin = "anonymous";
+  }
   img.onload = () => {
     try {
       const srcCanvas = documentLike.createElement("canvas");
@@ -4429,7 +4441,7 @@ function sliceEquirectangular(
       srcCanvas.height = img.height;
       const srcCtx = srcCanvas.getContext("2d");
       if (!srcCtx) {
-        onComplete([url, url, url, url, url, url]);
+        fallback("Could not get 2d context");
         return;
       }
       srcCtx.drawImage(img, 0, 0);
@@ -4489,7 +4501,7 @@ function sliceEquirectangular(
             if (blob) {
               resolveFace(URL.createObjectURL(blob));
             } else {
-              resolveFace(url);
+              resolveFace(transparent1x1);
             }
           }, "image/jpeg", 0.9);
         });
@@ -4497,15 +4509,15 @@ function sliceEquirectangular(
 
       Promise.all(promises)
         .then(onComplete)
-        .catch(() => {
-          onComplete([url, url, url, url, url, url]);
+        .catch((err) => {
+          fallback(err);
         });
     } catch (e) {
-      onComplete([url, url, url, url, url, url]);
+      fallback(e);
     }
   };
   img.onerror = () => {
-    onComplete([url, url, url, url, url, url]);
+    fallback("Image load error for: " + url);
   };
   img.src = url;
 }
