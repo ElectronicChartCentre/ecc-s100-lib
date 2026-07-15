@@ -5,6 +5,8 @@ export const demoVesselModelUrl =
 export const demoEnvironmentUrl = "/demo-assets/environment/demo-environment.json";
 export const demoNasaAmmosEnvironmentMapUrl =
   "/demo-assets/environment/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr";
+export const demoCesiumEnvironmentMapUrl =
+  "/demo-assets/environment/hdri/kloofendal_48d_partly_cloudy_puresky_4k.jpg";
 
 export const loadDemoEnvironment = async (engineId?: string): Promise<EnvironmentState> => {
   const response = await fetch(demoEnvironmentUrl, { cache: "no-store" });
@@ -12,22 +14,36 @@ export const loadDemoEnvironment = async (engineId?: string): Promise<Environmen
     throw new Error(`Unable to load ${demoEnvironmentUrl}`);
   }
   const environment = await response.json() as EnvironmentState;
-  if (engineId !== "nasa-ammos") {
-    return environment;
+
+  if (engineId === "nasa-ammos") {
+    const nasaEnvironment: EnvironmentState = {
+      ...environment,
+      skyboxUrl: demoNasaAmmosEnvironmentMapUrl,
+      lighting: {
+        ...environment.lighting,
+        environmentMapUrl: demoNasaAmmosEnvironmentMapUrl,
+      },
+      metadata: {
+        ...environment.metadata,
+        environmentMapSource: "s100-explorer-webapp kloofendal HDRI",
+      },
+    };
+    delete nasaEnvironment.skyboxFaces;
+    return nasaEnvironment;
   }
 
-  const nasaEnvironment: EnvironmentState = {
-    ...environment,
-    skyboxUrl: demoNasaAmmosEnvironmentMapUrl,
-    lighting: {
-      ...environment.lighting,
-      environmentMapUrl: demoNasaAmmosEnvironmentMapUrl,
-    },
-    metadata: {
-      ...environment.metadata,
-      environmentMapSource: "s100-explorer-webapp kloofendal HDRI",
-    },
-  };
-  delete nasaEnvironment.skyboxFaces;
-  return nasaEnvironment;
+  if (engineId === "cesium") {
+    const cesiumEnvironment: EnvironmentState = {
+      ...environment,
+      skyboxUrl: demoCesiumEnvironmentMapUrl,
+      metadata: {
+        ...environment.metadata,
+        environmentMapSource: "s100-explorer-webapp kloofendal HDRI",
+      },
+    };
+    delete cesiumEnvironment.skyboxFaces;
+    return cesiumEnvironment;
+  }
+
+  return environment;
 };

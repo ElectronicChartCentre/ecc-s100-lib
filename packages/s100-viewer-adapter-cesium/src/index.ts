@@ -448,6 +448,7 @@ class CesiumEngineScene implements EngineScene {
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0, w: 1 },
   };
+  private environmentBackgroundPrimitive: CesiumObject | null = null;
 
   constructor(
     private readonly cesium: CesiumModule,
@@ -680,12 +681,26 @@ class CesiumEngineScene implements EngineScene {
     const skyBox = getObject(scene, "skyBox");
     const skyAtmosphere = getObject(scene, "skyAtmosphere");
     if (state.background !== "skybox") {
+      this.clearEnvironmentBackgroundPrimitive();
       if (skyBox) {
         skyBox.show = false;
       }
       return;
     }
 
+    const equirectangularSkyboxUrl = getCesiumEquirectangularSkyboxUrl(state);
+    if (equirectangularSkyboxUrl) {
+      this.applyCesiumEquirectangularBackground(equirectangularSkyboxUrl, state);
+      if (skyBox) {
+        skyBox.show = false;
+      }
+      if (skyAtmosphere) {
+        skyAtmosphere.show = false;
+      }
+      return;
+    }
+
+    this.clearEnvironmentBackgroundPrimitive();
     const sources = resolveCesiumSkyboxSources(state);
     const SkyBox = this.cesium.SkyBox as CesiumConstructor | undefined;
     if (sources && typeof SkyBox === "function") {
@@ -701,6 +716,43 @@ class CesiumEngineScene implements EngineScene {
     }
     if (skyAtmosphere) {
       skyAtmosphere.show = !sources;
+    }
+  }
+
+  private applyCesiumEquirectangularBackground(
+    url: string,
+    state: EnvironmentState,
+  ): void {
+    const EquirectangularPanorama = this.cesium.EquirectangularPanorama as CesiumConstructor | undefined;
+    if (typeof EquirectangularPanorama !== "function") {
+      throw new S100Error(
+        "adapter-lifecycle",
+        "Cesium adapter requires Cesium EquirectangularPanorama support for equirectangular environment backgrounds.",
+      );
+    }
+
+    this.clearEnvironmentBackgroundPrimitive();
+
+    const panorama = new EquirectangularPanorama({
+      image: url,
+      transform: this.projectedLocalToWorldMatrix() ?? createIdentityMatrix4(this.cesium),
+      radius: getNumberMetadata(state, "panoramaRadiusMeters", 100_000),
+      repeatHorizontal: 1,
+      repeatVertical: 1,
+    }) as CesiumObject;
+    this.environmentBackgroundPrimitive = panorama;
+    this.addPrimitive(panorama);
+  }
+
+  private clearEnvironmentBackgroundPrimitive(): void {
+    if (!this.environmentBackgroundPrimitive) {
+      return;
+    }
+    const primitive = this.environmentBackgroundPrimitive;
+    this.environmentBackgroundPrimitive = null;
+    const removed = this.removePrimitive(primitive);
+    if (!removed) {
+      destroyCesiumObject(primitive);
     }
   }
 
@@ -1102,6 +1154,7 @@ class CesiumEngineScene implements EngineScene {
   }
 
   async dispose(): Promise<void> {
+    this.clearEnvironmentBackgroundPrimitive();
     this.cameraPanAbort?.();
     this.cameraPanAbort = null;
     this.cameraOrbitAbort?.();
@@ -4261,19 +4314,15 @@ function resolveCesiumSkyboxSources(state: EnvironmentState): CesiumSkyboxFaces 
     return createSkyboxFacesFromTemplate(template);
   }
 
+  return null;
+}
+
+function getCesiumEquirectangularSkyboxUrl(state: EnvironmentState): string | null {
   const url = state.skyboxUrl;
-  if (!url || isHdrEnvironmentMap(url) || isKtx2EnvironmentMap(url)) {
+  if (!url || state.skyboxFaces || isHdrEnvironmentMap(url) || isKtx2EnvironmentMap(url)) {
     return null;
   }
-
-  return {
-    positiveX: url,
-    negativeX: url,
-    positiveY: url,
-    negativeY: url,
-    positiveZ: url,
-    negativeZ: url,
-  };
+  return url;
 }
 
 function normalizeCesiumSkyboxFaces(value: unknown): CesiumSkyboxFaces | null {
@@ -4313,6 +4362,11 @@ function createSkyboxFacesFromTemplate(template: string): CesiumSkyboxFaces {
 function getStringMetadata(state: EnvironmentState, key: string): string | undefined {
   const value = state.metadata?.[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getNumberMetadata(state: EnvironmentState, key: string, fallback: number): number {
+  const value = state.metadata?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function isHdrEnvironmentMap(url: string): boolean {

@@ -46,7 +46,7 @@
     "proj4": "^2.20.8"
   },
   "peerDependencies": {
-    "cesium": ">=1.120.0"
+    "cesium": ">=1.143.0"
   },
   "peerDependenciesMeta": {
     "cesium": {
