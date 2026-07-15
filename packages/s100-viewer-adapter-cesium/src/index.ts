@@ -722,7 +722,42 @@ class CesiumEngineScene implements EngineScene {
 
     const localToWorld = this.projectedLocalToWorldMatrix() as Record<number, number> | undefined;
     let rotationMatrix: number[] | undefined;
-    if (localToWorld) {
+
+    const Transforms = this.cesium.Transforms as any;
+    const Matrix3 = this.cesium.Matrix3 as any;
+
+    if (localToWorld && Transforms?.computeTemeToPseudoFixedMatrix && Matrix3) {
+      const clock = (this.viewer as any).clock;
+      const julianDate = clock ? clock.currentTime : undefined;
+      if (julianDate) {
+        try {
+          const temeToFixed = Transforms.computeTemeToPseudoFixedMatrix(julianDate, new Matrix3());
+          if (temeToFixed) {
+            const rT = [
+              localToWorld[0] ?? 1, localToWorld[1] ?? 0, localToWorld[2] ?? 0,
+              localToWorld[4] ?? 0, localToWorld[5] ?? 1, localToWorld[6] ?? 0,
+              localToWorld[8] ?? 0, localToWorld[9] ?? 0, localToWorld[10] ?? 1
+            ];
+            const t = temeToFixed as Record<number, number>;
+            rotationMatrix = [
+              (rT[0] ?? 0) * (t[0] ?? 0) + (rT[1] ?? 0) * (t[1] ?? 0) + (rT[2] ?? 0) * (t[2] ?? 0),
+              (rT[0] ?? 0) * (t[3] ?? 0) + (rT[1] ?? 0) * (t[4] ?? 0) + (rT[2] ?? 0) * (t[5] ?? 0),
+              (rT[0] ?? 0) * (t[6] ?? 0) + (rT[1] ?? 0) * (t[7] ?? 0) + (rT[2] ?? 0) * (t[8] ?? 0),
+              (rT[3] ?? 0) * (t[0] ?? 0) + (rT[4] ?? 0) * (t[1] ?? 0) + (rT[5] ?? 0) * (t[2] ?? 0),
+              (rT[3] ?? 0) * (t[3] ?? 0) + (rT[4] ?? 0) * (t[4] ?? 0) + (rT[5] ?? 0) * (t[5] ?? 0),
+              (rT[3] ?? 0) * (t[6] ?? 0) + (rT[4] ?? 0) * (t[7] ?? 0) + (rT[5] ?? 0) * (t[8] ?? 0),
+              (rT[6] ?? 0) * (t[0] ?? 0) + (rT[7] ?? 0) * (t[1] ?? 0) + (rT[8] ?? 0) * (t[2] ?? 0),
+              (rT[6] ?? 0) * (t[3] ?? 0) + (rT[7] ?? 0) * (t[4] ?? 0) + (rT[8] ?? 0) * (t[5] ?? 0),
+              (rT[6] ?? 0) * (t[6] ?? 0) + (rT[7] ?? 0) * (t[7] ?? 0) + (rT[8] ?? 0) * (t[8] ?? 0)
+            ];
+          }
+        } catch (e) {
+          console.error("Failed to compute TEME to local rotation matrix:", e);
+        }
+      }
+    }
+
+    if (!rotationMatrix && localToWorld) {
       rotationMatrix = [
         localToWorld[0] ?? 1, localToWorld[1] ?? 0, localToWorld[2] ?? 0,
         localToWorld[4] ?? 0, localToWorld[5] ?? 1, localToWorld[6] ?? 0,
