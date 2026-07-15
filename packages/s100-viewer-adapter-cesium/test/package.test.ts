@@ -197,7 +197,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     await viewer.destroy();
   });
 
-  it("supports equirectangular background map in-app slicing", async () => {
+  it("renders equirectangular background maps with Cesium panoramas", async () => {
     const cesium = createMockCesium();
     const viewer = await createS100Viewer({
       container: createMockContainer(),
@@ -215,21 +215,21 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
       skyboxUrl: "/textures/skybox_equirectangular.png",
     });
 
-    const transparent1x1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-    expect(cesium.operations.skyBoxes).toContainEqual({
-      sources: {
-        positiveX: transparent1x1,
-        negativeX: transparent1x1,
-        positiveY: transparent1x1,
-        negativeY: transparent1x1,
-        positiveZ: transparent1x1,
-        negativeZ: transparent1x1,
+    expect(cesium.operations.equirectangularPanoramas).toHaveLength(1);
+    expect(cesium.operations.equirectangularPanoramas[0]).toMatchObject({
+      image: "/textures/skybox_equirectangular.png",
+      transform: {
+        kind: "enu",
+        origin: { lon: expect.any(Number), lat: expect.any(Number), height: 0 },
       },
+      radius: 100_000,
+      repeatHorizontal: 1,
+      repeatVertical: 1,
     });
-
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(cesium.operations.skyBoxes.length).toBeGreaterThan(1);
+    expect(cesium.operations.primitivesAdded).toContain(cesium.operations.equirectangularPanoramaInstances[0]);
+    expect(cesium.operations.skyBoxes).toHaveLength(0);
+    expect((cesium.operations.scene.skyBox as { show?: boolean }).show).toBe(false);
+    expect(cesium.operations.skyAtmosphere.show).toBe(false);
 
     await viewer.destroy();
   });
@@ -1820,6 +1820,14 @@ function createMockCesium() {
     skyAtmosphere: {} as { show?: boolean },
     skyBox: {} as { show?: boolean },
     skyBoxes: [] as Array<{ sources?: unknown }>,
+    equirectangularPanoramas: [] as Array<{
+      image?: unknown;
+      transform?: unknown;
+      radius?: unknown;
+      repeatHorizontal?: unknown;
+      repeatVertical?: unknown;
+    }>,
+    equirectangularPanoramaInstances: [] as unknown[],
     sun: {} as { show?: boolean },
     moon: {} as { show?: boolean },
     requestRenderCount: 0,
@@ -2196,6 +2204,31 @@ function createMockCesium() {
     }
   }
 
+  class EquirectangularPanorama {
+    show = true;
+    destroyed = false;
+
+    constructor(readonly options: {
+      image?: unknown;
+      transform?: unknown;
+      radius?: unknown;
+      repeatHorizontal?: unknown;
+      repeatVertical?: unknown;
+    }) {
+      operations.equirectangularPanoramas.push(options);
+      operations.equirectangularPanoramaInstances.push(this);
+    }
+
+    isDestroyed() {
+      return this.destroyed;
+    }
+
+    destroy() {
+      this.destroyed = true;
+      return undefined;
+    }
+  }
+
   class CustomShader {
     destroyed = false;
 
@@ -2419,6 +2452,7 @@ function createMockCesium() {
     },
     ScreenSpaceEventHandler,
     SkyBox,
+    EquirectangularPanorama,
     CameraEventType: {
       LEFT_DRAG: "LEFT_DRAG",
       MIDDLE_DRAG: "MIDDLE_DRAG",

@@ -446,8 +446,7 @@ class CesiumEngineScene implements EngineScene {
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0, w: 1 },
   };
-  private skyboxSlicingAbort: (() => void) | null = null;
-  private createdSkyboxBlobUrls: string[] = [];
+  private environmentBackgroundPrimitive: CesiumObject | null = null;
 
   constructor(
     private readonly cesium: CesiumModule,
@@ -680,12 +679,26 @@ class CesiumEngineScene implements EngineScene {
     const skyBox = getObject(scene, "skyBox");
     const skyAtmosphere = getObject(scene, "skyAtmosphere");
     if (state.background !== "skybox") {
+      this.clearEnvironmentBackgroundPrimitive();
       if (skyBox) {
         skyBox.show = false;
       }
       return;
     }
 
+    const equirectangularSkyboxUrl = getCesiumEquirectangularSkyboxUrl(state);
+    if (equirectangularSkyboxUrl) {
+      this.applyCesiumEquirectangularBackground(equirectangularSkyboxUrl, state);
+      if (skyBox) {
+        skyBox.show = false;
+      }
+      if (skyAtmosphere) {
+        skyAtmosphere.show = false;
+      }
+      return;
+    }
+
+    this.clearEnvironmentBackgroundPrimitive();
     const sources = resolveCesiumSkyboxSources(state);
     const SkyBox = this.cesium.SkyBox as CesiumConstructor | undefined;
     if (sources && typeof SkyBox === "function") {
@@ -702,121 +715,43 @@ class CesiumEngineScene implements EngineScene {
     if (skyAtmosphere) {
       skyAtmosphere.show = !sources;
     }
-
-    if (
-      state.skyboxUrl &&
-      !state.skyboxFaces &&
-      !isHdrEnvironmentMap(state.skyboxUrl) &&
-      !isKtx2EnvironmentMap(state.skyboxUrl)
-    ) {
-      this.triggerSkyboxSlicing(scene, state.skyboxUrl);
-    }
   }
 
-  private triggerSkyboxSlicing(scene: CesiumObject, url: string): void {
-    this.skyboxSlicingAbort?.();
-    let cancelled = false;
-    this.skyboxSlicingAbort = () => {
-      cancelled = true;
-    };
-
-    const localToWorld = this.projectedLocalToWorldMatrix() as Record<number, number> | undefined;
-    let rotationMatrix: number[] | undefined;
-
-    const Transforms = this.cesium.Transforms as any;
-    const Matrix3 = this.cesium.Matrix3 as any;
-
-    if (localToWorld && Transforms?.computeTemeToPseudoFixedMatrix && Matrix3) {
-      const clock = (this.viewer as any).clock;
-      const julianDate = clock ? clock.currentTime : undefined;
-      if (julianDate) {
-        try {
-          const temeToFixed = Transforms.computeTemeToPseudoFixedMatrix(julianDate, new Matrix3());
-          if (temeToFixed) {
-            const rT = [
-              localToWorld[0] ?? 1, localToWorld[1] ?? 0, localToWorld[2] ?? 0,
-              localToWorld[4] ?? 0, localToWorld[5] ?? 1, localToWorld[6] ?? 0,
-              localToWorld[8] ?? 0, localToWorld[9] ?? 0, localToWorld[10] ?? 1
-            ];
-            const t = temeToFixed as Record<number, number>;
-            rotationMatrix = [
-              (rT[0] ?? 0) * (t[0] ?? 0) + (rT[1] ?? 0) * (t[1] ?? 0) + (rT[2] ?? 0) * (t[2] ?? 0),
-              (rT[0] ?? 0) * (t[3] ?? 0) + (rT[1] ?? 0) * (t[4] ?? 0) + (rT[2] ?? 0) * (t[5] ?? 0),
-              (rT[0] ?? 0) * (t[6] ?? 0) + (rT[1] ?? 0) * (t[7] ?? 0) + (rT[2] ?? 0) * (t[8] ?? 0),
-              (rT[3] ?? 0) * (t[0] ?? 0) + (rT[4] ?? 0) * (t[1] ?? 0) + (rT[5] ?? 0) * (t[2] ?? 0),
-              (rT[3] ?? 0) * (t[3] ?? 0) + (rT[4] ?? 0) * (t[4] ?? 0) + (rT[5] ?? 0) * (t[5] ?? 0),
-              (rT[3] ?? 0) * (t[6] ?? 0) + (rT[4] ?? 0) * (t[7] ?? 0) + (rT[5] ?? 0) * (t[8] ?? 0),
-              (rT[6] ?? 0) * (t[0] ?? 0) + (rT[7] ?? 0) * (t[1] ?? 0) + (rT[8] ?? 0) * (t[2] ?? 0),
-              (rT[6] ?? 0) * (t[3] ?? 0) + (rT[7] ?? 0) * (t[4] ?? 0) + (rT[8] ?? 0) * (t[5] ?? 0),
-              (rT[6] ?? 0) * (t[6] ?? 0) + (rT[7] ?? 0) * (t[7] ?? 0) + (rT[8] ?? 0) * (t[8] ?? 0)
-            ];
-          }
-        } catch (e) {
-          console.error("Failed to compute TEME to local rotation matrix:", e);
-        }
-      }
+  private applyCesiumEquirectangularBackground(
+    url: string,
+    state: EnvironmentState,
+  ): void {
+    const EquirectangularPanorama = this.cesium.EquirectangularPanorama as CesiumConstructor | undefined;
+    if (typeof EquirectangularPanorama !== "function") {
+      throw new S100Error(
+        "adapter-lifecycle",
+        "Cesium adapter requires Cesium EquirectangularPanorama support for equirectangular environment backgrounds.",
+      );
     }
 
-    if (!rotationMatrix && localToWorld) {
-      rotationMatrix = [
-        localToWorld[0] ?? 1, localToWorld[1] ?? 0, localToWorld[2] ?? 0,
-        localToWorld[4] ?? 0, localToWorld[5] ?? 1, localToWorld[6] ?? 0,
-        localToWorld[8] ?? 0, localToWorld[9] ?? 0, localToWorld[10] ?? 1
-      ];
-    }
+    this.clearEnvironmentBackgroundPrimitive();
 
-    sliceEquirectangular(url, 256, rotationMatrix, (blobUrls) => {
-      if (cancelled) {
-        if (typeof URL === "object" || typeof URL === "function") {
-          for (const u of blobUrls) {
-            try {
-              URL.revokeObjectURL(u);
-            } catch {}
-          }
-        }
-        return;
-      }
-      this.skyboxSlicingAbort = null;
-      this.revokeOldSkyboxBlobUrls();
-      this.createdSkyboxBlobUrls = blobUrls;
-
-      const sources: CesiumSkyboxFaces = {
-        positiveX: blobUrls[0] ?? url,
-        negativeX: blobUrls[1] ?? url,
-        positiveY: blobUrls[2] ?? url,
-        negativeY: blobUrls[3] ?? url,
-        positiveZ: blobUrls[4] ?? url,
-        negativeZ: blobUrls[5] ?? url,
-      };
-
-      const SkyBox = this.cesium.SkyBox as CesiumConstructor | undefined;
-      if (typeof SkyBox === "function") {
-        const existingSkyBox = getObject(scene, "skyBox");
-        if (existingSkyBox && hasFunction(existingSkyBox, "destroy")) {
-          destroyCesiumObject(existingSkyBox);
-        }
-        scene.skyBox = new SkyBox({ sources });
-        const activeSkyBox = getObject(scene, "skyBox");
-        if (activeSkyBox) {
-          activeSkyBox.show = true;
-        }
-        const skyAtmosphere = getObject(scene, "skyAtmosphere");
-        if (skyAtmosphere) {
-          skyAtmosphere.show = false;
-        }
-      }
-    });
+    const panorama = new EquirectangularPanorama({
+      image: url,
+      transform: this.projectedLocalToWorldMatrix() ?? createIdentityMatrix4(this.cesium),
+      radius: getNumberMetadata(state, "panoramaRadiusMeters", 100_000),
+      repeatHorizontal: 1,
+      repeatVertical: 1,
+    }) as CesiumObject;
+    this.environmentBackgroundPrimitive = panorama;
+    this.addPrimitive(panorama);
   }
 
-  private revokeOldSkyboxBlobUrls(): void {
-    if (typeof URL === "object" || typeof URL === "function") {
-      for (const url of this.createdSkyboxBlobUrls) {
-        try {
-          URL.revokeObjectURL(url);
-        } catch {}
-      }
+  private clearEnvironmentBackgroundPrimitive(): void {
+    if (!this.environmentBackgroundPrimitive) {
+      return;
     }
-    this.createdSkyboxBlobUrls = [];
+    const primitive = this.environmentBackgroundPrimitive;
+    this.environmentBackgroundPrimitive = null;
+    const removed = this.removePrimitive(primitive);
+    if (!removed) {
+      destroyCesiumObject(primitive);
+    }
   }
 
   private applyCesiumSpecularEnvironment(scene: CesiumObject, state: EnvironmentState): boolean {
@@ -1213,9 +1148,7 @@ class CesiumEngineScene implements EngineScene {
   }
 
   async dispose(): Promise<void> {
-    this.skyboxSlicingAbort?.();
-    this.skyboxSlicingAbort = null;
-    this.revokeOldSkyboxBlobUrls();
+    this.clearEnvironmentBackgroundPrimitive();
     this.cameraPanAbort?.();
     this.cameraPanAbort = null;
     this.cameraOrbitAbort?.();
@@ -4375,20 +4308,15 @@ function resolveCesiumSkyboxSources(state: EnvironmentState): CesiumSkyboxFaces 
     return createSkyboxFacesFromTemplate(template);
   }
 
+  return null;
+}
+
+function getCesiumEquirectangularSkyboxUrl(state: EnvironmentState): string | null {
   const url = state.skyboxUrl;
-  if (!url || isHdrEnvironmentMap(url) || isKtx2EnvironmentMap(url)) {
+  if (!url || state.skyboxFaces || isHdrEnvironmentMap(url) || isKtx2EnvironmentMap(url)) {
     return null;
   }
-
-  const transparent1x1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-  return {
-    positiveX: transparent1x1,
-    negativeX: transparent1x1,
-    positiveY: transparent1x1,
-    negativeY: transparent1x1,
-    positiveZ: transparent1x1,
-    negativeZ: transparent1x1,
-  };
+  return url;
 }
 
 function normalizeCesiumSkyboxFaces(value: unknown): CesiumSkyboxFaces | null {
@@ -4430,131 +4358,17 @@ function getStringMetadata(state: EnvironmentState, key: string): string | undef
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function getNumberMetadata(state: EnvironmentState, key: string, fallback: number): number {
+  const value = state.metadata?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 function isHdrEnvironmentMap(url: string): boolean {
   return /\.hdr(?:[?#].*)?$/i.test(url);
 }
 
 function isKtx2EnvironmentMap(url: string): boolean {
   return /\.ktx2(?:[?#].*)?$/i.test(url);
-}
-
-function sliceEquirectangular(
-  url: string,
-  faceSize: number,
-  rotationMatrix: number[] | undefined,
-  onComplete: (blobUrls: string[]) => void
-): void {
-  const ImageConstructor = (globalThis as any).Image;
-  const documentLike = (globalThis as any).document;
-
-  const transparent1x1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-  const fallback = (err?: any) => {
-    if (err) {
-      console.error("sliceEquirectangular failed:", err);
-    }
-    onComplete([transparent1x1, transparent1x1, transparent1x1, transparent1x1, transparent1x1, transparent1x1]);
-  };
-
-  if (
-    typeof ImageConstructor !== "function" ||
-    !documentLike ||
-    typeof documentLike.createElement !== "function"
-  ) {
-    setTimeout(() => fallback(), 0);
-    return;
-  }
-
-  const img = new ImageConstructor();
-  const isAbsolute = /^(?:https?:)?\/\//i.test(url);
-  if (isAbsolute) {
-    img.crossOrigin = "anonymous";
-  }
-  img.onload = () => {
-    try {
-      const srcCanvas = documentLike.createElement("canvas");
-      srcCanvas.width = img.width;
-      srcCanvas.height = img.height;
-      const srcCtx = srcCanvas.getContext("2d");
-      if (!srcCtx) {
-        fallback("Could not get 2d context");
-        return;
-      }
-      srcCtx.drawImage(img, 0, 0);
-      const srcData = srcCtx.getImageData(0, 0, img.width, img.height);
-
-      const faces = ["px", "nx", "py", "ny", "pz", "nz"];
-      const promises = faces.map((face) => {
-        return new Promise<string>((resolveFace) => {
-          const destCanvas = documentLike.createElement("canvas");
-          destCanvas.width = faceSize;
-          destCanvas.height = faceSize;
-          const destCtx = destCanvas.getContext("2d")!;
-          const destData = destCtx.createImageData(faceSize, faceSize);
-
-          for (let dy = 0; dy < faceSize; dy++) {
-            for (let dx = 0; dx < faceSize; dx++) {
-              const u = (dx / faceSize) * 2 - 1;
-              const v = (dy / faceSize) * 2 - 1;
-
-              let x = 0, y = 0, z = 0;
-              if (face === "px") { x = 1;  y = -v; z = -u; }
-              else if (face === "nx") { x = -1; y = -v; z = u;  }
-              else if (face === "py") { x = u;  y = 1;  z = v;  }
-              else if (face === "ny") { x = u;  y = -1; z = -v; }
-              else if (face === "pz") { x = u;  y = -v; z = 1;  }
-              else if (face === "nz") { x = -u; y = -v; z = -1; }
-
-              let rx = x, ry = y, rz = z;
-              if (rotationMatrix) {
-                rx = (rotationMatrix[0] ?? 0) * x + (rotationMatrix[1] ?? 0) * y + (rotationMatrix[2] ?? 0) * z;
-                ry = (rotationMatrix[3] ?? 0) * x + (rotationMatrix[4] ?? 0) * y + (rotationMatrix[5] ?? 0) * z;
-                rz = (rotationMatrix[6] ?? 0) * x + (rotationMatrix[7] ?? 0) * y + (rotationMatrix[8] ?? 0) * z;
-              }
-
-              const r = Math.sqrt(rx*rx + ry*ry + rz*rz);
-              const theta = Math.atan2(ry, rx);
-              const phi = Math.asin(rz / r);
-
-              const sourceU = (theta + Math.PI) / (2 * Math.PI);
-              const sourceV = (phi + Math.PI / 2) / Math.PI;
-
-              const sx = Math.max(0, Math.min(img.width - 1, Math.floor(sourceU * img.width)));
-              const sy = Math.max(0, Math.min(img.height - 1, Math.floor((1 - sourceV) * img.height)));
-
-              const srcIndex = (sy * img.width + sx) * 4;
-              const destIndex = (dy * faceSize + dx) * 4;
-
-              destData.data[destIndex]     = srcData.data[srcIndex];
-              destData.data[destIndex + 1] = srcData.data[srcIndex + 1];
-              destData.data[destIndex + 2] = srcData.data[srcIndex + 2];
-              destData.data[destIndex + 3] = srcData.data[srcIndex + 3];
-            }
-          }
-
-          destCtx.putImageData(destData, 0, 0);
-          destCanvas.toBlob((blob: Blob | null) => {
-            if (blob) {
-              resolveFace(URL.createObjectURL(blob));
-            } else {
-              resolveFace(transparent1x1);
-            }
-          }, "image/jpeg", 0.9);
-        });
-      });
-
-      Promise.all(promises)
-        .then(onComplete)
-        .catch((err) => {
-          fallback(err);
-        });
-    } catch (e) {
-      fallback(e);
-    }
-  };
-  img.onerror = () => {
-    fallback("Image load error for: " + url);
-  };
-  img.src = url;
 }
 
 function mergeLayerSpecPatch<TSpec extends BaseLayerSpec>(spec: TSpec, patch: LayerPatch): TSpec {
