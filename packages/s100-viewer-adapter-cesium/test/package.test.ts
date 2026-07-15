@@ -197,6 +197,42 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     await viewer.destroy();
   });
 
+  it("supports equirectangular background map in-app slicing", async () => {
+    const cesium = createMockCesium();
+    const viewer = await createS100Viewer({
+      container: createMockContainer(),
+      adapter: createCesiumAdapter({ cesiumModule: cesium }),
+    });
+    const scene = await viewer.createScene({
+      georeference: SceneBuilder.projectedLocal({
+        crs: "EPSG:32619",
+        origin: { x: 331100, y: 5186420 },
+      }),
+    });
+
+    scene.environment.setState({
+      background: "skybox",
+      skyboxUrl: "/textures/skybox_equirectangular.png",
+    });
+
+    expect(cesium.operations.skyBoxes).toContainEqual({
+      sources: {
+        positiveX: "/textures/skybox_equirectangular.png",
+        negativeX: "/textures/skybox_equirectangular.png",
+        positiveY: "/textures/skybox_equirectangular.png",
+        negativeY: "/textures/skybox_equirectangular.png",
+        positiveZ: "/textures/skybox_equirectangular.png",
+        negativeZ: "/textures/skybox_equirectangular.png",
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(cesium.operations.skyBoxes.length).toBeGreaterThan(1);
+
+    await viewer.destroy();
+  });
+
   it("applies S-100 camera controls by default and allows viewer-level overrides", async () => {
     const cesium = createMockCesium();
     const viewer = await createS100Viewer({

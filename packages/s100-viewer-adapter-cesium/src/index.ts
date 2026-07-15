@@ -446,6 +446,8 @@ class CesiumEngineScene implements EngineScene {
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0, w: 1 },
   };
+  private skyboxSlicingAbort: (() => void) | null = null;
+  private createdSkyboxBlobUrls: string[] = [];
 
   constructor(
     private readonly cesium: CesiumModule,
@@ -700,6 +702,76 @@ class CesiumEngineScene implements EngineScene {
     if (skyAtmosphere) {
       skyAtmosphere.show = !sources;
     }
+
+    if (
+      state.skyboxUrl &&
+      !state.skyboxFaces &&
+      !isHdrEnvironmentMap(state.skyboxUrl) &&
+      !isKtx2EnvironmentMap(state.skyboxUrl)
+    ) {
+      this.triggerSkyboxSlicing(scene, state.skyboxUrl);
+    }
+  }
+
+  private triggerSkyboxSlicing(scene: CesiumObject, url: string): void {
+    this.skyboxSlicingAbort?.();
+    let cancelled = false;
+    this.skyboxSlicingAbort = () => {
+      cancelled = true;
+    };
+
+    sliceEquirectangular(url, 256, (blobUrls) => {
+      if (cancelled) {
+        if (typeof URL === "object" || typeof URL === "function") {
+          for (const u of blobUrls) {
+            try {
+              URL.revokeObjectURL(u);
+            } catch {}
+          }
+        }
+        return;
+      }
+      this.skyboxSlicingAbort = null;
+      this.revokeOldSkyboxBlobUrls();
+      this.createdSkyboxBlobUrls = blobUrls;
+
+      const sources: CesiumSkyboxFaces = {
+        positiveX: blobUrls[0] ?? url,
+        negativeX: blobUrls[1] ?? url,
+        positiveY: blobUrls[2] ?? url,
+        negativeY: blobUrls[3] ?? url,
+        positiveZ: blobUrls[4] ?? url,
+        negativeZ: blobUrls[5] ?? url,
+      };
+
+      const SkyBox = this.cesium.SkyBox as CesiumConstructor | undefined;
+      if (typeof SkyBox === "function") {
+        const existingSkyBox = getObject(scene, "skyBox");
+        if (existingSkyBox && hasFunction(existingSkyBox, "destroy")) {
+          destroyCesiumObject(existingSkyBox);
+        }
+        scene.skyBox = new SkyBox({ sources });
+        const activeSkyBox = getObject(scene, "skyBox");
+        if (activeSkyBox) {
+          activeSkyBox.show = true;
+        }
+        const skyAtmosphere = getObject(scene, "skyAtmosphere");
+        if (skyAtmosphere) {
+          skyAtmosphere.show = false;
+        }
+      }
+    });
+  }
+
+  private revokeOldSkyboxBlobUrls(): void {
+    if (typeof URL === "object" || typeof URL === "function") {
+      for (const url of this.createdSkyboxBlobUrls) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      }
+    }
+    this.createdSkyboxBlobUrls = [];
   }
 
   private applyCesiumSpecularEnvironment(scene: CesiumObject, state: EnvironmentState): boolean {
@@ -1096,6 +1168,9 @@ class CesiumEngineScene implements EngineScene {
   }
 
   async dispose(): Promise<void> {
+    this.skyboxSlicingAbort?.();
+    this.skyboxSlicingAbort = null;
+    this.revokeOldSkyboxBlobUrls();
     this.cameraPanAbort?.();
     this.cameraPanAbort = null;
     this.cameraOrbitAbort?.();
@@ -4315,6 +4390,106 @@ function isHdrEnvironmentMap(url: string): boolean {
 
 function isKtx2EnvironmentMap(url: string): boolean {
   return /\.ktx2(?:[?#].*)?$/i.test(url);
+}
+
+function sliceEquirectangular(
+  url: string,
+  faceSize: number,
+  onComplete: (blobUrls: string[]) => void
+): void {
+  const ImageConstructor = (globalThis as any).Image;
+  const documentLike = (globalThis as any).document;
+
+  if (
+    typeof ImageConstructor !== "function" ||
+    !documentLike ||
+    typeof documentLike.createElement !== "function"
+  ) {
+    setTimeout(() => onComplete([url, url, url, url, url, url]), 0);
+    return;
+  }
+
+  const img = new ImageConstructor();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    try {
+      const srcCanvas = documentLike.createElement("canvas");
+      srcCanvas.width = img.width;
+      srcCanvas.height = img.height;
+      const srcCtx = srcCanvas.getContext("2d");
+      if (!srcCtx) {
+        onComplete([url, url, url, url, url, url]);
+        return;
+      }
+      srcCtx.drawImage(img, 0, 0);
+      const srcData = srcCtx.getImageData(0, 0, img.width, img.height);
+
+      const faces = ["px", "nx", "py", "ny", "pz", "nz"];
+      const promises = faces.map((face) => {
+        return new Promise<string>((resolveFace) => {
+          const destCanvas = documentLike.createElement("canvas");
+          destCanvas.width = faceSize;
+          destCanvas.height = faceSize;
+          const destCtx = destCanvas.getContext("2d")!;
+          const destData = destCtx.createImageData(faceSize, faceSize);
+
+          for (let dy = 0; dy < faceSize; dy++) {
+            for (let dx = 0; dx < faceSize; dx++) {
+              const u = (dx / faceSize) * 2 - 1;
+              const v = (dy / faceSize) * 2 - 1;
+
+              let x = 0, y = 0, z = 0;
+              if (face === "px") { x = 1;  y = -v; z = -u; }
+              else if (face === "nx") { x = -1; y = -v; z = u;  }
+              else if (face === "py") { x = u;  y = 1;  z = v;  }
+              else if (face === "ny") { x = u;  y = -1; z = -v; }
+              else if (face === "pz") { x = u;  y = -v; z = 1;  }
+              else if (face === "nz") { x = -u; y = -v; z = -1; }
+
+              const r = Math.sqrt(x*x + y*y + z*z);
+              const theta = Math.atan2(y, x);
+              const phi = Math.asin(z / r);
+
+              const sourceU = (theta + Math.PI) / (2 * Math.PI);
+              const sourceV = (phi + Math.PI / 2) / Math.PI;
+
+              const sx = Math.max(0, Math.min(img.width - 1, Math.floor(sourceU * img.width)));
+              const sy = Math.max(0, Math.min(img.height - 1, Math.floor((1 - sourceV) * img.height)));
+
+              const srcIndex = (sy * img.width + sx) * 4;
+              const destIndex = (dy * faceSize + dx) * 4;
+
+              destData.data[destIndex]     = srcData.data[srcIndex];
+              destData.data[destIndex + 1] = srcData.data[srcIndex + 1];
+              destData.data[destIndex + 2] = srcData.data[srcIndex + 2];
+              destData.data[destIndex + 3] = srcData.data[srcIndex + 3];
+            }
+          }
+
+          destCtx.putImageData(destData, 0, 0);
+          destCanvas.toBlob((blob: Blob | null) => {
+            if (blob) {
+              resolveFace(URL.createObjectURL(blob));
+            } else {
+              resolveFace(url);
+            }
+          }, "image/jpeg", 0.9);
+        });
+      });
+
+      Promise.all(promises)
+        .then(onComplete)
+        .catch(() => {
+          onComplete([url, url, url, url, url, url]);
+        });
+    } catch (e) {
+      onComplete([url, url, url, url, url, url]);
+    }
+  };
+  img.onerror = () => {
+    onComplete([url, url, url, url, url, url]);
+  };
+  img.src = url;
 }
 
 function mergeLayerSpecPatch<TSpec extends BaseLayerSpec>(spec: TSpec, patch: LayerPatch): TSpec {
