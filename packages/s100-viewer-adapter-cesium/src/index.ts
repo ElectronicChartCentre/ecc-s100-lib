@@ -720,7 +720,17 @@ class CesiumEngineScene implements EngineScene {
       cancelled = true;
     };
 
-    sliceEquirectangular(url, 256, (blobUrls) => {
+    const localToWorld = this.projectedLocalToWorldMatrix() as Record<number, number> | undefined;
+    let rotationMatrix: number[] | undefined;
+    if (localToWorld) {
+      rotationMatrix = [
+        localToWorld[0] ?? 1, localToWorld[1] ?? 0, localToWorld[2] ?? 0,
+        localToWorld[4] ?? 0, localToWorld[5] ?? 1, localToWorld[6] ?? 0,
+        localToWorld[8] ?? 0, localToWorld[9] ?? 0, localToWorld[10] ?? 1
+      ];
+    }
+
+    sliceEquirectangular(url, 256, rotationMatrix, (blobUrls) => {
       if (cancelled) {
         if (typeof URL === "object" || typeof URL === "function") {
           for (const u of blobUrls) {
@@ -4395,6 +4405,7 @@ function isKtx2EnvironmentMap(url: string): boolean {
 function sliceEquirectangular(
   url: string,
   faceSize: number,
+  rotationMatrix: number[] | undefined,
   onComplete: (blobUrls: string[]) => void
 ): void {
   const ImageConstructor = (globalThis as any).Image;
@@ -4446,9 +4457,16 @@ function sliceEquirectangular(
               else if (face === "pz") { x = u;  y = -v; z = 1;  }
               else if (face === "nz") { x = -u; y = -v; z = -1; }
 
-              const r = Math.sqrt(x*x + y*y + z*z);
-              const theta = Math.atan2(y, x);
-              const phi = Math.asin(z / r);
+              let rx = x, ry = y, rz = z;
+              if (rotationMatrix) {
+                rx = (rotationMatrix[0] ?? 0) * x + (rotationMatrix[1] ?? 0) * y + (rotationMatrix[2] ?? 0) * z;
+                ry = (rotationMatrix[3] ?? 0) * x + (rotationMatrix[4] ?? 0) * y + (rotationMatrix[5] ?? 0) * z;
+                rz = (rotationMatrix[6] ?? 0) * x + (rotationMatrix[7] ?? 0) * y + (rotationMatrix[8] ?? 0) * z;
+              }
+
+              const r = Math.sqrt(rx*rx + ry*ry + rz*rz);
+              const theta = Math.atan2(ry, rx);
+              const phi = Math.asin(rz / r);
 
               const sourceU = (theta + Math.PI) / (2 * Math.PI);
               const sourceV = (phi + Math.PI / 2) / Math.PI;
