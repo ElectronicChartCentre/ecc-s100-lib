@@ -227,7 +227,7 @@ describe("createS100Viewer", () => {
           detailFactor: 250,
         },
         style: {
-          unsafeDepth: -1,
+          safetyDepthMeters: 1,
           contours: {
             visible: false,
             intervalMeters: 5,
@@ -236,7 +236,7 @@ describe("createS100Viewer", () => {
       }),
     );
 
-    await terrain.controllers.terrain.setUnsafeDepth(-8);
+    await terrain.controllers.terrain.setSafetyDepthMeters(8);
     await terrain.controllers.terrain.setContours({
       visible: true,
       intervalMeters: 3,
@@ -244,12 +244,12 @@ describe("createS100Viewer", () => {
     await terrain.controllers.terrain.setTileBoundsVisible(true);
     await terrain.controllers.terrain.setDetailFactor(700);
 
-    expect(terrain.controllers.terrain.terrain.unsafeDepth).toBe(-8);
+    expect(terrain.controllers.terrain.terrain.safetyDepthMeters).toBe(8);
     expect(terrain.controllers.terrain.terrain.showContour).toBe(true);
     expect(terrain.controllers.terrain.terrain.contourInterval).toBe(3);
     expect(terrain.controllers.terrain.settings.renderBBoxes).toBe(true);
     expect(terrain.spec.style).toMatchObject({
-      unsafeDepth: -8,
+      safetyDepthMeters: 8,
       contours: {
         visible: true,
         intervalMeters: 3,
@@ -265,16 +265,23 @@ describe("createS100Viewer", () => {
     await terrain.update({
       style: {
         ...terrain.spec.style,
-        unsafeDepth: -4,
+        safetyDepthMeters: 4,
         contours: {
           visible: false,
           intervalMeters: 9,
         },
       },
     });
-    expect(terrain.controllers.terrain.terrain.unsafeDepth).toBe(-4);
+    expect(terrain.controllers.terrain.terrain.safetyDepthMeters).toBe(4);
     expect(terrain.controllers.terrain.terrain.showContour).toBe(false);
     expect(terrain.controllers.terrain.terrain.contourInterval).toBe(9);
+
+    await terrain.controllers.terrain.updateDisplayStyle({
+      unsafeDepth: -6,
+    });
+    expect(terrain.controllers.terrain.terrain.safetyDepthMeters).toBe(6);
+    expect(terrain.spec.style?.safetyDepthMeters).toBe(6);
+    expect(terrain.spec.style?.unsafeDepth).toBeUndefined();
 
     const currents = await scene.layers.add(
       LayerBuilder.createStaticS111({
@@ -653,7 +660,7 @@ describe("createS100Viewer", () => {
         pickResult: {
           screen: { x: 0, y: 0 },
           source: "terrain",
-          depthMeters: -12,
+          depthMeters: 12,
         },
       }),
     });
@@ -697,7 +704,7 @@ describe("createS100Viewer", () => {
     expect(scene.environment.getState().skyboxUrl)
       .toBe("/textures/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
     expect(pick?.screen).toEqual({ x: 20, y: 40 });
-    expect(pick?.depthMeters).toBe(-12);
+    expect(pick?.depthMeters).toBe(12);
 
     await viewer.destroy();
   });
@@ -802,7 +809,7 @@ describe("createS100Viewer", () => {
               z: -3,
               frameId: "test",
             },
-            depthMeters: -3,
+            depthMeters: 3,
           });
         },
       }),
@@ -833,7 +840,7 @@ describe("createS100Viewer", () => {
     expect(pickEvents[0]).toMatchObject({
       screen: { x: 10, y: 20 },
       source: "terrain",
-      depthMeters: -3,
+      depthMeters: 3,
     });
 
     await viewer.destroy();

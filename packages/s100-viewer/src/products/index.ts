@@ -1,5 +1,6 @@
 export * from "./sources.js";
 export * from "./style.js";
+export * from "./depth.js";
 export * from "./data-coding.js";
 export * from "./enc.js";
 export * from "./projected-map-template.js";

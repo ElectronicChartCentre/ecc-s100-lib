@@ -28,6 +28,18 @@ const s102: S102LayerSpec = LayerBuilder.createS102({
 await scene.layers.add(s102);
 ```
 
+S-102 depth-facing API fields follow nautical chart convention: increasing
+depth is positive downward from the active water surface or sea level. For
+example, use `style.safetyDepthMeters: 8` or
+`layer.controllers.terrain.setSafetyDepthMeters(8)` for an 8 metre safety-depth
+threshold. Rendering adapters still keep their native world coordinates, such
+as z-up elevation, and convert at the adapter boundary.
+
+When a derived 3D Tiles service stores the terrain vertical coordinate itself as
+positive bathymetric depth, include `sourceMetadata.values.heightSign: -1`.
+Adapters use that source metadata to convert the sampled vertical value into
+z-up elevation before applying safety-depth styling.
+
 ENC helpers are split by standard:
 
 ```ts

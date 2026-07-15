@@ -4,6 +4,7 @@ import type { EngineCameraPose } from "@ecc/s100-viewer";
 import { formatCameraPose, formatCapabilities } from "./capabilityPanel";
 import { allEngineDefinitions, getEngineDefinition } from "./engineRegistry";
 import { allSceneRecipes, getSceneRecipe } from "./sceneRecipes";
+import { createSceneControlPanel } from "./sceneControls";
 import {
   createViewerSession,
   destroyViewerSession,
@@ -18,7 +19,12 @@ const reloadButton = getElement<HTMLButtonElement>("reload-button");
 const statusPill = getElement<HTMLElement>("status-pill");
 const capabilityPanel = getElement<HTMLElement>("capability-panel");
 const cameraPanel = getElement<HTMLElement>("camera-panel");
+const controlPanel = getElement<HTMLElement>("control-panel");
 const logPanel = getElement<HTMLOListElement>("log-panel");
+const sceneControlPanel = createSceneControlPanel({
+  root: controlPanel,
+  log: appendLog,
+});
 
 let activeSession: ViewerSession | null = null;
 let lastCameraPose: EngineCameraPose | null = null;
@@ -63,6 +69,7 @@ async function rebuild(): Promise<void> {
 
   const previousSession = activeSession;
   activeSession = null;
+  sceneControlPanel.bind(null);
   try {
     await destroyViewerSession(previousSession);
   } catch (error) {
@@ -93,6 +100,7 @@ async function rebuild(): Promise<void> {
 
     activeSession = session;
     capabilityPanel.textContent = formatCapabilities(session.adapter, session.recipeSupport);
+    sceneControlPanel.bind(session);
     setBusy(false, `${session.adapter.displayName} ready`);
     appendLog("info", `${recipe.label} loaded on ${session.adapter.displayName}.`);
   } catch (error) {
@@ -129,6 +137,7 @@ function setBusy(isBusy: boolean, message: string): void {
   reloadButton.disabled = isBusy;
   engineSelect.disabled = isBusy;
   recipeSelect.disabled = isBusy;
+  sceneControlPanel.setDisabled(isBusy);
   statusPill.textContent = message;
   statusPill.dataset.state = isBusy ? "busy" : message === "Failed" ? "error" : "ready";
 }

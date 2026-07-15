@@ -103,6 +103,7 @@ export const S102Styles = {
   DEFAULT: {
     visible: true,
     opacity: 1,
+    safetyDepthMeters: 10,
     seaLevel: 0,
     contours: {
       visible: true,

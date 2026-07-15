@@ -25,6 +25,7 @@ export type PickResult = {
   layerId?: string;
   featureId?: string;
   source: PickResultSource;
+  /** Positive nautical depth in metres below the active water surface/sea level. */
   depthMeters?: number;
   values?: Record<string, unknown>;
   native?: unknown;

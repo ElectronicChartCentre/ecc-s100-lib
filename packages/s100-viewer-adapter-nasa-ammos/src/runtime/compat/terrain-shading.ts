@@ -2,7 +2,8 @@ import type { Material, Object3D } from "three";
 
 type TerrainUniforms = {
   seaLevel: { value: number };
-  unsafeDepth: { value: number };
+  safetyDepthMeters: { value: number };
+  heightSign: { value: number };
   unsafeTransparency: { value: number };
   contourInterval: { value: number };
   ambientStrength: { value: number };
@@ -30,7 +31,8 @@ type TerrainShader = Parameters<Material["onBeforeCompile"]>[0];
 export class TerrainMaterialController {
   private readonly uniforms: TerrainUniforms = {
     seaLevel: { value: 0 },
-    unsafeDepth: { value: -10 },
+    safetyDepthMeters: { value: 10 },
+    heightSign: { value: 1 },
     unsafeTransparency: { value: DEFAULT_UNSAFE_TRANSPARENCY },
     contourInterval: { value: 2.5 },
     ambientStrength: { value: DEFAULT_AMBIENT_STRENGTH },
@@ -53,8 +55,12 @@ export class TerrainMaterialController {
     this.uniforms.seaLevel.value = normalizeFiniteNumber(value, 0);
   }
 
-  setUnsafeDepth(value: number): void {
-    this.uniforms.unsafeDepth.value = normalizeFiniteNumber(value, -10);
+  setSafetyDepthMeters(value: number): void {
+    this.uniforms.safetyDepthMeters.value = normalizeDepthMeters(value, 10);
+  }
+
+  setHeightSign(value: number): void {
+    this.uniforms.heightSign.value = normalizeHeightSign(value);
   }
 
   setContourInterval(value: number): void {
@@ -94,7 +100,8 @@ export class TerrainMaterialController {
 }
 
 export class TerrainDisplayPropertyAdapter {
-  private currentUnsafeDepth = -10;
+  private currentSafetyDepthMeters = 10;
+  private currentHeightSign = 1;
   private currentSeaLevel = 0;
   private currentShowContour = true;
   private currentContourInterval = 2.5;
@@ -103,13 +110,30 @@ export class TerrainDisplayPropertyAdapter {
     this.syncMaterialController();
   }
 
+  get safetyDepthMeters(): number {
+    return this.currentSafetyDepthMeters;
+  }
+
+  set safetyDepthMeters(value: number) {
+    this.currentSafetyDepthMeters = normalizeDepthMeters(value, 10);
+    this.materialController.setSafetyDepthMeters(this.currentSafetyDepthMeters);
+  }
+
   get unsafeDepth(): number {
-    return this.currentUnsafeDepth;
+    return this.currentSafetyDepthMeters;
   }
 
   set unsafeDepth(value: number) {
-    this.currentUnsafeDepth = normalizeFiniteNumber(value, -10);
-    this.materialController.setUnsafeDepth(this.currentUnsafeDepth);
+    this.safetyDepthMeters = value;
+  }
+
+  get heightSign(): number {
+    return this.currentHeightSign;
+  }
+
+  set heightSign(value: number) {
+    this.currentHeightSign = normalizeHeightSign(value);
+    this.materialController.setHeightSign(this.currentHeightSign);
   }
 
   get seaContour(): boolean {
@@ -148,7 +172,8 @@ export class TerrainDisplayPropertyAdapter {
   }
 
   private syncMaterialController(): void {
-    this.materialController.setUnsafeDepth(this.currentUnsafeDepth);
+    this.materialController.setSafetyDepthMeters(this.currentSafetyDepthMeters);
+    this.materialController.setHeightSign(this.currentHeightSign);
     this.materialController.setSeaLevel(this.currentSeaLevel);
     this.syncContourInterval();
   }
@@ -162,7 +187,8 @@ export class TerrainDisplayPropertyAdapter {
 
 function patchTerrainShader(shader: TerrainShader, uniforms: TerrainUniforms): void {
   shader.uniforms.s100TerrainSeaLevel = uniforms.seaLevel;
-  shader.uniforms.s100TerrainUnsafeDepth = uniforms.unsafeDepth;
+  shader.uniforms.s100TerrainSafetyDepthMeters = uniforms.safetyDepthMeters;
+  shader.uniforms.s100TerrainHeightSign = uniforms.heightSign;
   shader.uniforms.s100TerrainUnsafeTransparency = uniforms.unsafeTransparency;
   shader.uniforms.s100TerrainContourInterval = uniforms.contourInterval;
   shader.uniforms.s100TerrainAmbientStrength = uniforms.ambientStrength;
@@ -192,7 +218,8 @@ vS100TerrainWorldPosition = (modelMatrix * s100TerrainWorldPosition).xyz;`,
       `#include <common>
 varying vec3 vS100TerrainWorldPosition;
 uniform float s100TerrainSeaLevel;
-uniform float s100TerrainUnsafeDepth;
+uniform float s100TerrainSafetyDepthMeters;
+uniform float s100TerrainHeightSign;
 uniform float s100TerrainUnsafeTransparency;
 uniform float s100TerrainContourInterval;
 uniform float s100TerrainAmbientStrength;
@@ -235,7 +262,8 @@ float s100TerrainContourLine(float elevation, float interval) {
     .replace(
       "#include <color_fragment>",
       `#include <color_fragment>
-float s100TerrainElevation = vS100TerrainWorldPosition.z;
+float s100TerrainElevation = vS100TerrainWorldPosition.z * s100TerrainHeightSign;
+float s100TerrainDepth = s100TerrainSeaLevel - s100TerrainElevation;
 vec3 s100TerrainColor = s100TerrainElevationColor(s100TerrainElevation);
 
 float s100TerrainContour = s100TerrainContourLine(
@@ -248,10 +276,7 @@ s100TerrainColor = mix(
   s100TerrainContour
 );
 
-if (
-  s100TerrainElevation - s100TerrainSeaLevel > s100TerrainUnsafeDepth &&
-  s100TerrainElevation < 0.0
-) {
+if (s100TerrainDepth >= 0.0 && s100TerrainDepth <= s100TerrainSafetyDepthMeters) {
   s100TerrainColor = mix(
     s100TerrainColor,
     vec3(1.0, 0.0, 0.0),
@@ -269,4 +294,12 @@ totalEmissiveRadiance += diffuseColor.rgb * s100TerrainAmbientStrength;`,
 
 function normalizeFiniteNumber(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeDepthMeters(value: number, fallback: number): number {
+  return Math.max(0, normalizeFiniteNumber(value, fallback));
+}
+
+function normalizeHeightSign(value: number): number {
+  return Number.isFinite(value) && value < 0 ? -1 : 1;
 }

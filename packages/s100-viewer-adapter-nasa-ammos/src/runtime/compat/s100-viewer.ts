@@ -157,7 +157,9 @@ export type TerrainSettings = {
 };
 
 export type TerrainDisplayProperties = {
+  safetyDepthMeters: number;
   unsafeDepth: number;
+  heightSign: number;
   seaContour: boolean;
   seaLevel: number;
   showContour: boolean;

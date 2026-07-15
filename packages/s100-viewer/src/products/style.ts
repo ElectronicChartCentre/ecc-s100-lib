@@ -82,6 +82,9 @@ export type S57EncStyle = EncCommonStyle & {
 };
 
 export type S102BathymetryStyle = OpacityVisibilityStyle & {
+  /** Nautical chart convention: positive metres downward from the water surface. */
+  safetyDepthMeters?: number;
+  /** @deprecated Use safetyDepthMeters. Negative legacy values are read as z-up elevation thresholds. */
   unsafeDepth?: number;
   seaLevel?: number;
   contours?: ContourStyle;

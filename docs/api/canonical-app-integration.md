@@ -101,7 +101,7 @@ Layer-specific runtime controls are exposed through `layer.controllers`.
 Applications should prefer these handles over native objects:
 
 ```ts
-await terrain.controllers.terrain.setUnsafeDepth(-8);
+await terrain.controllers.terrain.setSafetyDepthMeters(8);
 await terrain.controllers.terrain.setTileBoundsVisible(true);
 
 await vessel.controllers.vessel.setDimensions({

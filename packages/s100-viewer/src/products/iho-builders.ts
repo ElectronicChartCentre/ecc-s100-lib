@@ -16,6 +16,7 @@ import type {
   S102BathymetryStyle,
   S111SurfaceCurrentStyle,
 } from "./style.js";
+import { getS102SafetyDepthMeters } from "./depth.js";
 import {
   commonLayerFields,
   productSpecificationVersionField,
@@ -167,14 +168,22 @@ export const S111WorkflowDefaults = {
 
 const mergeS102Style = (
   style: Partial<S102BathymetryStyle> | undefined,
-): S102BathymetryStyle => ({
-  ...S102Styles.DEFAULT,
-  ...style,
-  contours: {
-    ...S102Styles.DEFAULT.contours,
-    ...style?.contours,
-  },
-});
+): S102BathymetryStyle => {
+  const merged: S102BathymetryStyle = {
+    ...S102Styles.DEFAULT,
+    ...style,
+    contours: {
+      ...S102Styles.DEFAULT.contours,
+      ...style?.contours,
+    },
+  };
+
+  if (style?.safetyDepthMeters === undefined && style?.unsafeDepth !== undefined) {
+    merged.safetyDepthMeters = getS102SafetyDepthMeters(style, S102Styles.DEFAULT.safetyDepthMeters);
+  }
+  delete merged.unsafeDepth;
+  return merged;
+};
 
 const mergeS111Style = (
   style: Partial<S111SurfaceCurrentStyle> | undefined,

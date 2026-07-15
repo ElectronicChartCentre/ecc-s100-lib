@@ -55,7 +55,7 @@ const terrain = await scene.layers.add(LayerBuilder.createS102({
   url: "https://example.test/s102/tileset.json",
 }));
 
-await terrain.controllers.terrain.setUnsafeDepth(-8);
+await terrain.controllers.terrain.setSafetyDepthMeters(8);
 await terrain.controllers.terrain.setTileBoundsVisible(true);
 
 const currents = await scene.layers.add(LayerBuilder.createStaticS111({

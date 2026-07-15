@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   assertServiceReadyLayerSpec,
+  depthFromElevation,
+  elevationFromDepth,
+  getS102SafetyDepthMeters,
   defineS100LayerSpec,
   getLayerDisplayTitle,
   isServiceReadySource,
@@ -49,7 +52,7 @@ describe("@ecc/s100-viewer product specs", () => {
         verticalDatum: "LAT",
       },
       style: {
-        unsafeDepth: -7.5,
+        safetyDepthMeters: 7.5,
         contours: { visible: true, intervalMeters: 5 },
         depthColors: "s102-depth-default",
         shading: "lit",
@@ -61,6 +64,25 @@ describe("@ecc/s100-viewer product specs", () => {
     expect(spec.product).toBe("S-102");
     expect(spec.source.kind).toBe("3d-tiles");
     expect(spec.style?.contours?.intervalMeters).toBe(5);
+  });
+
+  it("uses positive nautical depth while preserving z-up elevation conversion helpers", () => {
+    expect(depthFromElevation(-8, 1.5)).toBe(9.5);
+    expect(elevationFromDepth(9.5, 1.5)).toBe(-8);
+    expect(getS102SafetyDepthMeters({ safetyDepthMeters: 6 })).toBe(6);
+    expect(getS102SafetyDepthMeters({ unsafeDepth: -6 })).toBe(6);
+  });
+
+  it("normalizes legacy S-102 builder unsafe depth into safety depth", () => {
+    const spec = LayerBuilder.createS102({
+      url: "/s102/tileset.json",
+      style: {
+        unsafeDepth: -7,
+      },
+    });
+
+    expect(spec.style?.safetyDepthMeters).toBe(7);
+    expect(spec.style?.unsafeDepth).toBeUndefined();
   });
 
   it("expresses S-111 currents as adapted REST JSON with temporal styling", () => {
@@ -198,12 +220,12 @@ describe("@ecc/s100-viewer product specs", () => {
         contours: {
           visible: false,
         },
-        unsafeDepth: 12,
+        safetyDepthMeters: 12,
       },
     });
 
     expect(spec.id).toBe("s102-main");
-    expect(spec.style?.unsafeDepth).toBe(12);
+    expect(spec.style?.safetyDepthMeters).toBe(12);
     expect(spec.style?.contours).toEqual({
       ...LayerBuilder.S102Styles.DEFAULT.contours,
       visible: false,

@@ -9,6 +9,7 @@ import type {
   S111SurfaceCurrentData,
   S111SurfaceCurrentLayerSpec,
 } from "../products/iho-s100.js";
+import { getS102SafetyDepthMeters, normalizeDepthMeters } from "../products/depth.js";
 import type {
   MapOverlayLayerSpec,
   VesselDimensions,
@@ -26,7 +27,7 @@ type Mutable<T> = {
 };
 
 export type TerrainDisplayController = {
-  readonly unsafeDepth: number;
+  readonly safetyDepthMeters: number;
   readonly seaLevel: number;
   readonly seaContour: boolean;
   readonly showContour: boolean;
@@ -47,6 +48,8 @@ export type TerrainContourOptions = {
 };
 
 export type TerrainDisplayPatch = {
+  safetyDepthMeters?: number;
+  /** Legacy z-up elevation threshold. Use safetyDepthMeters for positive nautical depth. */
   unsafeDepth?: number;
   seaLevel?: number;
   contours?: TerrainContourOptions;
@@ -60,7 +63,7 @@ export type TerrainLayerController = {
   readonly kind: "s102-terrain";
   readonly terrain: TerrainDisplayController;
   readonly settings: TerrainSettingsController;
-  setUnsafeDepth(value: number): Promise<void>;
+  setSafetyDepthMeters(value: number): Promise<void>;
   setSeaLevel(value: number): Promise<void>;
   setContours(options: TerrainContourOptions): Promise<void>;
   updateDisplayStyle(patch: TerrainDisplayPatch): Promise<void>;
@@ -202,7 +205,7 @@ class CoreTerrainLayerController implements TerrainLayerController {
     const spec = layer.spec;
     const contours = spec.style?.contours;
     this.terrainState = {
-      unsafeDepth: finiteNumber(spec.style?.unsafeDepth, 0),
+      safetyDepthMeters: getS102SafetyDepthMeters(spec.style),
       seaLevel: finiteNumber(spec.style?.seaLevel, 0),
       seaContour: contours?.visible ?? false,
       showContour: contours?.visible ?? false,
@@ -217,9 +220,9 @@ class CoreTerrainLayerController implements TerrainLayerController {
 
     const controller = this;
     this.terrain = {
-      get unsafeDepth() {
+      get safetyDepthMeters() {
         controller.syncFromLayerSpec();
-        return controller.terrainState.unsafeDepth;
+        return controller.terrainState.safetyDepthMeters;
       },
       get seaLevel() {
         controller.syncFromLayerSpec();
@@ -260,9 +263,9 @@ class CoreTerrainLayerController implements TerrainLayerController {
   private syncFromLayerSpec(): void {
     const spec = this.layer.spec;
     const contours = spec.style?.contours;
-    this.terrainState.unsafeDepth = finiteNumber(
-      spec.style?.unsafeDepth,
-      this.terrainState.unsafeDepth,
+    this.terrainState.safetyDepthMeters = getS102SafetyDepthMeters(
+      spec.style,
+      this.terrainState.safetyDepthMeters,
     );
     this.terrainState.seaLevel = finiteNumber(spec.style?.seaLevel, this.terrainState.seaLevel);
     if (contours?.visible !== undefined) {
@@ -279,8 +282,8 @@ class CoreTerrainLayerController implements TerrainLayerController {
       getNumberFromExtensions(spec.extensions, "detailFactor", this.settingsState.detailFactor);
   }
 
-  setUnsafeDepth(value: number): Promise<void> {
-    return this.updateDisplayStyle({ unsafeDepth: value });
+  setSafetyDepthMeters(value: number): Promise<void> {
+    return this.updateDisplayStyle({ safetyDepthMeters: value });
   }
 
   setSeaLevel(value: number): Promise<void> {
@@ -293,8 +296,16 @@ class CoreTerrainLayerController implements TerrainLayerController {
 
   async updateDisplayStyle(patch: TerrainDisplayPatch): Promise<void> {
     this.syncFromLayerSpec();
-    if (patch.unsafeDepth !== undefined) {
-      this.terrainState.unsafeDepth = finiteNumber(patch.unsafeDepth, this.terrainState.unsafeDepth);
+    if (patch.safetyDepthMeters !== undefined) {
+      this.terrainState.safetyDepthMeters = normalizeDepthMeters(
+        patch.safetyDepthMeters,
+        this.terrainState.safetyDepthMeters,
+      );
+    } else if (patch.unsafeDepth !== undefined) {
+      this.terrainState.safetyDepthMeters = getS102SafetyDepthMeters(
+        { unsafeDepth: patch.unsafeDepth },
+        this.terrainState.safetyDepthMeters,
+      );
     }
     if (patch.seaLevel !== undefined) {
       this.terrainState.seaLevel = finiteNumber(patch.seaLevel, this.terrainState.seaLevel);
@@ -312,11 +323,12 @@ class CoreTerrainLayerController implements TerrainLayerController {
       );
     }
 
-    const style = this.layer.spec.style ?? {};
+    const style = { ...this.layer.spec.style };
+    delete style.unsafeDepth;
     await this.layer.update({
       style: {
         ...style,
-        unsafeDepth: this.terrainState.unsafeDepth,
+        safetyDepthMeters: this.terrainState.safetyDepthMeters,
         seaLevel: this.terrainState.seaLevel,
         contours: {
           ...style.contours,

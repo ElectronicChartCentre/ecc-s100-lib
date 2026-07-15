@@ -1,5 +1,7 @@
 import proj4 from "proj4";
 import {
+  depthFromElevation,
+  getS102SafetyDepthMeters,
   S100Error,
   S100ProductType,
   S100SupportedProductVersions,
@@ -850,6 +852,10 @@ class CesiumEngineScene implements EngineScene {
     const geodetic = this.pickWorldToGeodetic(worldCoordinate);
     if (geodetic !== undefined) {
       result.geodetic = geodetic;
+    }
+    const depthMeters = getPickDepthMeters(worldCoordinate, geodetic, this.currentSeaLevel);
+    if (depthMeters !== undefined) {
+      result.depthMeters = depthMeters;
     }
     if (request.includeNative) {
       result.native = { picked, world, canvas };
@@ -4450,6 +4456,31 @@ function finiteOptionalNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function getPickDepthMeters(
+  coordinate: Coordinate,
+  geodetic: Coordinate | undefined,
+  seaLevelMeters: number,
+): number | undefined {
+  if (
+    geodetic?.kind === "geodetic" &&
+    typeof geodetic.height === "number" &&
+    Number.isFinite(geodetic.height)
+  ) {
+    return depthFromElevation(geodetic.height, seaLevelMeters);
+  }
+  if (
+    coordinate.kind === "projected" &&
+    typeof coordinate.z === "number" &&
+    Number.isFinite(coordinate.z)
+  ) {
+    return depthFromElevation(coordinate.z, seaLevelMeters);
+  }
+  if (coordinate.kind === "engine-local") {
+    return depthFromElevation(coordinate.z, seaLevelMeters);
+  }
+  return undefined;
+}
+
 function clamp01(value: unknown): number {
   return Math.max(0, Math.min(1, finiteNumber(value, 1)));
 }
@@ -5698,9 +5729,9 @@ function createS102CustomShader(
         type: UniformType.FLOAT,
         value: finiteNumber(seaLevelMeters, 0),
       },
-      u_s102UnsafeDepth: {
+      u_s102SafetyDepthMeters: {
         type: UniformType.FLOAT,
-        value: finiteNumber(style?.unsafeDepth, 0),
+        value: getS102SafetyDepthMeters(style),
       },
       u_s102ContourInterval: {
         type: UniformType.FLOAT,
@@ -5848,7 +5879,8 @@ void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material)
         bathyColor = mix(bathyColor, vec3(0.0, 0.0, 0.0), contour);
     }
 
-    if (height - u_s102SeaLevel > u_s102UnsafeDepth && height < 0.0) {
+    float depthBelowWater = u_s102SeaLevel - height;
+    if (depthBelowWater >= 0.0 && depthBelowWater <= u_s102SafetyDepthMeters) {
         bathyColor = mix(bathyColor, vec3(1.0, 0.0, 0.0), 0.6);
     }
 

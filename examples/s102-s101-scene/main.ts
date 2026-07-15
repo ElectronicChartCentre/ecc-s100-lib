@@ -29,7 +29,7 @@ await scene.layers.add(
     url: "https://example.test/s102/tileset.json",
     crs,
     style: {
-      unsafeDepth: 10,
+      safetyDepthMeters: 10,
       shading: "hypsometric",
     },
   }),

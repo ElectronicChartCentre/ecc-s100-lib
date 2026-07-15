@@ -1,4 +1,6 @@
 import {
+  depthFromElevation,
+  getS102SafetyDepthMeters,
   S100Error,
   S100SupportedProductVersions,
   type AdapterCapabilities,
@@ -433,7 +435,7 @@ class NasaAmmosEngineScene implements EngineScene {
           frameId: "nasa-ammos",
         },
         source: "geometry",
-        depthMeters: hit.point.z - this.scene.seaLevel,
+        depthMeters: depthFromElevation(hit.point.z, this.scene.seaLevel),
         native: request.includeNative ? hit : undefined,
       };
     }
@@ -953,12 +955,11 @@ function applyTerrainStyle(view: TerrainView, spec: S102BathymetryLayerSpec): vo
     return;
   }
 
-  if (typeof style.unsafeDepth === "number") {
-    view.terrain.unsafeDepth = style.unsafeDepth;
-  }
   if (typeof style.seaLevel === "number") {
     view.terrain.seaLevel = style.seaLevel;
   }
+  view.terrain.safetyDepthMeters = getS102SafetyDepthMeters(style);
+  view.terrain.heightSign = getS102HeightSign(spec);
   if (style.contours) {
     view.terrain.showContour = style.contours.visible;
     view.terrain.seaContour = style.contours.visible;
@@ -1453,6 +1454,31 @@ function getS102DetailFactor(spec: S102BathymetryLayerSpec): number {
   return spec.rendering?.detailFactor ?? getNumberExtension(spec, "detailFactor", 1);
 }
 
+function getS102HeightSign(spec: S102BathymetryLayerSpec): 1 | -1 {
+  const heightCoordinate = getNasaAmmosExtension<{ sign?: unknown }>(spec, "heightCoordinate");
+  return parseHeightSign(
+    heightCoordinate?.sign ??
+      getNasaAmmosExtension<unknown>(spec, "heightSign") ??
+      spec.source.metadata?.values?.heightSign,
+  );
+}
+
+function parseHeightSign(value: unknown): 1 | -1 {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value < 0 ? -1 : 1;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "-1" || normalized === "-" || normalized === "negative" || normalized === "inverted") {
+      return -1;
+    }
+    if (normalized.startsWith("-")) {
+      return -1;
+    }
+  }
+  return 1;
+}
+
 function getNumberExtension(spec: BaseLayerSpec, key: string, fallback: number): number {
   const value = getNasaAmmosExtension<unknown>(spec, key);
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -1522,7 +1548,7 @@ function legacyPickToPickResult(pick: PickedInfo): PickResult | null {
     native: pick.entity ?? pick.view,
   };
   if (pick.hasDepth) {
-    result.depthMeters = pick.xyz[2] - (pick.seaLevel ?? 0);
+    result.depthMeters = depthFromElevation(pick.xyz[2], pick.seaLevel ?? 0);
   }
   return result;
 }

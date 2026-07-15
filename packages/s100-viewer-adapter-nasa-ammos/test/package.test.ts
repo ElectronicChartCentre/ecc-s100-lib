@@ -93,6 +93,11 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
         kind: "3d-tiles",
         url: "https://example.test/s102/tileset.json",
         crs: "EPSG:32633",
+        metadata: {
+          values: {
+            heightSign: -1,
+          },
+        },
       },
       extensions: {
         nasaAmmos: {
@@ -100,7 +105,7 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
         },
       },
       style: {
-        unsafeDepth: -7,
+        safetyDepthMeters: 7,
         contours: { visible: true, intervalMeters: 5 },
       },
     });
@@ -122,10 +127,11 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos package boundary", () => {
 
     const terrainNative = terrain.getNativeHandle<{
       kind: string;
-      view: { dataset: { additionalURLParameters: string } };
+      view: { dataset: { additionalURLParameters: string }; terrain: { heightSign: number } };
     }>();
     expect(terrainNative?.kind).toBe("terrain");
     expect(terrainNative?.view.dataset.additionalURLParameters).toBe("crs=EPSG:32633");
+    expect(terrainNative?.view.terrain.heightSign).toBe(-1);
     expect(waterLevel.getNativeHandle<{ kind: string }>()?.kind).toBe("simulated-water-level");
     expect(scene.getSeaLevel()).toBe(2.25);
 

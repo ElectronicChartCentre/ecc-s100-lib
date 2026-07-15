@@ -109,7 +109,7 @@ export const sceneRecipes = {
             detailFactor: 500,
           },
           style: {
-            unsafeDepth: 8,
+            safetyDepthMeters: 8,
             shading: "hypsometric",
           },
           metadata: {

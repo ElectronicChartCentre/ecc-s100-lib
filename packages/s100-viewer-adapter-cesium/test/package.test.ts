@@ -1609,8 +1609,13 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
         id: "s102-styled",
         url: "https://example.test/s102",
         crs: "EPSG:32619",
+        sourceMetadata: {
+          values: {
+            heightSign: -1,
+          },
+        },
         style: {
-          unsafeDepth: -7,
+          safetyDepthMeters: 7,
           contours: {
             visible: false,
             intervalMeters: 5,
@@ -1628,10 +1633,10 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
         destroyed?: boolean;
       };
     };
-    expect(primitive.customShader?.options?.uniforms?.u_s102UnsafeDepth?.value).toBe(-7);
+    expect(primitive.customShader?.options?.uniforms?.u_s102SafetyDepthMeters?.value).toBe(7);
     expect(primitive.customShader?.options?.uniforms?.u_s102SeaLevel?.value).toBe(0);
     expect(primitive.customShader?.options?.uniforms?.u_s102HeightAxis?.value).toBe(1);
-    expect(primitive.customShader?.options?.uniforms?.u_s102HeightSign?.value).toBe(1);
+    expect(primitive.customShader?.options?.uniforms?.u_s102HeightSign?.value).toBe(-1);
     expect(primitive.customShader?.options?.uniforms?.u_s102UseProjectedLocalWorldHeight?.value).toBe(true);
     expect(primitive.customShader?.options?.uniforms?.u_s102FallbackLightingEnabled?.value).toBe(true);
     expect(primitive.customShader?.options?.uniforms?.u_s102FallbackAmbientIntensity?.value).toBeGreaterThan(0);
@@ -1666,7 +1671,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
 
     await layer.update({
       style: {
-        unsafeDepth: -12,
+        safetyDepthMeters: 12,
         contours: {
           visible: true,
           intervalMeters: 2.5,
@@ -1676,7 +1681,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
 
     expect(firstShader?.destroyed).toBe(true);
     expect(primitive.customShader?.options?.uniforms?.u_s102SeaLevel?.value).toBe(2.4);
-    expect(primitive.customShader?.options?.uniforms?.u_s102UnsafeDepth?.value).toBe(-12);
+    expect(primitive.customShader?.options?.uniforms?.u_s102SafetyDepthMeters?.value).toBe(12);
     expect(primitive.customShader?.options?.uniforms?.u_s102ShowContours?.value).toBe(true);
     expect(primitive.customShader?.options?.uniforms?.u_s102ContourInterval?.value).toBe(2.5);
     expect(primitive.customShader?.options?.fragmentShaderText).toContain(
@@ -1695,7 +1700,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     expect(primitive.customShader?.options?.fragmentShaderText).toContain("s100ApplyTerrainFallbackLighting");
     expect(primitive.customShader?.options?.fragmentShaderText).not.toContain("positionWC");
     expect(primitive.customShader?.options?.fragmentShaderText).toContain(
-      "height - u_s102SeaLevel > u_s102UnsafeDepth",
+      "depthBelowWater >= 0.0 && depthBelowWater <= u_s102SafetyDepthMeters",
     );
     expect(primitive.customShader?.options?.fragmentShaderText).not.toContain("unsafeFeather");
     await viewer.destroy();
