@@ -36,6 +36,77 @@ export type EngineLocalCoordinate = {
   frameId: string;
 };
 
+export type GeodeticCoordinateInput = Omit<GeodeticCoordinate, "kind">;
+export type ProjectedCoordinateInput = Omit<ProjectedCoordinate, "kind">;
+export type EcefCoordinateInput = Omit<EcefCoordinate, "kind">;
+export type EngineLocalCoordinateInput = Omit<EngineLocalCoordinate, "kind">;
+
+export const Coordinates = {
+  geodetic(input: GeodeticCoordinateInput): GeodeticCoordinate {
+    return {
+      kind: "geodetic",
+      ...input,
+    };
+  },
+
+  projected(input: ProjectedCoordinateInput): ProjectedCoordinate {
+    return {
+      kind: "projected",
+      ...input,
+    };
+  },
+
+  ecef(input: EcefCoordinateInput): EcefCoordinate {
+    return {
+      kind: "ecef",
+      ...input,
+    };
+  },
+
+  engineLocal(input: EngineLocalCoordinateInput): EngineLocalCoordinate {
+    return {
+      kind: "engine-local",
+      ...input,
+    };
+  },
+
+  isGeodetic(coordinate: Coordinate): coordinate is GeodeticCoordinate {
+    return coordinate.kind === "geodetic";
+  },
+
+  isProjected(coordinate: Coordinate): coordinate is ProjectedCoordinate {
+    return coordinate.kind === "projected";
+  },
+
+  isEcef(coordinate: Coordinate): coordinate is EcefCoordinate {
+    return coordinate.kind === "ecef";
+  },
+
+  isEngineLocal(coordinate: Coordinate): coordinate is EngineLocalCoordinate {
+    return coordinate.kind === "engine-local";
+  },
+
+  getVerticalMeters(coordinate: Coordinate): number {
+    if (coordinate.kind === "geodetic") {
+      return coordinate.height ?? 0;
+    }
+    return coordinate.z ?? 0;
+  },
+
+  withVerticalMeters(coordinate: Coordinate, value: number): Coordinate {
+    if (coordinate.kind === "geodetic") {
+      return {
+        ...coordinate,
+        height: value,
+      };
+    }
+    return {
+      ...coordinate,
+      z: value,
+    };
+  },
+};
+
 export type SceneGeoreferenceMode = "projected-local" | "ellipsoid-ecef";
 
 export type SceneGeoreference = ProjectedLocalGeoreference | EllipsoidEcefGeoreference;

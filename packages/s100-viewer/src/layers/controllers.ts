@@ -14,6 +14,7 @@ import type {
   MapOverlayLayerSpec,
   VesselDimensions,
   VesselLayerSpec,
+  VesselPose,
   VesselTransformControlMode,
 } from "../products/viewer-features.js";
 
@@ -113,7 +114,7 @@ export type VesselTransformController = {
 };
 
 export type VesselPosePatch = {
-  position?: Vec3Tuple;
+  position?: Coordinate;
   headingDegrees?: number;
 };
 
@@ -122,9 +123,10 @@ export type VesselLayerController = {
   readonly dimensions: VesselDimensions;
   readonly seaLevelIndicator: VesselSeaLevelIndicatorController;
   readonly transformControls: VesselTransformController;
-  getPosition(): Vec3Tuple;
+  getPosition(): Coordinate;
+  getPose(): VesselPose;
   setPose(pose: VesselPosePatch): Promise<void>;
-  setPosition(position: Vec3Tuple): Promise<void>;
+  setPosition(position: Coordinate): Promise<void>;
   getHeading(): number;
   setHeading(heading: number): Promise<void>;
   setDimensions(dimensions: VesselDimensions): Promise<void>;
@@ -133,7 +135,7 @@ export type VesselLayerController = {
   setOceanSurfaceVisible(visible: boolean): Promise<void>;
   getTransformMode(): VesselTransformControlMode;
   setTransformMode(mode: VesselTransformControlMode): Promise<void>;
-  onPositionChanged(listener: (position: Vec3Tuple) => void): S100Unsubscribe;
+  onPositionChanged(listener: (position: Coordinate) => void): S100Unsubscribe;
   onHeadingChanged(listener: (heading: number) => void): S100Unsubscribe;
   destroy(): void;
 };
@@ -571,7 +573,7 @@ class CoreVesselLayerController implements VesselLayerController {
   private seaLevelIndicatorModeState: VesselSeaLevelIndicatorMode;
   private oceanSurfaceVisibleState: boolean;
   private transformModeState: VesselTransformControlMode;
-  private readonly positionListeners = new Set<(position: Vec3Tuple) => void>();
+  private readonly positionListeners = new Set<(position: Coordinate) => void>();
   private readonly headingListeners = new Set<(heading: number) => void>();
   private readonly subscriptions: S100Unsubscribe[] = [];
   private nativePositionSubscription: NativeSubscription | null = null;
@@ -628,9 +630,19 @@ class CoreVesselLayerController implements VesselLayerController {
     );
   }
 
-  getPosition(): Vec3Tuple {
+  getPosition(): Coordinate {
     this.syncFromLayerSpec(false);
-    return [...this.positionState];
+    return coordinateFromVec3Tuple(this.positionState, this.layer.spec.pose.position);
+  }
+
+  getPose(): VesselPose {
+    this.syncFromLayerSpec(false);
+    const pose = this.layer.spec.pose;
+    return {
+      ...pose,
+      position: coordinateFromVec3Tuple(this.positionState, pose.position),
+      headingDegrees: this.headingState,
+    };
   }
 
   setPose(pose: VesselPosePatch): Promise<void> {
@@ -647,7 +659,7 @@ class CoreVesselLayerController implements VesselLayerController {
     return promise;
   }
 
-  async setPosition(position: Vec3Tuple): Promise<void> {
+  async setPosition(position: Coordinate): Promise<void> {
     await this.setPose({ position });
   }
 
@@ -728,7 +740,7 @@ class CoreVesselLayerController implements VesselLayerController {
     });
   }
 
-  onPositionChanged(listener: (position: Vec3Tuple) => void): S100Unsubscribe {
+  onPositionChanged(listener: (position: Coordinate) => void): S100Unsubscribe {
     this.positionListeners.add(listener);
     this.attachNativeBridge();
     return () => {
@@ -772,7 +784,7 @@ class CoreVesselLayerController implements VesselLayerController {
           return;
         }
         this.positionState = nextPosition;
-        this.emitPosition(nextPosition);
+        this.emitPosition(coordinateFromVec3Tuple(nextPosition, this.layer.spec.pose.position));
       });
     }
     if (!this.nativeHeadingSubscription && nativeView.headingChanged?.subscribe) {
@@ -818,17 +830,16 @@ class CoreVesselLayerController implements VesselLayerController {
     this.transformModeState = normalizeVesselTransformMode(spec.style?.transformControls);
 
     if (emitChanges && positionChanged) {
-      this.emitPosition(nextPosition);
+      this.emitPosition(coordinateFromVec3Tuple(nextPosition, spec.pose.position));
     }
     if (emitChanges && headingChanged) {
       this.emitHeading(nextHeading);
     }
   }
 
-  private emitPosition(position: Vec3Tuple): void {
-    const value: Vec3Tuple = [...position];
+  private emitPosition(position: Coordinate): void {
     for (const listener of [...this.positionListeners]) {
-      listener(value);
+      listener(cloneCoordinate(position));
     }
   }
 
@@ -841,9 +852,10 @@ class CoreVesselLayerController implements VesselLayerController {
   private normalizePendingPosePatch(pose: VesselPosePatch): VesselPosePatch | null {
     const patch: VesselPosePatch = {};
     if (pose.position) {
-      patch.position = normalizeVec3Tuple(
+      patch.position = normalizeCoordinatePosition(
         pose.position,
-        this.pendingPosePatch?.position ?? this.positionState,
+        this.pendingPosePatch?.position ??
+          coordinateFromVec3Tuple(this.positionState, this.layer.spec.pose.position),
       );
     }
     if (pose.headingDegrees !== undefined) {
@@ -890,15 +902,16 @@ class CoreVesselLayerController implements VesselLayerController {
   }
 
   private async applyPosePatch(pose: VesselPosePatch): Promise<void> {
-    const nextPosition = pose.position
-      ? normalizeVec3Tuple(pose.position, this.positionState)
-      : this.positionState;
+    const currentPose = this.layer.spec.pose;
+    const nextPositionCoordinate = pose.position
+      ? normalizeCoordinatePosition(pose.position, currentPose.position)
+      : coordinateFromVec3Tuple(this.positionState, currentPose.position);
+    const nextPosition = coordinateToVec3Tuple(nextPositionCoordinate);
     const nextHeading = pose.headingDegrees !== undefined
       ? normalizeDegrees(pose.headingDegrees)
       : this.headingState;
     const positionChanged = !vec3TupleEquals(nextPosition, this.positionState);
     const headingChanged = !Object.is(nextHeading, this.headingState);
-    const currentPose = this.layer.spec.pose;
 
     this.positionState = [...nextPosition];
     this.headingState = nextHeading;
@@ -906,13 +919,13 @@ class CoreVesselLayerController implements VesselLayerController {
     await this.layer.update({
       pose: {
         ...currentPose,
-        position: coordinateFromVec3Tuple(nextPosition, currentPose.position),
+        position: nextPositionCoordinate,
         headingDegrees: nextHeading,
       },
     });
 
     if (positionChanged) {
-      this.emitPosition(nextPosition);
+      this.emitPosition(nextPositionCoordinate);
     }
     if (headingChanged) {
       this.emitHeading(nextHeading);
@@ -1016,6 +1029,19 @@ const coordinateToVec3Tuple = (coordinate: Coordinate): Vec3Tuple => {
     return [coordinate.lon, coordinate.lat, coordinate.height ?? 0];
   }
   return [coordinate.x, coordinate.y, coordinate.z ?? 0];
+};
+
+const cloneCoordinate = (coordinate: Coordinate): Coordinate => ({ ...coordinate });
+
+const normalizeCoordinatePosition = (
+  coordinate: Coordinate,
+  fallback: Coordinate,
+): Coordinate => {
+  const position = normalizeVec3Tuple(
+    coordinateToVec3Tuple(coordinate),
+    coordinateToVec3Tuple(fallback),
+  );
+  return coordinateFromVec3Tuple(position, coordinate);
 };
 
 const coordinateFromVec3Tuple = (position: Vec3Tuple, previous: Coordinate): Coordinate => {

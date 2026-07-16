@@ -6,6 +6,7 @@ import {
   createBoundingBox,
   createPrismGeometry,
   createQuatIdentity,
+  Coordinates,
   CameraControlPresets,
   LayerBuilder,
   ProjectedMapDiscardMode,
@@ -212,6 +213,13 @@ describe("createS100Viewer", () => {
   });
 
   it("exposes typed controllers from canonical product layers", async () => {
+    const projectedPosition = (x: number, y: number, z: number) =>
+      Coordinates.projected({
+        crs: "EPSG:32633",
+        x,
+        y,
+        z,
+      });
     const viewer = await createS100Viewer({
       adapter: createInMemoryAdapter(),
     });
@@ -420,7 +428,7 @@ describe("createS100Viewer", () => {
       vesselHeadings.push(heading);
     });
 
-    await vessel.controllers.vessel.setPosition([500010, 7000020, -3]);
+    await vessel.controllers.vessel.setPosition(projectedPosition(500010, 7000020, -3));
     await vessel.controllers.vessel.setHeading(725);
     await vessel.controllers.vessel.setDimensions({
       draught: 9,
@@ -434,9 +442,15 @@ describe("createS100Viewer", () => {
     await vessel.controllers.vessel.setOceanSurfaceVisible(true);
     await vessel.controllers.vessel.setTransformMode("rotate");
 
-    expect(vessel.controllers.vessel.getPosition()).toEqual([500010, 7000020, -3]);
+    expect(vessel.controllers.vessel.getPosition()).toEqual(
+      projectedPosition(500010, 7000020, -3),
+    );
+    expect(vessel.controllers.vessel.getPose()).toMatchObject({
+      position: projectedPosition(500010, 7000020, -3),
+      headingDegrees: 5,
+    });
     expect(vessel.controllers.vessel.getHeading()).toBe(5);
-    expect(vesselPositions).toEqual([[500010, 7000020, -3]]);
+    expect(vesselPositions).toEqual([projectedPosition(500010, 7000020, -3)]);
     expect(vesselHeadings).toEqual([5]);
     expect(vessel.visible).toBe(false);
     expect(vessel.spec.pose.position).toMatchObject({
@@ -473,16 +487,22 @@ describe("createS100Viewer", () => {
     });
 
     await vessel.controllers.vessel.setPose({
-      position: [500020, 7000030, -4],
+      position: projectedPosition(500020, 7000030, -4),
       headingDegrees: 185,
     });
-    expect(vessel.controllers.vessel.getPosition()).toEqual([500020, 7000030, -4]);
+    expect(vessel.controllers.vessel.getPosition()).toEqual(
+      projectedPosition(500020, 7000030, -4),
+    );
     expect(vessel.controllers.vessel.getHeading()).toBe(185);
 
     const pendingHeading = vessel.controllers.vessel.setHeading(270);
-    const pendingPosition = vessel.controllers.vessel.setPosition([500030, 7000040, -5]);
+    const pendingPosition = vessel.controllers.vessel.setPosition(
+      projectedPosition(500030, 7000040, -5),
+    );
     await Promise.all([pendingHeading, pendingPosition]);
-    expect(vessel.controllers.vessel.getPosition()).toEqual([500030, 7000040, -5]);
+    expect(vessel.controllers.vessel.getPosition()).toEqual(
+      projectedPosition(500030, 7000040, -5),
+    );
     expect(vessel.controllers.vessel.getHeading()).toBe(270);
 
     let rapidPoseUpdates = 0;
@@ -490,17 +510,19 @@ describe("createS100Viewer", () => {
       rapidPoseUpdates += 1;
     });
     const rapidUpdates = [
-      vessel.controllers.vessel.setPosition([500040, 7000050, -6]),
-      vessel.controllers.vessel.setPosition([500050, 7000060, -7]),
+      vessel.controllers.vessel.setPosition(projectedPosition(500040, 7000050, -6)),
+      vessel.controllers.vessel.setPosition(projectedPosition(500050, 7000060, -7)),
       vessel.controllers.vessel.setPose({
-        position: [500060, 7000070, -8],
+        position: projectedPosition(500060, 7000070, -8),
         headingDegrees: 315,
       }),
     ];
     await Promise.all(rapidUpdates);
     unsubscribeRapidPoseUpdates();
     expect(rapidPoseUpdates).toBe(1);
-    expect(vessel.controllers.vessel.getPosition()).toEqual([500060, 7000070, -8]);
+    expect(vessel.controllers.vessel.getPosition()).toEqual(
+      projectedPosition(500060, 7000070, -8),
+    );
     expect(vessel.controllers.vessel.getHeading()).toBe(315);
 
     await viewer.destroy();

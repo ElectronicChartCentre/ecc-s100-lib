@@ -43,16 +43,20 @@ export type {
 export type {
   Coordinate,
   EcefCoordinate,
+  EcefCoordinateInput,
   EllipsoidEcefGeoreference,
   EngineLocalCoordinate,
+  EngineLocalCoordinateInput,
   GeodeticCoordinate,
+  GeodeticCoordinateInput,
   ProjectedCoordinate,
+  ProjectedCoordinateInput,
   ProjectedLocalGeoreference,
   SceneGeoreference,
   SceneGeoreferenceMode,
   SpatialExtent,
 } from "./coordinates/types.js";
-export { defaultProjectedLocalGeoreference, SceneBuilder } from "./coordinates/types.js";
+export { Coordinates, defaultProjectedLocalGeoreference, SceneBuilder } from "./coordinates/types.js";
 export type {
   ProjectedLocalOriginInput,
   ProjectedLocalSceneBuilderOptions,
