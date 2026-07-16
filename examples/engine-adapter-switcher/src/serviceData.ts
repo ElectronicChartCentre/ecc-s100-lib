@@ -3,12 +3,6 @@ import type { DemoServiceConfig } from "./demoConfig";
 
 const S102_TILE_PROXY_PREFIX = "/demo-proxy/s102-tiles";
 
-export type FetchedS111Dataset = {
-  datasetId: string;
-  data: unknown;
-  metadata: unknown;
-};
-
 export type BuildS101WmsUrlTemplateOptions = {
   imageSizePixels?: number | undefined;
   styleId?: string | undefined;
@@ -51,19 +45,6 @@ export const buildS101WmsUrlTemplate = (
     ],
   });
 
-export const fetchS111Dataset = async (
-  config: DemoServiceConfig,
-  datasetId: string,
-): Promise<FetchedS111Dataset> => {
-  const metadata = await fetchJson(buildS111Url(config, datasetId, "metadata.json"));
-  const rawData = await fetchJson(buildS111Url(config, datasetId, "data.json", { crs: config.crs }));
-  return {
-    datasetId,
-    metadata,
-    data: unwrapS111Instance(rawData),
-  };
-};
-
 export const appendWmsTemplateParameters = (
   baseUrl: string,
   parameters: readonly (readonly [string, string | number | boolean])[],
@@ -72,38 +53,6 @@ export const appendWmsTemplateParameters = (
     baseUrl,
     parameters,
   });
-
-const buildS111Url = (
-  config: DemoServiceConfig,
-  datasetId: string,
-  path: "metadata.json" | "data.json",
-  query: Record<string, string> = {},
-): string => {
-  const url = new URL(
-    `${encodeURIComponent(datasetId)}/${path}`,
-    ensureTrailingSlash(requireValue(config.s111Endpoint, "s111Endpoint")),
-  );
-  url.searchParams.set("licenseeKey", requireValue(config.licenseeKey, "licenseeKey"));
-  Object.entries(query).forEach(([key, value]) => {
-    url.searchParams.set(key, value);
-  });
-  return url.toString();
-};
-
-const fetchJson = async (url: string): Promise<unknown> => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status}) for ${url}`);
-  }
-  return response.json() as Promise<unknown>;
-};
-
-const unwrapS111Instance = (value: unknown): unknown => {
-  if (isRecord(value) && Array.isArray(value.instances) && value.instances[0] !== undefined) {
-    return value.instances[0];
-  }
-  return value;
-};
 
 const ensureTrailingSlash = (value: string): string =>
   value.endsWith("/") ? value : `${value}/`;
@@ -135,6 +84,3 @@ const normalizeOptionalParameter = (value: string | undefined): string | undefin
 
 const normalizeImageSize = (value: number | undefined): number =>
   Number.isFinite(value) && value !== undefined && value > 0 ? Math.round(value) : 256;
-
-const isRecord = (value: unknown): value is { instances?: unknown[] } =>
-  typeof value === "object" && value !== null;

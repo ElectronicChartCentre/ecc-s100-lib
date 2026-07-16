@@ -1,10 +1,12 @@
 import {
   createBoundingBox,
   createQuatIdentity,
+  createPrimarS111Service,
   LayerBuilder,
+  S111Workflow,
   type AdapterCapabilities,
-  type PreparedStaticS111Layer,
   type S100Scene,
+  type S111ProjectedBounds,
   type VesselDimensions,
 } from "@ecc/s100-viewer";
 import {
@@ -16,7 +18,6 @@ import {
   appendWmsTemplateParameters,
   buildS101WmsUrlTemplate,
   buildS102TilesUrl,
-  fetchS111Dataset,
 } from "./serviceData";
 import { demoVesselModelUrl } from "./staticAssets";
 
@@ -135,59 +136,54 @@ export const sceneRecipes = {
         "s111Endpoint",
         "s111DatasetIds",
       ]);
+      const s111Endpoint = requireConfiguredValue(config.s111Endpoint, "s111Endpoint");
+      const licenseeKey = requireConfiguredValue(config.licenseeKey, "licenseeKey");
       await addTransparentS101Overlay(scene, context);
-      const preparedDatasets: PreparedStaticS111Layer[] = [];
-
-      for (const datasetId of config.s111DatasetIds) {
-        const fetched = await fetchS111Dataset(config, datasetId);
-        const prepared = LayerBuilder.prepareStaticS111({
+      const workflowResult = await S111Workflow.prepare({
+        datasets: config.s111DatasetIds.map((datasetId) => ({
           id: datasetId,
           title: `S-111 ${datasetId}`,
-          crs: config.crs,
-          data: fetched.data,
-          sourceMetadata: {
-            id: datasetId,
-            title: `S-111 ${datasetId}`,
-            values: {
-              metadata: fetched.metadata,
-            },
+          bounds: {
+            projected: demoProjectedBounds(config),
           },
-          time: {
-            interpolation: "nearest",
-          },
-          style: {
-            renderer: "arrows",
-            scale: "auto",
-          },
-        });
-        preparedDatasets.push(prepared);
-        const currents = await scene.layers.add(prepared.layer);
-        await currents.controllers.surfaceCurrent.setAutoScaling(true);
+        })),
+        crs: config.crs,
+        service: createPrimarS111Service({
+          endpoint: s111Endpoint,
+          licenseeKey,
+        }),
+        limits: {
+          dataFetchConcurrency: 2,
+        },
+        time: {
+          interpolation: "nearest",
+        },
+        style: {
+          renderer: "arrows",
+          scale: "auto",
+        },
+      });
+
+      await S111Workflow.addPreparedLayers(scene, workflowResult.prepared);
+      S111Workflow.configureSceneTime(scene, workflowResult.timeline, {
+        play: true,
+        loop: true,
+        rate: s111PlaybackTimestepsPerSecond,
+      });
+
+      const failedDatasets = workflowResult.statuses.filter((status) => status.status === "error");
+      for (const status of failedDatasets) {
+        context.log("warn", `S-111 dataset ${status.datasetId} was not loaded: ${status.message}`);
       }
 
-      const playbackSummary = LayerBuilder.summarizePreparedS111Datasets(preparedDatasets);
-      if (playbackSummary.timeline !== null) {
-        const current = new Date(playbackSummary.timeline.initialTime);
-        scene.time.setAvailability({
-          start: new Date(playbackSummary.timeline.startTime),
-          end: new Date(playbackSummary.timeline.endTime),
-        });
-        scene.time.setCurrent(current);
-        for (const layer of scene.layers.all()) {
-          layer.controllers.surfaceCurrent?.setCurrentTime(current);
-        }
-        scene.time.play({
-          loop: true,
-          rate: s111PlaybackTimestepsPerSecond,
-          stepMs: playbackSummary.timeline.stepSeconds * 1000,
-        });
+      if (workflowResult.timeline !== null) {
         context.log(
           "info",
           `Started loop playback at ${s111PlaybackTimestepsPerSecond} S-111 timesteps/s.`,
         );
       }
 
-      context.log("info", `Fetched and added ${config.s111DatasetIds.length} S-111 dataset(s).`);
+      context.log("info", `Fetched and added ${workflowResult.acceptedCount} S-111 dataset(s).`);
     },
   },
   vessel: {
@@ -301,6 +297,23 @@ const createS101BasemapLayer = () => {
       description: "Service-backed S-101 WMS basemap for the current projected-local scene.",
     },
   });
+};
+
+const demoProjectedBounds = (config: ReturnType<typeof requireDemoServiceConfig>): S111ProjectedBounds => {
+  const halfWidth = config.mapWidthMeters / 2;
+  return {
+    west: config.origin.x - halfWidth,
+    east: config.origin.x + halfWidth,
+    south: config.origin.y - halfWidth,
+    north: config.origin.y + halfWidth,
+  };
+};
+
+const requireConfiguredValue = (value: string | undefined, label: string): string => {
+  if (!value) {
+    throw new Error(`Missing ${label}.`);
+  }
+  return value;
 };
 
 const addTransparentS101Overlay = async (
