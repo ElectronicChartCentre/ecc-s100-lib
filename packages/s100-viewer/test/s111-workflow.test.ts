@@ -179,6 +179,29 @@ describe("S111Workflow", () => {
 });
 
 describe("createPrimarS111Service", () => {
+  it("supports Vite dev proxy endpoints for PRIMAR requests", async () => {
+    const requestedUrls: string[] = [];
+    const fetchHandler = vi.fn(async (url: string | URL | Request) => {
+      requestedUrls.push(String(url));
+      return responseJson(s111Metadata());
+    });
+    const service = createPrimarS111Service({
+      endpoint: "s111/",
+      licenseeKey: "secret-license",
+      fetchHandler: fetchHandler as typeof fetch,
+    });
+
+    await service.fetchMetadata("dataset with spaces", { crs: "EPSG:32633" });
+    await service.fetchData("dataset with spaces", { crs: "EPSG:32633" });
+
+    expect(requestedUrls[0]).toBe(
+      "/s111/dataset%20with%20spaces/metadata.json?licenseeKey=secret-license",
+    );
+    expect(requestedUrls[1]).toBe(
+      "/s111/dataset%20with%20spaces/data.json?licenseeKey=secret-license&crs=EPSG%3A32633",
+    );
+  });
+
   it("builds PRIMAR URLs, unwraps data instances, and rejects no-instance metadata", async () => {
     const fetchHandler = vi.fn(async (url: string | URL) => {
       const urlText = String(url);

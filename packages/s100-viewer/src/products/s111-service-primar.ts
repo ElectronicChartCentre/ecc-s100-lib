@@ -105,24 +105,28 @@ type PrimarRequest = {
 };
 
 const buildPrimarS111Url = (options: PrimarUrlOptions): PrimarRequest => {
-  const endpoint = normalizeEndpoint(options.endpoint);
   const encodedDatasetId = encodeURIComponent(options.datasetId);
   const relativePath = `${encodedDatasetId}/${options.path}`;
-  const url = new URL(`${endpoint}/${relativePath}`);
-  url.searchParams.set("licenseeKey", options.licenseeKey);
-  if (options.crs !== undefined) {
-    url.searchParams.set("crs", options.crs);
-  }
-  for (const [key, value] of Object.entries(options.extraQuery ?? {})) {
-    url.searchParams.set(key, String(value));
-  }
+  const url = buildUrl({
+    endpoint: options.endpoint,
+    relativePath,
+    params: buildQueryParams(options),
+  });
+  const sanitizedUrl = buildUrl({
+    endpoint: options.endpoint,
+    relativePath,
+    params: buildQueryParams({
+      ...options,
+      licenseeKey: "<redacted>",
+    }),
+  });
 
   return {
-    url: url.toString(),
+    url,
     details: {
       datasetId: options.datasetId,
       requestKind: options.requestKind,
-      url: sanitizeCredentialUrl(url),
+      url: sanitizedUrl,
       path: relativePath,
     },
   };
@@ -162,19 +166,48 @@ const hasNoMetadataInstances = (metadata: unknown): boolean => {
   return typeof numberOfInstances === "number" && numberOfInstances <= 0;
 };
 
+type UrlBuildOptions = {
+  endpoint: string;
+  relativePath: string;
+  params: URLSearchParams;
+};
+
+const buildUrl = (options: UrlBuildOptions): string => {
+  const endpoint = normalizeEndpoint(options.endpoint);
+  const path = `${endpoint}/${options.relativePath}`;
+  if (isAbsoluteUrl(path)) {
+    const url = new URL(path);
+    url.search = options.params.toString();
+    return url.toString();
+  }
+
+  const query = options.params.toString();
+  return `${normalizeRelativePath(path)}${query.length > 0 ? `?${query}` : ""}`;
+};
+
+const buildQueryParams = (options: PrimarUrlOptions): URLSearchParams => {
+  const params = new URLSearchParams();
+  params.set("licenseeKey", options.licenseeKey);
+  if (options.crs !== undefined) {
+    params.set("crs", options.crs);
+  }
+  for (const [key, value] of Object.entries(options.extraQuery ?? {})) {
+    params.set(key, String(value));
+  }
+  return params;
+};
+
+const isAbsoluteUrl = (value: string): boolean =>
+  /^[a-z][a-z\d+\-.]*:\/\//i.test(value);
+
 const normalizeEndpoint = (endpoint: string): string =>
-  endpoint.replace(/\/+$/, "");
+  endpoint.trim().replace(/\/+$/, "");
+
+const normalizeRelativePath = (path: string): string =>
+  `/${path.replace(/^\/+/, "")}`;
 
 const normalizePath = (path: string): string =>
   path.replace(/^\/+/, "");
-
-const sanitizeCredentialUrl = (url: URL): string => {
-  const sanitized = new URL(url);
-  if (sanitized.searchParams.has("licenseeKey")) {
-    sanitized.searchParams.set("licenseeKey", "<redacted>");
-  }
-  return sanitized.toString();
-};
 
 const recordFromUnknown = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === "object" ? value as Record<string, unknown> : {};
