@@ -380,6 +380,7 @@ class CesiumViewerHost implements EngineViewerHost {
       fullscreenButton: false,
       selectionIndicator: false,
       infoBox: false,
+      skyBox: false,
       useBrowserRecommendedResolution: false,
       ...options.viewerOptions,
     };
@@ -678,22 +679,17 @@ class CesiumEngineScene implements EngineScene {
   }
 
   private applyCesiumBackgroundEnvironment(scene: CesiumObject, state: EnvironmentState): void {
-    const skyBox = getObject(scene, "skyBox");
     const skyAtmosphere = getObject(scene, "skyAtmosphere");
     if (state.background !== "skybox") {
       this.clearEnvironmentBackgroundPrimitive();
-      if (skyBox) {
-        skyBox.show = false;
-      }
+      clearCesiumSkyBox(scene);
       return;
     }
 
     const equirectangularSkyboxUrl = getCesiumEquirectangularSkyboxUrl(state);
     if (equirectangularSkyboxUrl) {
+      clearCesiumSkyBox(scene);
       this.applyCesiumEquirectangularBackground(equirectangularSkyboxUrl, state);
-      if (skyBox) {
-        skyBox.show = false;
-      }
       if (skyAtmosphere) {
         skyAtmosphere.show = false;
       }
@@ -704,11 +700,10 @@ class CesiumEngineScene implements EngineScene {
     const sources = resolveCesiumSkyboxSources(state);
     const SkyBox = this.cesium.SkyBox as CesiumConstructor | undefined;
     if (sources && typeof SkyBox === "function") {
-      const existingSkyBox = getObject(scene, "skyBox");
-      if (existingSkyBox && hasFunction(existingSkyBox, "destroy")) {
-        destroyCesiumObject(existingSkyBox);
-      }
+      clearCesiumSkyBox(scene);
       scene.skyBox = new SkyBox({ sources });
+    } else {
+      clearCesiumSkyBox(scene);
     }
     const activeSkyBox = getObject(scene, "skyBox");
     if (activeSkyBox) {
@@ -1946,10 +1941,8 @@ class CesiumEngineScene implements EngineScene {
 
     if (native.kind === "projected-wms") {
       native.spec = mergeLayerSpecPatch(native.spec, patch);
-      if (patch.visible !== undefined && patch.opacity === undefined && patch.style === undefined) {
-        for (const drawable of native.drawables) {
-          setDrawableVisible(drawable, patch.visible);
-        }
+      if (isProjectedWmsDisplayPatch(patch)) {
+        this.applyProjectedWmsDisplayPatch(native);
         return;
       }
       this.rebuildProjectedWmsLayer(native);
@@ -2086,6 +2079,23 @@ class CesiumEngineScene implements EngineScene {
       this.removeDrawable(drawable);
     }
     native.drawables = this.createProjectedWmsDrawables(native.spec, native.urlTemplate, native.extent);
+  }
+
+  private applyProjectedWmsDisplayPatch(native: Extract<CesiumLayerNative, { kind: "projected-wms" }>): void {
+    const opacity = native.spec.opacity ?? native.spec.style?.opacity ?? 1;
+    const visible = native.spec.visible ?? native.spec.style?.visible ?? true;
+    for (const drawable of native.drawables) {
+      if (drawable.kind !== "primitive") {
+        setDrawableVisible(drawable, visible);
+        continue;
+      }
+      setProjectedWmsPrimitiveVisible(drawable.value, visible);
+      updateProjectedWmsPrimitiveOpacity(drawable.value, opacity);
+    }
+    const scene = getObject(this.viewer, "scene");
+    if (hasFunction(scene, "requestRender")) {
+      scene.requestRender?.();
+    }
   }
 
   private createProjectedWmsDrawables(
@@ -2646,7 +2656,7 @@ class CesiumEngineScene implements EngineScene {
       material,
       flat: true,
       faceForward: true,
-      translucent,
+      translucent: true,
       closed: false,
       materialSupport: MaterialAppearance.MaterialSupport?.TEXTURED,
       renderState: {
@@ -2660,12 +2670,16 @@ class CesiumEngineScene implements EngineScene {
       asynchronous: false,
       show: visible && imageSource.ready,
     });
+    primitive.__s100ProjectedWmsMaterial = material;
+    primitive.__s100ProjectedWmsImageReady = imageSource.ready;
+    primitive.__s100ProjectedWmsVisible = visible;
     if (!imageSource.ready) {
       imageSource.onLoad(() => {
         if (isCesiumObjectDestroyed(primitive)) {
           return;
         }
-        primitive.show = visible;
+        primitive.__s100ProjectedWmsImageReady = true;
+        primitive.show = Boolean(primitive.__s100ProjectedWmsVisible);
         const scene = getObject(this.viewer, "scene");
         if (hasFunction(scene, "requestRender")) {
           scene.requestRender?.();
@@ -4384,6 +4398,11 @@ function mergeLayerSpecPatch<TSpec extends BaseLayerSpec>(spec: TSpec, patch: La
   } as TSpec;
 }
 
+function isProjectedWmsDisplayPatch(patch: LayerPatch): boolean {
+  const keys = Object.keys(patch as Record<string, unknown>);
+  return keys.length > 0 && keys.every((key) => key === "opacity" || key === "visible");
+}
+
 async function resolveCesiumModule(provider: CesiumModuleProvider | undefined): Promise<CesiumModule> {
   if (!provider) {
     const dynamicImport = new Function("specifier", "return import(specifier)") as (
@@ -4436,6 +4455,43 @@ function setDrawableVisible(drawable: CesiumSceneDrawable, visible: boolean): vo
   drawable.value.show = visible;
 }
 
+function setProjectedWmsPrimitiveVisible(primitive: CesiumObject, visible: boolean): void {
+  primitive.__s100ProjectedWmsVisible = visible;
+  const imageReady = primitive.__s100ProjectedWmsImageReady !== false;
+  primitive.show = visible && imageReady;
+}
+
+function updateProjectedWmsPrimitiveOpacity(primitive: CesiumObject, opacity: number): void {
+  const material = getObject(primitive, "__s100ProjectedWmsMaterial");
+  const color = findProjectedWmsMaterialColor(material);
+  setCesiumColorAlpha(color, clamp01(opacity));
+}
+
+function findProjectedWmsMaterialColor(material: CesiumObject | null): CesiumObject | null {
+  const uniformColor = getObject(getObject(material, "uniforms"), "color");
+  if (uniformColor) {
+    return uniformColor;
+  }
+
+  const fabricUniformColor = getObject(
+    getObject(getObject(getObject(material, "options"), "fabric"), "uniforms"),
+    "color",
+  );
+  if (fabricUniformColor) {
+    return fabricUniformColor;
+  }
+
+  return null;
+}
+
+function setCesiumColorAlpha(color: CesiumObject | null, opacity: number): void {
+  if (!color) {
+    return;
+  }
+  color.alpha = opacity;
+  color.a = opacity;
+}
+
 function hasFunction(value: unknown, key: string): value is Record<string, (...args: unknown[]) => unknown> {
   return Boolean(value && typeof value === "object" && typeof (value as Record<string, unknown>)[key] === "function");
 }
@@ -4469,6 +4525,14 @@ function destroyCesiumObject(value: unknown): void {
       throw error;
     }
   }
+}
+
+function clearCesiumSkyBox(scene: CesiumObject): void {
+  const skyBox = getObject(scene, "skyBox");
+  if (skyBox) {
+    destroyCesiumObject(skyBox);
+  }
+  scene.skyBox = undefined;
 }
 
 function isCesiumObjectDestroyed(value: unknown): boolean {

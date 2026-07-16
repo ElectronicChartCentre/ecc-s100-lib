@@ -7,6 +7,9 @@ const demoRoot = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(demoRoot, "../..");
 const cesiumSource = resolve(workspaceRoot, "node_modules/cesium/Build/Cesium");
 const cesiumPublicPath = "/cesium";
+const viewerSource = resolve(workspaceRoot, "packages/s100-viewer/src/index.ts");
+const nasaAmmosAdapterSource = resolve(workspaceRoot, "packages/s100-viewer-adapter-nasa-ammos/src/index.ts");
+const cesiumAdapterSource = resolve(workspaceRoot, "packages/s100-viewer-adapter-cesium/src/index.ts");
 
 const contentTypes: Record<string, string> = {
   ".css": "text/css",
@@ -80,6 +83,13 @@ export default defineConfig(({ mode }) => {
       CESIUM_BASE_URL: JSON.stringify(cesiumPublicPath),
     },
     plugins: [cesiumAssets()],
+    resolve: {
+      alias: [
+        { find: "@ecc/s100-viewer", replacement: viewerSource },
+        { find: "@ecc/s100-viewer-adapter-nasa-ammos", replacement: nasaAmmosAdapterSource },
+        { find: "@ecc/s100-viewer-adapter-cesium", replacement: cesiumAdapterSource },
+      ],
+    },
     server: {
       proxy: createS102TileProxy(s102Endpoint),
     },

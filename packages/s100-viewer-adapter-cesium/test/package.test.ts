@@ -43,6 +43,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
       },
     });
     expect(cesium.operations.viewerOptions[0]).toMatchObject({
+      skyBox: false,
       useBrowserRecommendedResolution: false,
     });
     await viewer.destroy();
@@ -178,7 +179,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     expect(cesium.operations.scene.__s100EnvironmentMapUrl)
       .toBe("/textures/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
     expect(cesium.operations.scene.specularEnvironmentMaps).toBeUndefined();
-    expect((cesium.operations.scene.skyBox as { show?: boolean }).show).toBe(false);
+    expect(cesium.operations.scene.skyBox).toBeUndefined();
     expect(cesium.operations.skyAtmosphere.show).toBe(true);
     expect(cesium.operations.sceneLights).toHaveLength(3);
 
@@ -228,7 +229,8 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     });
     expect(cesium.operations.primitivesAdded).toContain(cesium.operations.equirectangularPanoramaInstances[0]);
     expect(cesium.operations.skyBoxes).toHaveLength(0);
-    expect((cesium.operations.scene.skyBox as { show?: boolean }).show).toBe(false);
+    expect(cesium.operations.scene.skyBox).toBeUndefined();
+    expect(cesium.operations.skyBox.destroyed).toBe(true);
     expect(cesium.operations.skyAtmosphere.show).toBe(false);
 
     await viewer.destroy();
@@ -1241,7 +1243,7 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
     });
     expect(opaquePrimitives).toHaveLength(4);
     expect(opaquePrimitives.every((primitive) =>
-      primitive.options?.appearance?.options?.translucent === false,
+      primitive.options?.appearance?.options?.translucent === true,
     )).toBe(true);
     expect(Array.from(opaquePrimitives[0]?.options?.geometryInstances?.geometry?.attributes?.position?.values ?? [])).toEqual([
       -1000, -1000, 0.5,
@@ -1342,17 +1344,31 @@ describe("@ecc/s100-viewer-adapter-cesium", () => {
 
     expect(cesium.operations.entitiesAdded).toHaveLength(0);
     expect(cesium.operations.primitivesAdded).toHaveLength(1);
-    expect((cesium.operations.primitivesAdded[0] as { show?: boolean }).show).toBe(false);
+    const initialPrimitive = cesium.operations.primitivesAdded[0] as {
+      destroyed?: boolean;
+      show?: boolean;
+      options?: { appearance?: { options?: { material?: { uniforms?: { color?: { a?: number } } } } } };
+    };
+    expect(initialPrimitive.show).toBe(false);
 
     await layer.update({ visible: true, opacity: 0.35 });
 
     expect(cesium.operations.primitivesAdded).toHaveLength(1);
+    expect(cesium.operations.primitivesAdded[0]).toBe(initialPrimitive);
+    expect(initialPrimitive.destroyed).toBe(false);
     const rebuiltPrimitive = cesium.operations.primitivesAdded[0] as {
       show?: boolean;
       options?: { appearance?: { options?: { material?: { uniforms?: { color?: { a?: number } } } } } };
     };
     expect(rebuiltPrimitive.show).toBe(true);
     expect(rebuiltPrimitive.options?.appearance?.options?.material?.uniforms?.color?.a).toBe(0.35);
+
+    await layer.update({ opacity: 1 });
+
+    expect(cesium.operations.primitivesAdded).toHaveLength(1);
+    expect(cesium.operations.primitivesAdded[0]).toBe(initialPrimitive);
+    expect(initialPrimitive.show).toBe(true);
+    expect(initialPrimitive.options?.appearance?.options?.material?.uniforms?.color?.a).toBe(1);
     await viewer.destroy();
   });
 
@@ -1823,7 +1839,22 @@ function createMockCesium() {
     } as Record<string, unknown>,
     screenSpaceCameraController: {} as Record<string, unknown>,
     skyAtmosphere: {} as { show?: boolean },
-    skyBox: {} as { show?: boolean },
+    skyBox: {
+      show: true,
+      destroyed: false,
+      isDestroyed() {
+        return this.destroyed;
+      },
+      destroy() {
+        this.destroyed = true;
+        return undefined;
+      },
+    } as {
+      show?: boolean;
+      destroyed: boolean;
+      isDestroyed(): boolean;
+      destroy(): undefined;
+    },
     skyBoxes: [] as Array<{ sources?: unknown }>,
     equirectangularPanoramas: [] as Array<{
       image?: unknown;
