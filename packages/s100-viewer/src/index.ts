@@ -65,6 +65,7 @@ export { S100Error } from "./errors/S100Error.js";
 export type { S100ErrorCode } from "./errors/S100Error.js";
 export { EventBus } from "./events/S100EventBus.js";
 export type { S100EventBus, S100EventListener, S100Unsubscribe } from "./events/S100EventBus.js";
+export * from "./features/index.js";
 export { S100ProductType } from "./layers/types.js";
 export type {
   BaseLayerSpec,

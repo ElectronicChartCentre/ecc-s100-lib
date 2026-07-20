@@ -1,7 +1,17 @@
 # Examples
 
-Runnable and copy-pasteable S-100 viewer examples:
+The two primary examples are:
 
+1. [Getting started](./getting-started): the smallest runnable app and
+   TypeScript story for wiring the high-level feature sessions into an app.
+2. [Reference app](./reference-app): the canonical runnable workspace app
+   showing how a software engineering team can structure viewer lifecycle,
+   service configuration, feature-session setup, controls, logging, and
+   teardown.
+
+Additional focused examples:
+
+- [Step-by-step engine switcher learning guide](../docs/learn/engine-switcher-practical-guide.md)
 - [Minimal NASA-AMMOS scene](./minimal-nasa-ammos/main.ts)
 - [S-102 and S-101 scene](./s102-s101-scene/main.ts)
 - [S-111 time scene](./s111-time-scene/main.ts)
@@ -17,6 +27,22 @@ npm run demo:engine-switcher
 npm run build:demo:engine-switcher
 ```
 
+The getting-started app is the smallest runnable session example:
+
+```sh
+cp examples/getting-started/.env.example examples/getting-started/.env.local
+npm run demo:getting-started
+npm run build:demo:getting-started
+```
+
+The reference app is the fuller session-oriented runnable app:
+
+```sh
+cp examples/reference-app/.env.example examples/reference-app/.env.local
+npm run demo:reference
+npm run build:demo:reference
+```
+
 Until the packages are published to npm, local workspaces and release tarballs
 are the expected dependency sources. Once published, the install shape is:
 
@@ -25,5 +51,8 @@ npm install @ecc/s100-viewer @ecc/s100-viewer-adapter-nasa-ammos
 npm install @ecc/s100-viewer-adapter-cesium cesium
 ```
 
-The other example files are TypeScript snippets that document public API usage
-without becoming applications of their own.
+The remaining non-app example files are TypeScript snippets that document public
+API usage without becoming applications of their own. Use
+`getting-started/main.ts` when you want the higher-level app integration style
+where the library owns product orchestration and the app maps user settings into
+session calls.

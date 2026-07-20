@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>S-100 Reference App</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="toolbar">
+        <div class="toolbar__title">
+          <strong>S-100 Reference App</strong>
+          <span>Session API integration</span>
+        </div>
+        <button id="load-button" type="button">Load</button>
+        <button id="dispose-button" type="button" disabled>Dispose</button>
+        <span id="status-pill" class="status-pill">Idle</span>
+      </header>
+      <main class="workspace">
+        <section id="viewer" class="viewer-surface" aria-label="S-100 viewer"></section>
+        <aside class="side-panel" aria-label="Reference app controls">
+          <section>
+            <h2>Configuration</h2>
+            <dl id="config-panel" class="config-list"></dl>
+          </section>
+          <section>
+            <h2>Feature Controls</h2>
+            <div class="control-grid">
+              <label class="control-row">
+                <input id="s102-toggle" type="checkbox" checked disabled />
+                <span>S-102 terrain</span>
+              </label>
+              <label class="control-row">
+                <input id="s111-toggle" type="checkbox" checked disabled />
+                <span>S-111 currents</span>
+              </label>
+              <label class="control-row">
+                <input id="enc-toggle" type="checkbox" disabled />
+                <span>ENC overlay</span>
+              </label>
+              <label class="control-row">
+                <input id="vessel-toggle" type="checkbox" checked disabled />
+                <span>Demo vessel</span>
+              </label>
+              <label class="field">
+                <span>ENC preference</span>
+                <select id="enc-preference" disabled>
+                  <option value="S-101">S-101 first</option>
+                  <option value="S-57">S-57 first</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>S-111 time</span>
+                <input id="time-slider" type="range" min="0" max="0" value="0" disabled />
+              </label>
+              <output id="time-output" class="time-output">No timeline</output>
+            </div>
+          </section>
+          <section class="log-section">
+            <h2>Events</h2>
+            <ol id="log-panel" class="log-list"></ol>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

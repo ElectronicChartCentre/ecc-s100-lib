@@ -3,6 +3,11 @@
 Private workspace demo for exercising the public `@ecc/s100-viewer` package
 against NASA-AMMOS and Cesium adapters.
 
+For a zero-knowledge, step-by-step learning path through S-100 concepts, the
+public API, this demo's source structure, and first adapter-authoring steps,
+start with the
+[engine switcher practical guide](../../docs/learn/engine-switcher-practical-guide.md).
+
 ## Local Configuration
 
 Copy `.env.example` to `.env.local` and fill in the local PRIMAR credentials

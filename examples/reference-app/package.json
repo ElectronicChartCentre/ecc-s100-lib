@@ -1,0 +1,21 @@
+{
+  "name": "@ecc/s100-reference-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ecc/s100-viewer": "0.1.0-alpha.8",
+    "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.6.0",
+    "vite": "^8.0.14"
+  }
+}

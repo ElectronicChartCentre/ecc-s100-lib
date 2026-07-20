@@ -132,6 +132,186 @@ LayerBuilder.MapOverlayStyles.DEFAULT;
 `defineS100LayerSpec(...)` remains available as a low-level helper when an
 application wants to spell out a complete spec object.
 
+## Feature Sessions
+
+Feature sessions are the recommended high-level API for app integrations that
+want less orchestration code than raw `LayerBuilder` calls. They keep the
+primitive scene/layer/controller APIs available, but own common mechanics such
+as lifecycle cleanup, layer replacement, visibility, status, timeline, and
+interaction constraints.
+
+For a runnable copy-pasteable app-neutral workflow that wires the feature
+sessions together, see
+[`examples/getting-started`](../../examples/getting-started).
+
+```ts
+import {
+  S102TerrainSession,
+  S111SurfaceCurrentSession,
+  EncWmsSession,
+  VesselFeatureSession,
+  PrimarServices,
+  resolveEncWmsAvailability,
+} from "@ecc/s100-viewer";
+```
+
+S-102 terrain:
+
+```ts
+const terrain = S102TerrainSession.create({
+  scene,
+  crs: "EPSG:32633",
+  source: PrimarServices.s102Tiles({
+    endpoint: "https://example.test/s102",
+    apiKey,
+  }),
+  rendering: {
+    detailFactor: 500,
+  },
+  style: {
+    safetyDepthMeters: 8,
+    contours: {
+      visible: true,
+      intervalMeters: 5,
+    },
+  },
+  replacement: {
+    oldLayerRemovalDelayMs: 500,
+  },
+});
+
+await terrain.setDatasetIds(["NO5F001"]);
+await terrain.updateDisplayStyle({ safetyDepthMeters: 10 });
+await terrain.dispose();
+```
+
+S-111 surface currents:
+
+```ts
+const currents = await S111SurfaceCurrentSession.load({
+  scene,
+  datasets: [{
+    id: "NO_S111_SAMPLE",
+    bounds: {
+      latLon: bounds,
+    },
+  }],
+  crs: "EPSG:32633",
+  service: PrimarServices.s111({
+    endpoint: "https://example.test/s111",
+    licenseeKey,
+  }),
+  projection: {
+    projectBounds,
+  },
+  limits: {
+    maxDataPoints: 100000,
+  },
+  style: {
+    renderer: "arrows",
+    scale: "auto",
+  },
+});
+
+currents.setCurrentTime(Date.now());
+await currents.setVisibleDatasetIds(["NO_S111_SAMPLE"]);
+await currents.dispose();
+```
+
+ENC WMS:
+
+```ts
+const availability = await resolveEncWmsAvailability({
+  bounds: sceneBounds,
+  licenseeKey,
+  service: PrimarServices.encAvailability({
+    getLicensedProductsWithinBounds,
+    getValidProductTypes,
+    getS57WithinBounds,
+  }),
+});
+
+const enc = await EncWmsSession.create({
+  scene,
+  standards: {
+    "S-101": PrimarServices.s101EncWms({
+      licenseeKey,
+      center,
+      widthMeters: 10000,
+      wmsBaseUrl,
+      pixelRatio: window.devicePixelRatio,
+    }),
+    "S-57": PrimarServices.s57EncWms({
+      licenseeKey,
+      center,
+      widthMeters: 10000,
+      wmsBaseUrl,
+      wmsTemplatePath,
+      customStyleId,
+      opaqueStyleId,
+      includeOpaqueLayer: true,
+    }),
+  },
+  availability,
+  preference: ["S-101", "S-57"],
+  visible: true,
+  opacity: 0.7,
+});
+
+await enc.setPreferredStandard("S-57");
+await enc.setOpacity(0.75);
+await enc.setOpacityAnimated(0.95, {
+  from: "current",
+  durationMs: 250,
+  easing: "ease-out",
+});
+await enc.setVisible(false);
+await enc.dispose();
+```
+
+`setOpacity(...)` applies directly and is the default choice for application
+state updates. `setOpacityAnimated(...)` is opt-in for consumers that want a
+session-owned transition with cancellation on direct opacity updates, active
+standard changes, or disposal.
+
+Vessel feature:
+
+```ts
+const vessel = await VesselFeatureSession.add({
+  scene,
+  url: "/models/demo-vessel.glb",
+  pose: {
+    position,
+    headingDegrees: 90,
+  },
+  dimensions: {
+    draught: 5,
+    bow: 50,
+    stern: 50,
+    port: 10,
+    starboard: 10,
+  },
+  constraints: {
+    vertical: {
+      minMeters: -75,
+      maxMeters: "draught",
+      reference: "sea-level",
+    },
+  },
+  onPoseChanged: (pose) => {
+    savePose(pose);
+  },
+});
+
+await vessel.setTransformMode("translate");
+await vessel.dispose();
+```
+
+Sessions are app-neutral. They do not know about Vue, Pinia, Explorer scenario
+models, or PRIMAR authentication flows. Apps still own state persistence, UI
+text, service credentials, and request functions; provider helpers can own
+provider-specific defaults and response interpretation.
+
 ## Core Product Specs
 
 - `EncLayerSpec`

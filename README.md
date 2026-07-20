@@ -71,10 +71,14 @@ policy. By default, product layers use `latest-confirmed-supported`; pass
 specification identifier or edition that the app wants to track explicitly.
 
 For applications that want a more batteries-included surface, the core package
-also exports product controllers such as `TerrainFeature`, `MapFeature`,
-`S111Feature`, and `VesselFeature`. These controllers translate app-friendly
-inputs into canonical layer specs, including templated WMS map sources, while
-still using the same `scene.layers` kernel underneath.
+also exports product sessions such as `S102TerrainSession`,
+`S111SurfaceCurrentSession`, `EncWmsSession`, and `VesselFeatureSession`.
+These sessions translate app-friendly inputs into canonical layer specs,
+including templated WMS map sources and provider defaults through
+`PrimarServices`. PRIMAR helpers also provide reusable service adapters such as
+ENC availability resolution, so apps can inject their request functions without
+duplicating provider response parsing. Sessions still use the same
+`scene.layers` kernel underneath.
 
 The core package exports `S100SupportedProductVersions`, and each adapter reports
 its engine-specific matrix through `adapter.capabilities.supportedProductVersions`.
@@ -100,6 +104,9 @@ npm run pack:release-target:dry-run
 
 ## Documentation
 
+- [Getting started app and story](./examples/getting-started)
+- [Reference app](./examples/reference-app)
+- [Step-by-step engine switcher learning guide](./docs/learn/engine-switcher-practical-guide.md)
 - [Package readiness](./docs/package-readiness.md)
 - [Developer ergonomics review](./docs/developer-ergonomics-review.md)
 - [Cogs adapter extraction plan](./docs/cogs-adapter-extraction-plan.md)

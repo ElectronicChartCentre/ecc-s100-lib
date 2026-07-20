@@ -1,0 +1,273 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #10151a;
+  color: #edf3f7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+.app-shell {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #29343e;
+  background: #171f26;
+}
+
+.toolbar__title {
+  display: grid;
+  gap: 2px;
+  min-width: 240px;
+}
+
+.toolbar__title strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.toolbar__title span {
+  color: #98a6b2;
+  font-size: 12px;
+}
+
+.toolbar button,
+.field select {
+  min-height: 34px;
+  border: 1px solid #374652;
+  border-radius: 6px;
+  background: #222d35;
+  color: #edf3f7;
+}
+
+.toolbar button {
+  min-width: 92px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.toolbar button:disabled,
+.field select:disabled,
+.control-row input:disabled,
+.field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.status-pill {
+  min-width: 126px;
+  margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #29333d;
+  color: #becad4;
+  font-size: 13px;
+  text-align: center;
+}
+
+.status-pill[data-state="ready"] {
+  background: #123629;
+  color: #b7ebd2;
+}
+
+.status-pill[data-state="busy"] {
+  background: #382d12;
+  color: #efd587;
+}
+
+.status-pill[data-state="error"] {
+  background: #422127;
+  color: #ffc0c8;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  min-height: 0;
+}
+
+.viewer-surface {
+  min-width: 0;
+  min-height: 0;
+  background: #05080b;
+}
+
+.viewer-surface > * {
+  width: 100%;
+  height: 100%;
+}
+
+.side-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+  border-left: 1px solid #29343e;
+  background: #151c22;
+}
+
+.side-panel section {
+  min-height: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid #29343e;
+}
+
+.side-panel h2 {
+  margin: 0 0 10px;
+  color: #dce5eb;
+  font-size: 14px;
+  font-weight: 680;
+}
+
+.config-list {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.config-list dt {
+  color: #91a0ad;
+}
+
+.config-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #d8e1e8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c6d1db;
+  font-size: 13px;
+}
+
+.control-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: #6fb4ef;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  color: #a2afbb;
+  font-size: 12px;
+}
+
+.field select {
+  width: 100%;
+  padding: 0 10px;
+}
+
+.field input[type="range"] {
+  width: 100%;
+  accent-color: #6fb4ef;
+}
+
+.time-output {
+  color: #dbe4eb;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.log-section {
+  overflow: hidden;
+}
+
+.log-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.log-list__item {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid #2d3944;
+  border-radius: 6px;
+  background: #192229;
+  color: #cfd9e2;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.log-list__item time {
+  color: #80909d;
+  font-size: 11px;
+}
+
+.log-list__item--warn {
+  border-color: #645022;
+  color: #f1d994;
+}
+
+.log-list__item--error {
+  border-color: #684047;
+  color: #ffc5cc;
+}
+
+@media (max-width: 820px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .toolbar__title {
+    min-width: 100%;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(320px, 1fr) minmax(260px, 42vh);
+  }
+
+  .side-panel {
+    border-top: 1px solid #29343e;
+    border-left: 0;
+  }
+}
