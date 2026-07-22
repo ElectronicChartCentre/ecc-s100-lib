@@ -1,7 +1,7 @@
 import { type S100EngineAdapter } from "@ecc/s100-viewer";
 import { cesiumAdapterCapabilities } from "./capabilities.js";
 import { CesiumViewerHost } from "./CesiumViewerHost.js";
-import { ensureConstructibleBrowserImageGlobal } from "./CesiumEngineScene.js";
+import { ensureConstructibleBrowserImageGlobal } from "../environment/imageCompatibility.js";
 import type {
   CesiumAdapterOptions,
   CesiumModule,

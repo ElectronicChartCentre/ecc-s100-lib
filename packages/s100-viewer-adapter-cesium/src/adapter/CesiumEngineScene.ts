@@ -47,6 +47,23 @@ import type {
   CesiumObject,
   FetchLike,
 } from "./types.js";
+import {
+  createEngineVersionFields,
+  getCesiumConstructor,
+  getObject,
+  hasConstructor,
+  hasFunction,
+} from "../cesium/object.js";
+import {
+  callIfFunction,
+  clearCesiumSkyBox,
+  destroyCesiumObject,
+  isCesiumObjectDestroyed,
+} from "../cesium/lifecycle.js";
+import {
+  createDeferredImageSource,
+  type DeferredImageSource,
+} from "../environment/imageCompatibility.js";
 
 type Vector3Fields = { x: number; y: number; z: number };
 type VesselVerticalPositionLimits = {
@@ -129,35 +146,6 @@ type S111ArrowGlyph = {
   indices: number[];
   colorKey: string;
   color: unknown;
-};
-
-type BrowserImageLike = {
-  crossOrigin?: string | null;
-  height?: number;
-  src: string;
-  width?: number;
-  complete?: boolean;
-  naturalWidth?: number;
-  onload?: unknown;
-  onerror?: unknown;
-  addEventListener?: (type: "load" | "error", listener: () => void, options?: { once?: boolean }) => void;
-  removeEventListener?: (type: "load" | "error", listener: () => void) => void;
-};
-
-type BrowserImageGlobalLike = {
-  HTMLImageElement?: { prototype?: unknown };
-  Image?: new (width?: number, height?: number) => BrowserImageLike;
-};
-
-type BrowserDocumentLike = {
-  createElement?: (tagName: string) => unknown;
-  defaultView?: BrowserImageGlobalLike | null;
-};
-
-type DeferredImageSource = {
-  image: string | BrowserImageLike;
-  readonly ready: boolean;
-  onLoad(callback: () => void): void;
 };
 
 type ProjectedWmsAlphaOptions = {
@@ -4269,30 +4257,6 @@ function isProjectedWmsDisplayPatch(patch: LayerPatch): boolean {
   return keys.length > 0 && keys.every((key) => key === "opacity" || key === "visible");
 }
 
-export function createEngineVersionFields(cesium: CesiumModule): Pick<EngineHandleBundle, "engineVersion"> {
-  return typeof cesium.VERSION === "string" ? { engineVersion: cesium.VERSION } : {};
-}
-
-export function getCesiumConstructor(cesium: CesiumModule, key: string): CesiumConstructor {
-  const value = cesium[key];
-  if (typeof value !== "function") {
-    throw new S100Error("adapter-lifecycle", `Cesium module does not expose '${key}'.`);
-  }
-  return value as CesiumConstructor;
-}
-
-function hasConstructor(cesium: CesiumModule, key: string): boolean {
-  return typeof cesium[key] === "function";
-}
-
-export function getObject(value: unknown, key: string): CesiumObject | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-  const child = (value as Record<string, unknown>)[key];
-  return child && typeof child === "object" ? (child as CesiumObject) : null;
-}
-
 function setDrawableVisible(drawable: CesiumSceneDrawable, visible: boolean): void {
   drawable.value.show = visible;
 }
@@ -4332,76 +4296,6 @@ function setCesiumColorAlpha(color: CesiumObject | null, opacity: number): void 
   }
   color.alpha = opacity;
   color.a = opacity;
-}
-
-function hasFunction(value: unknown, key: string): value is Record<string, (...args: unknown[]) => unknown> {
-  return Boolean(value && typeof value === "object" && typeof (value as Record<string, unknown>)[key] === "function");
-}
-
-function callIfFunction(value: unknown, key: string): void {
-  if (hasFunction(value, key)) {
-    value[key]?.();
-  }
-}
-
-export function destroyCesiumObject(value: unknown): void {
-  if (!hasFunction(value, "destroy")) {
-    return;
-  }
-  if (hasFunction(value, "isDestroyed")) {
-    try {
-      if (Boolean(value.isDestroyed?.())) {
-        return;
-      }
-    } catch (error) {
-      if (isCesiumDestroyedError(error)) {
-        return;
-      }
-      throw error;
-    }
-  }
-  try {
-    value.destroy?.();
-  } catch (error) {
-    if (!isCesiumDestroyedError(error)) {
-      throw error;
-    }
-  }
-}
-
-function clearCesiumSkyBox(scene: CesiumObject): void {
-  const skyBox = getObject(scene, "skyBox");
-  if (skyBox) {
-    destroyCesiumObject(skyBox);
-  }
-  scene.skyBox = undefined;
-}
-
-function isCesiumObjectDestroyed(value: unknown): boolean {
-  if (!hasFunction(value, "isDestroyed")) {
-    return false;
-  }
-  try {
-    return Boolean(value.isDestroyed?.());
-  } catch (error) {
-    if (isCesiumDestroyedError(error)) {
-      return true;
-    }
-    throw error;
-  }
-}
-
-function isCesiumDestroyedError(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-  const name = (error as { name?: unknown }).name;
-  const message = (error as { message?: unknown }).message;
-  return (
-    name === "DeveloperError" &&
-    typeof message === "string" &&
-    /destroyed|destroy\(\)/iu.test(message)
-  );
 }
 
 function getFiniteNumber(value: unknown, fallback: number): number {
@@ -4451,158 +4345,6 @@ function clampNumber(value: number, min: number, max: number): number {
 
 function lerpNumber(start: number, end: number, t: number): number {
   return start + (end - start) * t;
-}
-
-function createDeferredImageSource(imageUrl: string): DeferredImageSource {
-  const image = createBrowserImageElement();
-  if (!image) {
-    return {
-      image: imageUrl,
-      ready: true,
-      onLoad(callback: () => void): void {
-        callback();
-      },
-    };
-  }
-
-  const loadCallbacks: Array<() => void> = [];
-  let ready = false;
-  let failed = false;
-
-  const markReady = () => {
-    if (ready || failed) {
-      return;
-    }
-    ready = true;
-    const callbacks = loadCallbacks.splice(0);
-    for (const callback of callbacks) {
-      callback();
-    }
-  };
-  const markFailed = () => {
-    if (ready || failed) {
-      return;
-    }
-    failed = true;
-    loadCallbacks.length = 0;
-  };
-
-  if (typeof image.addEventListener === "function") {
-    image.addEventListener("load", markReady, { once: true });
-    image.addEventListener("error", markFailed, { once: true });
-  } else {
-    image.onload = markReady;
-    image.onerror = markFailed;
-  }
-
-  image.crossOrigin = "anonymous";
-  image.src = imageUrl;
-  if (image.complete && (image.naturalWidth ?? 1) > 0) {
-    markReady();
-  }
-
-  return {
-    image,
-    get ready() {
-      return ready;
-    },
-    onLoad(callback: () => void): void {
-      if (ready) {
-        callback();
-        return;
-      }
-      if (!failed) {
-        loadCallbacks.push(callback);
-      }
-    },
-  };
-}
-
-function createBrowserImageElement(): BrowserImageLike | null {
-  const ImageConstructor = (globalThis as { Image?: new () => BrowserImageLike }).Image;
-  if (typeof ImageConstructor === "function") {
-    try {
-      return new ImageConstructor();
-    } catch {
-      // Some embedded contexts expose HTMLImageElement as Image; that constructor is not directly constructible.
-    }
-  }
-
-  const documentLike = (globalThis as {
-    document?: { createElement?: (tagName: string) => unknown };
-  }).document;
-  const image = documentLike?.createElement?.("img");
-  return image && typeof image === "object" ? (image as BrowserImageLike) : null;
-}
-
-export function ensureConstructibleBrowserImageGlobal(
-  documentLike?: BrowserDocumentLike,
-): void {
-  const globals = globalThis as BrowserImageGlobalLike & { document?: BrowserDocumentLike };
-  const imageDocument = documentLike ?? globals.document;
-  if (typeof imageDocument?.createElement !== "function") {
-    return;
-  }
-
-  patchImageConstructor(globals, imageDocument);
-  const windowTarget = imageDocument.defaultView;
-  if (windowTarget && windowTarget !== globals) {
-    patchImageConstructor(windowTarget, imageDocument);
-  }
-}
-
-function patchImageConstructor(
-  target: BrowserImageGlobalLike,
-  imageDocument: BrowserDocumentLike,
-): void {
-  const ImageConstructor = target.Image;
-  if (typeof ImageConstructor !== "function" || isConstructibleImageConstructor(ImageConstructor)) {
-    return;
-  }
-  const createElement = imageDocument.createElement;
-  if (typeof createElement !== "function") {
-    return;
-  }
-  const CompatibleImage = function Image(width?: number, height?: number) {
-    const image = createElement.call(imageDocument, "img") as BrowserImageLike;
-    if (typeof width === "number") {
-      image.width = width;
-    }
-    if (typeof height === "number") {
-      image.height = height;
-    }
-    return image;
-  } as unknown as {
-    new (width?: number, height?: number): BrowserImageLike;
-    prototype?: unknown;
-  };
-  if (target.HTMLImageElement?.prototype) {
-    CompatibleImage.prototype = target.HTMLImageElement.prototype;
-  }
-
-  try {
-    Object.defineProperty(target, "Image", {
-      configurable: true,
-      writable: true,
-      value: CompatibleImage,
-    });
-  } catch {
-    try {
-      target.Image = CompatibleImage;
-    } catch {
-      // Leave the host global untouched if it is non-writable.
-    }
-  }
-}
-
-function isConstructibleImageConstructor(
-  ImageConstructor: new () => BrowserImageLike,
-): boolean {
-  try {
-    return Boolean(new ImageConstructor());
-  } catch {
-    return false;
-  }
 }
 
 type LocalPoint2D = readonly [number, number];

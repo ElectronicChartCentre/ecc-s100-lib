@@ -8,11 +8,13 @@ import {
 } from "@ecc/s100-viewer";
 import {
   CesiumEngineScene,
+} from "./CesiumEngineScene.js";
+import {
   createEngineVersionFields,
-  destroyCesiumObject,
   getCesiumConstructor,
   getObject,
-} from "./CesiumEngineScene.js";
+} from "../cesium/object.js";
+import { destroyCesiumObject } from "../cesium/lifecycle.js";
 import type {
   CesiumAdapterOptions,
   CesiumModule,
