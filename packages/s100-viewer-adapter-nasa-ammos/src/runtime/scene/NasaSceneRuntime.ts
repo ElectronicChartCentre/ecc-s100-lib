@@ -59,6 +59,12 @@ import {
   parseSurfaceCurrentTime,
   SeaCurrentsOverlay,
 } from "../s111/SeaCurrentsOverlay.js";
+import {
+  constrainVesselPoseZ,
+  normalizeVesselVerticalPositionLimits,
+  renderedEngineZFromVesselPose,
+  vesselPoseZFromRenderedEngineZ,
+} from "@ecc/s100-viewer/internal/products/vesselPose";
 
 export { EventEmitter };
 export type { Subscription };
@@ -2589,7 +2595,7 @@ export class VesselView {
         this.position = [
           renderPosition[0],
           renderPosition[1],
-          renderPosition[2] - coreScene.seaLevel,
+          vesselPoseZFromRenderedEngineZ(renderPosition[2], coreScene.seaLevel),
         ];
         this.updateSeaLevelVisuals(coreScene.seaLevel);
         this.positionChanged.emit(this.getPosition());
@@ -2731,24 +2737,26 @@ export class VesselView {
     return [
       this.position[0],
       this.position[1],
-      this.position[2] + this.coreScene.seaLevel,
+      renderedEngineZFromVesselPose(this.position[2], this.coreScene.seaLevel),
     ];
   }
 
   private constrainTransformRenderPosition(renderPosition: Vec3Tuple): Vec3Tuple {
-    const positionZ = renderPosition[2] - this.coreScene.seaLevel;
-    const constrainedPositionZ = constrainVesselPositionZ(
-      positionZ,
-      this.verticalPositionLimits,
-      this.coreScene.seaLevel,
-    );
+    const positionZ = vesselPoseZFromRenderedEngineZ(renderPosition[2], this.coreScene.seaLevel);
+    const constrainedPositionZ = this.verticalPositionLimits
+      ? constrainVesselPoseZ(
+          positionZ,
+          this.verticalPositionLimits,
+          this.coreScene.seaLevel,
+        )
+      : positionZ;
     if (Object.is(positionZ, constrainedPositionZ)) {
       return renderPosition;
     }
     return [
       renderPosition[0],
       renderPosition[1],
-      constrainedPositionZ + this.coreScene.seaLevel,
+      renderedEngineZFromVesselPose(constrainedPositionZ, this.coreScene.seaLevel),
     ];
   }
 }
@@ -3718,40 +3726,6 @@ function getS111ZOffset(seaLevel: number): number {
 function normalizeOptionalNumber(value: unknown): number | undefined {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function normalizeVesselVerticalPositionLimits(
-  value: VesselVerticalPositionLimits | undefined,
-): VesselVerticalPositionLimits | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-  const minMeters = normalizeOptionalNumber(value.minMeters);
-  const maxMeters = normalizeOptionalNumber(value.maxMeters);
-  if (minMeters === undefined && maxMeters === undefined) {
-    return null;
-  }
-  return {
-    ...(minMeters !== undefined ? { minMeters } : {}),
-    ...(maxMeters !== undefined ? { maxMeters } : {}),
-    reference: value.reference === "sea-level" ? "sea-level" : "scene",
-  };
-}
-
-function constrainVesselPositionZ(
-  value: number,
-  limits: VesselVerticalPositionLimits | null,
-  seaLevel: number,
-): number {
-  if (!limits) {
-    return value;
-  }
-  const offset = limits.reference === "sea-level" ? seaLevel : 0;
-  const lower =
-    limits.minMeters !== undefined ? limits.minMeters + offset : -Infinity;
-  const upper =
-    limits.maxMeters !== undefined ? limits.maxMeters + offset : Infinity;
-  return Math.min(Math.max(value, Math.min(lower, upper)), Math.max(lower, upper));
 }
 
 function detailFactorToErrorTarget(detailFactor: number): number {

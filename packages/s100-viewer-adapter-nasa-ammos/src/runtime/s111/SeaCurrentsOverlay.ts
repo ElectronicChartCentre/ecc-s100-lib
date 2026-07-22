@@ -4,7 +4,6 @@ import {
   Group,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
-  MathUtils,
   Mesh,
   Sphere,
   ShaderMaterial,
@@ -12,6 +11,17 @@ import {
   Vector3,
   type Scene,
 } from "three";
+import {
+  getS111RecordCount,
+  getS111RecordIndexForTime,
+  parseS111Time,
+  resolveS111IntervalSeconds,
+} from "@ecc/s100-viewer/internal/products/s111Time";
+import {
+  inferS111SpeedKnotsScale,
+  resolveS111ArrowScaleMeters,
+  resolveS111SpeedColor,
+} from "@ecc/s100-viewer/internal/products/s111Style";
 
 export type SurfaceCurrentDatasetLike = {
   id?: string;
@@ -52,15 +62,8 @@ type SeaCurrentsOverlayOptions = {
   originOffset?: readonly [number, number, number] | undefined;
 };
 
-const DEFAULT_INTERVAL_SECONDS = 1;
 const DEFAULT_Z_OFFSET = 0.5;
-const CENTIMETERS_PER_SECOND_TO_KNOTS = 0.019438444924406;
-const SPEED_LEGEND_MAX_KNOTS = 99;
-const ARROW_MIN_SPEED_SCALE = 0.2;
-const ARROW_MAX_SPEED_SCALE = 1;
-const ARROW_EXPLICIT_MAX_SPEED_SCALE = 0.65;
-const ARROW_EXPLICIT_REFERENCE_SPEED_KNOTS = 10;
-const ARROW_MAX_LOCAL_SPACING_FACTOR = 1;
+const ARROW_BOUNDING_RADIUS_PADDING_METERS = 1;
 const ARROW_OUTLINE_WIDTH = 0.0105;
 const ARROW_FILL_Z_OFFSET = 0.02;
 const ARROW_POLYGON: readonly (readonly [number, number])[] = [
@@ -74,18 +77,6 @@ const ARROW_POLYGON: readonly (readonly [number, number])[] = [
 ];
 const ARROW_OUTLINE_POLYGON = offsetClosedPolygon(ARROW_POLYGON, ARROW_OUTLINE_WIDTH);
 const ARROW_FILL_INDICES = [0, 1, 6, 2, 3, 4, 2, 4, 5] as const;
-const SPEED_COLOR_BANDS: readonly (readonly [number, number, number, number])[] =
-  [
-    [0.5, 0x76 / 255, 0x52 / 255, 0xe2 / 255],
-    [1, 0x48 / 255, 0x98 / 255, 0xd3 / 255],
-    [2, 0x61 / 255, 0xcb / 255, 0xe5 / 255],
-    [3, 0x6d / 255, 0xbc / 255, 0x45 / 255],
-    [5, 0xb4 / 255, 0xdc / 255, 0x00 / 255],
-    [7, 0xcd / 255, 0xc1 / 255, 0x00 / 255],
-    [10, 0xf8 / 255, 0xa7 / 255, 0x18 / 255],
-    [13, 0xf7 / 255, 0xa2 / 255, 0x9d / 255],
-    [SPEED_LEGEND_MAX_KNOTS, 0xff / 255, 0x1e / 255, 0x1e / 255],
-  ];
 
 export class SeaCurrentsOverlay {
   readonly group = new Group();
@@ -317,8 +308,8 @@ export class SeaCurrentsOverlay {
           this.autoScaling,
           this.parsedDataset,
         );
-      const angle = MathUtils.degToRad(90 - direction);
-      const color = getSpeedColor(speedKnots);
+      const angle = ((90 - direction) * Math.PI) / 180;
+      const color = resolveS111SpeedColor(speedKnots);
       setCurrentInstance(
         this.outlineInstancePositionScaleAngle,
         this.outlineInstanceColor,
@@ -362,7 +353,7 @@ export function parseSurfaceCurrentDataset(
   const intervalSeconds = normalizeIntervalSeconds(dataset.timeRecordInterval);
   const startTime = parseSurfaceCurrentTime(dataset.dateTimeOfFirstRecord) ?? 0;
   const rawSpeedRange = getRawSpeedRange(records);
-  const speedKnotsScale = inferSpeedKnotsScale(rawSpeedRange.max);
+  const speedKnotsScale = inferS111SpeedKnotsScale(rawSpeedRange.max);
   const endTime =
     parseSurfaceCurrentTime(dataset.dateTimeOfLastRecord) ??
     startTime +
@@ -384,46 +375,13 @@ export function parseSurfaceCurrentDataset(
 }
 
 export function parseSurfaceCurrentTime(value: unknown): number | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const parsed = Date.parse(value);
-  if (!Number.isNaN(parsed)) {
-    return parsed;
-  }
-
-  const compact = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(
-    value,
-  );
-  if (!compact) {
-    return undefined;
-  }
-
-  const [, year, month, day, hour, minute, second] = compact;
-  return Date.UTC(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second),
-  );
+  return parseS111Time(value) ?? undefined;
 }
 
 export function getSurfaceCurrentRecordCount(
   dataset: SurfaceCurrentDatasetLike,
 ): number {
-  const explicitCount = normalizeFiniteNumber(dataset.numberOfTimes);
-  if (explicitCount !== undefined && explicitCount > 0) {
-    return Math.floor(explicitCount);
-  }
-
-  if (Array.isArray(dataset.data)) {
-    return dataset.data.length;
-  }
-
-  return 1;
+  return getS111RecordCount(dataset);
 }
 
 function createArrowGeometry(
@@ -487,7 +445,7 @@ function createSurfaceCurrentBoundingSphere(
     radius = Math.max(
       radius,
       Math.hypot(position[0] - origin[0], position[1] - origin[1]) +
-        ARROW_MAX_LOCAL_SPACING_FACTOR,
+        ARROW_BOUNDING_RADIUS_PADDING_METERS,
     );
   }
 
@@ -666,15 +624,11 @@ function getRecordIndex(
   dataset: ParsedSurfaceCurrentDataset,
   currentTimeMs: number,
 ): number {
-  if (dataset.records.length <= 1) {
-    return 0;
-  }
-
-  const intervalMs = Math.max(1, dataset.intervalSeconds * 1000);
-  return MathUtils.clamp(
-    Math.round((currentTimeMs - dataset.startTime) / intervalMs),
-    0,
-    dataset.records.length - 1,
+  return getS111RecordIndexForTime(
+    dataset.records.length,
+    dataset.startTime,
+    dataset.intervalSeconds,
+    currentTimeMs,
   );
 }
 
@@ -698,20 +652,6 @@ function getRawSpeedRange(records: readonly SurfaceCurrentRecord[]): {
     min: Number.isFinite(minSpeed) ? minSpeed : 0,
     max: maxSpeed,
   };
-}
-
-function inferSpeedKnotsScale(rawMaxSpeed: number): number {
-  if (!Number.isFinite(rawMaxSpeed) || rawMaxSpeed <= 0) {
-    return 1;
-  }
-
-  // The PRIMAR web-adapted S-111 JSON used by the viewer exposes normal
-  // surface current speeds in knots, matching the S-111 legend. Some older
-  // sample payloads encode speed as centimetres per second, which shows up
-  // outside the legend's valid knot range.
-  return rawMaxSpeed > SPEED_LEGEND_MAX_KNOTS
-    ? CENTIMETERS_PER_SECOND_TO_KNOTS
-    : 1;
 }
 
 function getGridSize(
@@ -773,96 +713,22 @@ function getGridSize(
   return nearestDistances[Math.floor(nearestDistances.length / 2)] ?? 0;
 }
 
-function getBaseArrowScale(customScale: number, gridSize: number): number {
-  if (!Number.isFinite(gridSize) || gridSize <= 0) {
-    return customScale;
-  }
-
-  return Math.min(customScale, gridSize * ARROW_MAX_LOCAL_SPACING_FACTOR);
-}
-
 function getArrowScale(
   speedKnots: number,
   customScale: number,
   autoScaling: boolean,
   dataset: ParsedSurfaceCurrentDataset,
 ): number {
-  if (autoScaling) {
-    const gridScale = dataset.gridSize > 0
-      ? dataset.gridSize * ARROW_MAX_LOCAL_SPACING_FACTOR
-      : 250;
-    return gridScale * getSpeedScaleFactor(speedKnots, dataset);
-  }
-
-  if (customScale > 1) {
-    return getExplicitArrowScale(speedKnots, customScale);
-  }
-
-  return getBaseArrowScale(customScale, dataset.gridSize) *
-    getSpeedScaleFactor(speedKnots, dataset);
-}
-
-function getExplicitArrowScale(speedKnots: number, maxScaleMeters: number): number {
-  if (!Number.isFinite(speedKnots) || speedKnots < 0) {
-    return 0;
-  }
-
-  return maxScaleMeters * getExplicitSpeedScaleFactor(speedKnots);
-}
-
-function getExplicitSpeedScaleFactor(speedKnots: number): number {
-  const normalized = MathUtils.clamp(
-    speedKnots / ARROW_EXPLICIT_REFERENCE_SPEED_KNOTS,
-    0,
-    1,
+  return resolveS111ArrowScaleMeters(
+    {
+      speedKnots,
+      customScaleMeters: customScale,
+      autoScaling,
+      gridSizeMeters: dataset.gridSize,
+      minSpeedKnots: dataset.minSpeed,
+      maxSpeedKnots: dataset.maxSpeed,
+    },
   );
-  return MathUtils.lerp(
-    ARROW_MIN_SPEED_SCALE,
-    ARROW_EXPLICIT_MAX_SPEED_SCALE,
-    normalized,
-  );
-}
-
-function getSpeedScaleFactor(
-  speedKnots: number,
-  dataset: ParsedSurfaceCurrentDataset,
-): number {
-  if (!Number.isFinite(speedKnots) || speedKnots < 0) {
-    return 0;
-  }
-
-  if (dataset.maxSpeed <= dataset.minSpeed) {
-    return ARROW_MAX_SPEED_SCALE;
-  }
-
-  const normalized = MathUtils.clamp(
-    (speedKnots - dataset.minSpeed) /
-      (dataset.maxSpeed - dataset.minSpeed),
-    0,
-    1,
-  );
-  return MathUtils.lerp(
-    ARROW_MIN_SPEED_SCALE,
-    ARROW_MAX_SPEED_SCALE,
-    normalized,
-  );
-}
-
-function getSpeedColor(speedKnots: number): readonly [number, number, number] {
-  const lastBand = SPEED_COLOR_BANDS[SPEED_COLOR_BANDS.length - 1];
-  for (const band of SPEED_COLOR_BANDS) {
-    if (!band || speedKnots > band[0]) {
-      continue;
-    }
-
-    return [band[1], band[2], band[3]];
-  }
-
-  return [
-    lastBand?.[1] ?? 1,
-    lastBand?.[2] ?? 1,
-    lastBand?.[3] ?? 1,
-  ];
 }
 
 function isValidCurrentValue(
@@ -887,10 +753,7 @@ function normalizeDatasetId(id: unknown): string {
 }
 
 function normalizeIntervalSeconds(value: unknown): number {
-  const interval = normalizeFiniteNumber(value);
-  return interval !== undefined && interval > 0
-    ? interval
-    : DEFAULT_INTERVAL_SECONDS;
+  return resolveS111IntervalSeconds(value);
 }
 
 function normalizePositiveScale(value: unknown, fallback = 1): number {

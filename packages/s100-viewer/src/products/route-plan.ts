@@ -1,4 +1,10 @@
 import type { BaseLayerSpec } from "../layers/types.js";
+import {
+  ROUTE_S421_DEFAULT_STYLE,
+  createRouteDebug3dStyle,
+  createS421Hybrid3dRouteStyle,
+  createS421RouteStyle,
+} from "../internal/products/routeStyle.js";
 import type { RoutePlanSource } from "./sources.js";
 import type { ColorValue, OpacityVisibilityStyle } from "./style.js";
 
@@ -214,54 +220,20 @@ export interface RoutePlanLayerSpec
 }
 
 export const RouteStyleDefaults = {
-  S421: {
-    visible: true,
-    opacity: 1,
-    portrayal: "s421",
-    visualization: "standard",
-    showCenterline: true,
-    showWaypoints: true,
-    showCorridor: true,
-    showXtdBoundaries: true,
-    showRouteVolume: false,
-    showRouteSides: false,
-    showTurnDebugGeometry: false,
-    centerlineColor: "#6f43ff",
-    waypointColor: "#ffffff",
-    portsideBoundaryColor: "#e53935",
-    starboardBoundaryColor: "#43a047",
-    corridorFillColor: { r: 0.42, g: 0.26, b: 1, a: 0.18 },
-    routeVolumeFillColor: { r: 0.14, g: 0.48, b: 0.9, a: 0.22 },
-  } satisfies RouteFeatureStyle,
+  S421: ROUTE_S421_DEFAULT_STYLE,
 } as const;
 
 export const s421RouteStyle = (
   options: Partial<RouteFeatureStyle> = {},
-): RouteFeatureStyle => ({
-  ...RouteStyleDefaults.S421,
-  ...options,
-});
+): RouteFeatureStyle => createS421RouteStyle(options);
 
 export const s421Hybrid3dRouteStyle = (
   options: Partial<RouteFeatureStyle> = {},
-): RouteFeatureStyle => ({
-  ...RouteStyleDefaults.S421,
-  visualization: "hybrid-3d",
-  showRouteVolume: true,
-  showRouteSides: true,
-  ...options,
-});
+): RouteFeatureStyle => createS421Hybrid3dRouteStyle(options);
 
 export const routeDebug3dStyle = (
   options: Partial<RouteFeatureStyle> = {},
-): RouteFeatureStyle => ({
-  ...RouteStyleDefaults.S421,
-  visualization: "debug-3d",
-  showRouteVolume: true,
-  showRouteSides: true,
-  showTurnDebugGeometry: true,
-  ...options,
-});
+): RouteFeatureStyle => createRouteDebug3dStyle(options);
 
 export const RouteStyles = {
   s421Defaults: s421RouteStyle,

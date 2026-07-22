@@ -1,4 +1,5 @@
 import type { Material, Object3D } from "three";
+import { normalizeDepthMeters } from "@ecc/s100-viewer/internal/products/depthStyle";
 
 type TerrainUniforms = {
   seaLevel: { value: number };
@@ -294,10 +295,6 @@ totalEmissiveRadiance += diffuseColor.rgb * s100TerrainAmbientStrength;`,
 
 function normalizeFiniteNumber(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
-}
-
-function normalizeDepthMeters(value: number, fallback: number): number {
-  return Math.max(0, normalizeFiniteNumber(value, fallback));
 }
 
 function normalizeHeightSign(value: number): number {

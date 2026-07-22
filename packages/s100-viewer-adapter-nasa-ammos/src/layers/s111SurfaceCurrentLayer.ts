@@ -1,4 +1,5 @@
 import type { S111SurfaceCurrentLayerSpec } from "@ecc/s100-viewer";
+import { resolveS111Scale } from "@ecc/s100-viewer/internal/products/s111Style";
 import type { S111View } from "../runtime/scene/NasaSceneRuntime.js";
 import type { NasaSceneGeoreference } from "../adapter/layerNativeTypes.js";
 
@@ -6,7 +7,7 @@ export const applyS111Style = (
   view: S111View,
   spec: S111SurfaceCurrentLayerSpec,
 ): void => {
-  const scale = spec.style?.scale ?? spec.style?.speedScale;
+  const scale = resolveS111Scale(spec.style);
   if (typeof scale === "number") {
     view.disableAutoScaling = true;
     view.setCustomScale(scale);

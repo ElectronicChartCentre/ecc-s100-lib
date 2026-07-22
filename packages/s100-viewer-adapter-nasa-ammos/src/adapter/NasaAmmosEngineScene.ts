@@ -1,5 +1,4 @@
 import {
-  depthFromElevation,
   S100Error,
   type BaseLayerSpec,
   type CameraControlConfig,
@@ -25,6 +24,7 @@ import {
   type SimulatedWaterLevelLayerSpec,
   type VesselLayerSpec,
 } from "@ecc/s100-viewer";
+import { depthFromElevation } from "@ecc/s100-viewer/internal/products/depthStyle";
 import { type Vec3 } from "../runtime/index.js";
 import {
   NasaSceneRuntime,

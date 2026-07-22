@@ -1,7 +1,5 @@
 import proj4 from "proj4";
 import {
-  depthFromElevation,
-  getS102SafetyDepthMeters,
   S100Error,
   S100ProductType,
   type BaseLayerSpec,
@@ -37,6 +35,32 @@ import {
   type WmtsSource,
   isEncLayerSpec,
 } from "@ecc/s100-viewer";
+import {
+  depthFromElevation,
+  resolveSafetyDepthMeters,
+} from "@ecc/s100-viewer/internal/products/depthStyle";
+import {
+  isLayerDisplayPatch,
+  mergeLayerSpecPatch,
+} from "@ecc/s100-viewer/internal/adapter-utils/layerPatch";
+import {
+  getNearestS111TimedRecord,
+  getS111RecordIndexForTime,
+  parseS111Time,
+} from "@ecc/s100-viewer/internal/products/s111Time";
+import {
+  S111_ARROW_MAX_LOCAL_SPACING_FACTOR,
+  inferS111SpeedKnotsScale,
+  resolveS111ArrowLengthMeters,
+  resolveS111ArrowScaleMeters,
+  resolveS111Scale,
+  resolveS111SpeedColor,
+} from "@ecc/s100-viewer/internal/products/s111Style";
+import {
+  constrainVesselPoseCoordinate,
+  normalizeVesselVerticalPositionLimits,
+  resolveVesselDimensions,
+} from "@ecc/s100-viewer/internal/products/vesselPose";
 import type {
   CesiumAdapterOptions,
   CesiumConstructor,
@@ -239,26 +263,8 @@ const S102_FAILED_TILE_RETRY_INITIAL_DELAY_MS = 1000;
 const S102_FAILED_TILE_RETRY_MAX_DELAY_MS = 30000;
 const S102_FAILED_TILE_RETRY_MAX_ATTEMPTS = 10;
 const S102_FAILED_TILE_RETRY_JITTER_RATIO = 0.35;
-const CENTIMETERS_PER_SECOND_TO_KNOTS = 0.019438444924406;
-const S111_SPEED_LEGEND_MAX_KNOTS = 99;
-const S111_ARROW_MIN_SPEED_SCALE = 0.2;
-const S111_ARROW_MAX_SPEED_SCALE = 1;
-const S111_ARROW_EXPLICIT_MAX_SPEED_SCALE = 0.65;
-const S111_ARROW_EXPLICIT_REFERENCE_SPEED_KNOTS = 10;
-const S111_ARROW_MAX_LOCAL_SPACING_FACTOR = 1;
 const S111_ARROW_OUTLINE_WIDTH = 0.0105;
 const S111_ARROW_FILL_Z_OFFSET_METERS = 0.02;
-const S111_SPEED_COLOR_BANDS: readonly (readonly [number, number, number, number])[] = [
-  [0.5, 0x76 / 255, 0x52 / 255, 0xe2 / 255],
-  [1, 0x48 / 255, 0x98 / 255, 0xd3 / 255],
-  [2, 0x61 / 255, 0xcb / 255, 0xe5 / 255],
-  [3, 0x6d / 255, 0xbc / 255, 0x45 / 255],
-  [5, 0xb4 / 255, 0xdc / 255, 0x00 / 255],
-  [7, 0xcd / 255, 0xc1 / 255, 0x00 / 255],
-  [10, 0xf8 / 255, 0xa7 / 255, 0x18 / 255],
-  [13, 0xf7 / 255, 0xa2 / 255, 0x9d / 255],
-  [S111_SPEED_LEGEND_MAX_KNOTS, 0xff / 255, 0x1e / 255, 0x1e / 255],
-];
 const S111_ARROW_POLYGON: readonly (readonly [number, number])[] = [
   [0.5, 0],
   [0.15, 0.2],
@@ -1763,7 +1769,7 @@ export class CesiumEngineScene implements EngineScene {
 
     if (native.kind === "projected-wms") {
       native.spec = mergeLayerSpecPatch(native.spec, patch);
-      if (isProjectedWmsDisplayPatch(patch)) {
+      if (isLayerDisplayPatch(patch)) {
         this.applyProjectedWmsDisplayPatch(native);
         return;
       }
@@ -2108,7 +2114,7 @@ export class CesiumEngineScene implements EngineScene {
         "heightOffsetMeters",
         getNumberExtension(spec, "s111HeightOffsetMeters", DEFAULT_S111_HEIGHT_OFFSET_METERS),
       );
-    const speedColor = getS111SpeedColor(sample.speedKnots);
+    const speedColor = resolveS111SpeedColor(sample.speedKnots);
     const color = toCesiumColor(this.cesium, {
       r: speedColor[0],
       g: speedColor[1],
@@ -2245,7 +2251,7 @@ export class CesiumEngineScene implements EngineScene {
       return null;
     }
 
-    const speedColor = getS111SpeedColor(sample.speedKnots);
+    const speedColor = resolveS111SpeedColor(sample.speedKnots);
     return {
       positions,
       outlinePositions,
@@ -3519,18 +3525,6 @@ function normalizeDegrees(value: number): number {
   return ((value % 360) + 360) % 360;
 }
 
-function mergeLayerSpecPatch<TSpec extends BaseLayerSpec>(spec: TSpec, patch: LayerPatch): TSpec {
-  return {
-    ...spec,
-    ...patch,
-  } as TSpec;
-}
-
-function isProjectedWmsDisplayPatch(patch: LayerPatch): boolean {
-  const keys = Object.keys(patch as Record<string, unknown>);
-  return keys.length > 0 && keys.every((key) => key === "opacity" || key === "visible");
-}
-
 function setDrawableVisible(drawable: CesiumSceneDrawable, visible: boolean): void {
   drawable.value.show = visible;
 }
@@ -3580,10 +3574,6 @@ function finiteNumber(value: unknown, fallback: number): number {
   return getFiniteNumber(value, fallback);
 }
 
-function finiteOptionalNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
 function getPickDepthMeters(
   coordinate: Coordinate,
   geodetic: Coordinate | undefined,
@@ -3615,10 +3605,6 @@ function clamp01(value: unknown): number {
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-function lerpNumber(start: number, end: number, t: number): number {
-  return start + (end - start) * t;
 }
 
 type LocalPoint2D = readonly [number, number];
@@ -4698,7 +4684,7 @@ function createS102CustomShader(
       },
       u_s102SafetyDepthMeters: {
         type: UniformType.FLOAT,
-        value: getS102SafetyDepthMeters(style),
+        value: resolveSafetyDepthMeters(style),
       },
       u_s102ContourInterval: {
         type: UniformType.FLOAT,
@@ -5158,48 +5144,14 @@ function getS111RecordForTime(
   const start = parseS111Time(dataset.dateTimeOfFirstRecord ?? dataset.FirstRecordTimestamp) ?? 0;
   const intervalSeconds = Number(dataset.timeRecordInterval ?? dataset.TimeRecordInterval);
   const intervalMs = Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds * 1000 : 1;
-  const index = Math.max(0, Math.min(records.length - 1, Math.round((time.getTime() - start) / intervalMs)));
+  const index = getS111RecordIndexForTime(
+    records.length,
+    start,
+    intervalMs / 1000,
+    time.getTime(),
+  );
   const record = records[index];
   return record && typeof record === "object" ? (record as Record<string, unknown>) : {};
-}
-
-function parseS111Time(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value < 1_000_000_000_000 ? value * 1000 : value;
-  }
-  if (typeof value !== "string") {
-    return null;
-  }
-  const normalized = value.includes("T")
-    ? value.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/u, "$1-$2-$3T$4:$5:$6Z")
-    : value;
-  const parsed = Date.parse(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function getNearestS111TimedRecord(records: unknown[], time: Date): Record<string, unknown> | null {
-  let best: { record: Record<string, unknown>; delta: number } | null = null;
-  for (const record of records) {
-    if (!record || typeof record !== "object") {
-      continue;
-    }
-    const recordObject = record as Record<string, unknown>;
-    const recordTime = parseS111Time(
-      recordObject.time ??
-        recordObject.dateTime ??
-        recordObject.timestamp ??
-        recordObject.Timestamp ??
-        recordObject.FromTime,
-    );
-    if (recordTime === null) {
-      continue;
-    }
-    const delta = Math.abs(time.getTime() - recordTime);
-    if (!best || delta < best.delta) {
-      best = { record: recordObject, delta };
-    }
-  }
-  return best?.record ?? null;
 }
 
 function getArrayProperty(data: Record<string, unknown>, keys: readonly string[]): unknown[] | null {
@@ -5352,15 +5304,6 @@ function getS111RawSpeedRange(records: unknown[]): { min: number; max: number } 
   };
 }
 
-function inferS111SpeedKnotsScale(rawMaxSpeed: number): number {
-  if (!Number.isFinite(rawMaxSpeed) || rawMaxSpeed <= 0) {
-    return 1;
-  }
-  return rawMaxSpeed > S111_SPEED_LEGEND_MAX_KNOTS
-    ? CENTIMETERS_PER_SECOND_TO_KNOTS
-    : 1;
-}
-
 function getS111GridSize(
   dataset: Record<string, unknown>,
   positions: readonly (readonly [number, number])[],
@@ -5420,10 +5363,11 @@ function isValidS111Direction(value: number): boolean {
 }
 
 function s111ArrowLengthMeters(speedKnots: number, spec: S111SurfaceCurrentLayerSpec): number {
-  const scale = spec.style?.scale ?? spec.style?.speedScale;
-  const numericScale = typeof scale === "number" && Number.isFinite(scale) && scale > 0 ? scale : 250;
-  const scaledLength = getExplicitS111ArrowScaleMeters(speedKnots, numericScale);
-  return Math.max(30, numericScale * 0.12, Number.isFinite(scaledLength) ? scaledLength : 30);
+  const scale = resolveS111Scale(spec.style);
+  return resolveS111ArrowLengthMeters(
+    speedKnots,
+    typeof scale === "number" ? scale : undefined,
+  );
 }
 
 function s111ArrowScaleMeters(
@@ -5431,75 +5375,16 @@ function s111ArrowScaleMeters(
   spec: S111SurfaceCurrentLayerSpec,
   renderData: S111RenderData,
 ): number {
-  const scale = spec.style?.scale ?? spec.style?.speedScale;
-  const explicitScale = typeof scale === "number" && Number.isFinite(scale) && scale > 0
-    ? scale
-    : null;
-  if (explicitScale !== null && explicitScale > 1) {
-    const scaled = getExplicitS111ArrowScaleMeters(speedKnots, explicitScale);
-    return Number.isFinite(scaled) && scaled > 0 ? scaled : 30;
-  }
-
-  const gridScale = renderData.gridSizeMeters > 0
-    ? renderData.gridSizeMeters * S111_ARROW_MAX_LOCAL_SPACING_FACTOR
-    : 250;
-  const baseScale = explicitScale !== null
-    ? Math.min(explicitScale, gridScale)
-    : gridScale;
-  const speedScale = getS111SpeedScaleFactor(speedKnots, renderData);
-  const scaled = baseScale * speedScale;
+  const scale = resolveS111Scale(spec.style);
+  const scaled = resolveS111ArrowScaleMeters({
+    speedKnots,
+    autoScaling: scale === undefined || scale === "auto",
+    gridSizeMeters: renderData.gridSizeMeters,
+    minSpeedKnots: renderData.minSpeedKnots,
+    maxSpeedKnots: renderData.maxSpeedKnots,
+    ...(typeof scale === "number" ? { customScaleMeters: scale } : {}),
+  });
   return Number.isFinite(scaled) && scaled > 0 ? scaled : 30;
-}
-
-function getExplicitS111ArrowScaleMeters(speedKnots: number, maxScaleMeters: number): number {
-  if (!Number.isFinite(speedKnots) || speedKnots < 0) {
-    return 0;
-  }
-  return maxScaleMeters * getExplicitS111SpeedScaleFactor(speedKnots);
-}
-
-function getExplicitS111SpeedScaleFactor(speedKnots: number): number {
-  const normalized = clampNumber(
-    speedKnots / S111_ARROW_EXPLICIT_REFERENCE_SPEED_KNOTS,
-    0,
-    1,
-  );
-  return lerpNumber(
-    S111_ARROW_MIN_SPEED_SCALE,
-    S111_ARROW_EXPLICIT_MAX_SPEED_SCALE,
-    normalized,
-  );
-}
-
-function getS111SpeedScaleFactor(speedKnots: number, renderData: S111RenderData): number {
-  if (!Number.isFinite(speedKnots) || speedKnots < 0) {
-    return 0;
-  }
-  if (renderData.maxSpeedKnots <= renderData.minSpeedKnots) {
-    return S111_ARROW_MAX_SPEED_SCALE;
-  }
-  const normalized = clampNumber(
-    (speedKnots - renderData.minSpeedKnots) /
-      (renderData.maxSpeedKnots - renderData.minSpeedKnots),
-    0,
-    1,
-  );
-  return lerpNumber(S111_ARROW_MIN_SPEED_SCALE, S111_ARROW_MAX_SPEED_SCALE, normalized);
-}
-
-function getS111SpeedColor(speedKnots: number): readonly [number, number, number] {
-  const lastBand = S111_SPEED_COLOR_BANDS[S111_SPEED_COLOR_BANDS.length - 1];
-  for (const band of S111_SPEED_COLOR_BANDS) {
-    if (!band || speedKnots > band[0]) {
-      continue;
-    }
-    return [band[1], band[2], band[3]];
-  }
-  return [
-    lastBand?.[1] ?? 1,
-    lastBand?.[2] ?? 1,
-    lastBand?.[3] ?? 1,
-  ];
 }
 
 function offsetProjectedVector(
@@ -5579,24 +5464,11 @@ function constrainVesselVerticalPosition(
   spec: VesselLayerSpec,
   seaLevel: number,
 ): Coordinate {
-  const limits = getVesselTransformGizmoVerticalPositionLimits(spec);
-  if (!limits) {
-    return coordinate;
-  }
-
-  if (coordinate.kind === "geodetic") {
-    const height = coordinate.height ?? 0;
-    const constrainedHeight = constrainVesselPositionZ(height, limits, seaLevel);
-    return Object.is(height, constrainedHeight)
-      ? coordinate
-      : { ...coordinate, height: constrainedHeight };
-  }
-
-  const z = coordinate.z ?? 0;
-  const constrainedZ = constrainVesselPositionZ(z, limits, seaLevel);
-  return Object.is(z, constrainedZ)
-    ? coordinate
-    : { ...coordinate, z: constrainedZ };
+  return constrainVesselPoseCoordinate(
+    coordinate,
+    getVesselTransformGizmoVerticalPositionLimits(spec),
+    seaLevel,
+  );
 }
 
 function getVesselTransformGizmoVerticalPositionLimits(
@@ -5606,33 +5478,7 @@ function getVesselTransformGizmoVerticalPositionLimits(
   if (!gizmo || typeof gizmo !== "object") {
     return null;
   }
-  const minMeters = finiteOptionalNumber(gizmo.verticalPositionLimits?.minMeters);
-  const maxMeters = finiteOptionalNumber(gizmo.verticalPositionLimits?.maxMeters);
-  if (minMeters === undefined && maxMeters === undefined) {
-    return null;
-  }
-  const reference: "scene" | "sea-level" =
-    gizmo.verticalPositionLimits?.reference === "sea-level"
-      ? "sea-level"
-      : "scene";
-  return {
-    ...(minMeters !== undefined ? { minMeters } : {}),
-    ...(maxMeters !== undefined ? { maxMeters } : {}),
-    reference,
-  };
-}
-
-function constrainVesselPositionZ(
-  value: number,
-  limits: VesselVerticalPositionLimits,
-  seaLevel: number,
-): number {
-  const offset = limits.reference === "sea-level" ? seaLevel : 0;
-  const lower =
-    limits.minMeters !== undefined ? limits.minMeters + offset : -Infinity;
-  const upper =
-    limits.maxMeters !== undefined ? limits.maxMeters + offset : Infinity;
-  return clampNumber(value, Math.min(lower, upper), Math.max(lower, upper));
+  return normalizeVesselVerticalPositionLimits(gizmo.verticalPositionLimits);
 }
 
 function rotateHeadingOffset(x: number, y: number, headingDegrees: number): { x: number; y: number } {
@@ -5767,16 +5613,21 @@ function getVesselModelRootOffset(spec: VesselLayerSpec): Vector3Fields {
 }
 
 function getVesselDimensions(spec: VesselLayerSpec): VesselDimensionsLike {
-  const semantic: Partial<VesselDimensionsLike> = spec.dimensions ?? {};
-  const extension = getExtension<Partial<VesselDimensionsLike>>(spec, "nasaAmmos", "dimensions") ?? {};
-  const draught = finiteNumber(semantic.draught ?? extension.draught ?? spec.style?.draughtMeters, 7);
-  return {
-    draught,
-    bow: finiteNumber(semantic.bow ?? extension.bow, 100),
-    stern: finiteNumber(semantic.stern ?? extension.stern, 100),
-    port: finiteNumber(semantic.port ?? extension.port, 20),
-    starboard: finiteNumber(semantic.starboard ?? extension.starboard, 20),
-  };
+  const extensionDimensions = getExtension<Partial<VesselDimensionsLike>>(spec, "nasaAmmos", "dimensions");
+  return resolveVesselDimensions(
+    {
+      ...(spec.dimensions !== undefined ? { dimensions: spec.dimensions } : {}),
+      ...(spec.style !== undefined ? { style: spec.style } : {}),
+      ...(extensionDimensions !== undefined ? { extensionDimensions } : {}),
+    },
+    {
+      draught: 7,
+      bow: 100,
+      stern: 100,
+      port: 20,
+      starboard: 20,
+    },
+  );
 }
 
 function vesselModelSource(spec: VesselLayerSpec): ModelSource | undefined {

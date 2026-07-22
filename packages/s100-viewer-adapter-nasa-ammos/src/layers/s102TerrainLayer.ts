@@ -1,9 +1,9 @@
 import {
-  getS102SafetyDepthMeters,
   type BaseLayerSpec,
   type S102BathymetryLayerSpec,
   type ThreeDTilesSource,
 } from "@ecc/s100-viewer";
+import { resolveSafetyDepthMeters } from "@ecc/s100-viewer/internal/products/depthStyle";
 import type { TerrainView } from "../runtime/scene/NasaSceneRuntime.js";
 import {
   getNasaAmmosExtension,
@@ -58,7 +58,7 @@ export const applyTerrainStyle = (
   if (typeof style.seaLevel === "number") {
     view.terrain.seaLevel = style.seaLevel;
   }
-  view.terrain.safetyDepthMeters = getS102SafetyDepthMeters(style);
+  view.terrain.safetyDepthMeters = resolveSafetyDepthMeters(style);
   view.terrain.heightSign = getS102HeightSign(spec);
   if (style.contours) {
     view.terrain.showContour = style.contours.visible;

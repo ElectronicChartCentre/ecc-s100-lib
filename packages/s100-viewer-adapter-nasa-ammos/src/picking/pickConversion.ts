@@ -1,9 +1,9 @@
 import {
-  depthFromElevation,
   type LivePickingOptions,
   type PickRequest,
   type PickResult,
 } from "@ecc/s100-viewer";
+import { depthFromElevation } from "@ecc/s100-viewer/internal/products/depthStyle";
 import {
   Raycaster,
   Vector2,

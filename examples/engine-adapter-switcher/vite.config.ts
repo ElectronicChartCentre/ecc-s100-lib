@@ -8,6 +8,7 @@ const workspaceRoot = resolve(demoRoot, "../..");
 const cesiumSource = resolve(workspaceRoot, "node_modules/cesium/Build/Cesium");
 const cesiumPublicPath = "/cesium";
 const viewerSource = resolve(workspaceRoot, "packages/s100-viewer/src/index.ts");
+const viewerInternalSource = resolve(workspaceRoot, "packages/s100-viewer/src/internal/$1");
 const nasaAmmosAdapterSource = resolve(workspaceRoot, "packages/s100-viewer-adapter-nasa-ammos/src/index.ts");
 const cesiumAdapterSource = resolve(workspaceRoot, "packages/s100-viewer-adapter-cesium/src/index.ts");
 
@@ -85,6 +86,10 @@ export default defineConfig(({ mode }) => {
     plugins: [cesiumAssets()],
     resolve: {
       alias: [
+        {
+          find: /^@ecc\/s100-viewer\/internal\/(.+)$/u,
+          replacement: viewerInternalSource,
+        },
         { find: "@ecc/s100-viewer", replacement: viewerSource },
         { find: "@ecc/s100-viewer-adapter-nasa-ammos", replacement: nasaAmmosAdapterSource },
         { find: "@ecc/s100-viewer-adapter-cesium", replacement: cesiumAdapterSource },

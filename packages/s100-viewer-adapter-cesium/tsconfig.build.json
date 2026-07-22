@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": "src",
     "paths": {
-      "@ecc/s100-viewer": ["packages/s100-viewer/dist/index.d.ts"]
+      "@ecc/s100-viewer": ["packages/s100-viewer/dist/index.d.ts"],
+      "@ecc/s100-viewer/internal/*": ["packages/s100-viewer/dist/internal/*"]
     }
   },
   "include": ["src/**/*.ts"],

@@ -11,6 +11,7 @@ import {
   MapLayerType,
   type MapSpecification,
 } from "../runtime/scene/NasaSceneRuntime.js";
+import { resolveEncRasterAlphaOptions } from "@ecc/s100-viewer/internal/products/encTransparency";
 import type { NasaSceneGeoreference } from "../adapter/layerNativeTypes.js";
 import {
   getNasaAmmosExtension,
@@ -85,28 +86,14 @@ const getMapAlphaOptions = (
   spec: EncLayerSpec | MapOverlayLayerSpec,
 ): Pick<MapSpecification, "alphaMode" | "alphaCutoff"> => {
   const style = spec.style as { alphaMode?: unknown; alphaCutoff?: unknown } | undefined;
-  const alphaMode = normalizeMapAlphaMode(style?.alphaMode);
-  const alphaCutoff = normalizeMapAlphaCutoff(style?.alphaCutoff, alphaMode);
+  if (style?.alphaMode !== "binary" && style?.alphaMode !== "source") {
+    return {};
+  }
+  const alphaOptions = resolveEncRasterAlphaOptions(style);
   return {
-    ...(alphaMode !== undefined ? { alphaMode } : {}),
-    ...(alphaCutoff !== undefined ? { alphaCutoff } : {}),
+    alphaMode: alphaOptions.mode,
+    ...(alphaOptions.mode === "binary" ? { alphaCutoff: alphaOptions.cutoff } : {}),
   };
-};
-
-const normalizeMapAlphaMode = (value: unknown): MapSpecification["alphaMode"] =>
-  value === "binary" || value === "source" ? value : undefined;
-
-const normalizeMapAlphaCutoff = (
-  value: unknown,
-  alphaMode: MapSpecification["alphaMode"],
-): number | undefined => {
-  if (alphaMode !== "binary") {
-    return undefined;
-  }
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return 0.01;
-  }
-  return Math.max(0, Math.min(1, value));
 };
 
 const getMapOriginOffset = (

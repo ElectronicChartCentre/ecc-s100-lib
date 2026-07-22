@@ -19,12 +19,18 @@ import type {
 } from "../products/viewer-features.js";
 import {
   RoutePlanProductType,
-  RouteStyles,
   type RouteDiagnostic,
   type RouteFeatureStyle,
   type RoutePlan,
   type RoutePlanLayerSpec,
 } from "../products/route-plan.js";
+import {
+  mergeRouteDiagnostics,
+  setRouteDebugGeometryVisible,
+  setRouteHybrid3d,
+} from "../internal/products/routeStyle.js";
+import { resolveS111Scale } from "../internal/products/s111Style.js";
+import { resolveS111TimeRange } from "../internal/products/s111Time.js";
 
 export type LayerControllerContext = {
   setSceneTime?(time: Date): void;
@@ -407,10 +413,10 @@ class CoreRouteLayerController implements RouteLayerController {
   }
 
   getDiagnostics(): readonly RouteDiagnostic[] {
-    return [
-      ...this.layer.spec.source.routePlan.diagnostics,
-      ...(this.layer.spec.source.layout?.diagnostics ?? []),
-    ];
+    return mergeRouteDiagnostics(
+      this.layer.spec.source.routePlan,
+      this.layer.spec.source.layout,
+    );
   }
 
   async setStyle(style: Partial<RouteFeatureStyle>): Promise<void> {
@@ -423,19 +429,14 @@ class CoreRouteLayerController implements RouteLayerController {
   }
 
   async setHybrid3d(enabled: boolean): Promise<void> {
-    await this.setStyle({
-      ...(enabled
-        ? RouteStyles.s421Hybrid3d(this.layer.spec.style)
-        : RouteStyles.s421Defaults(this.layer.spec.style)),
-      visualization: enabled ? "hybrid-3d" : "standard",
-      showRouteVolume: enabled,
-      showRouteSides: enabled,
+    await this.layer.update({
+      style: setRouteHybrid3d(this.layer.spec.style, enabled),
     });
   }
 
   async setDebugGeometryVisible(visible: boolean): Promise<void> {
-    await this.setStyle({
-      showTurnDebugGeometry: visible,
+    await this.layer.update({
+      style: setRouteDebugGeometryVisible(this.layer.spec.style, visible),
     });
   }
 }
@@ -453,13 +454,8 @@ class CoreSurfaceCurrentLayerController implements SurfaceCurrentLayerController
     private readonly context: LayerControllerContext,
   ) {
     const dataset = surfaceCurrentDataFromSpec(layer.spec);
-    const startTime = parseTime(dataset?.dateTimeOfFirstRecord) ?? 0;
-    const intervalSeconds = normalizePositiveInteger(dataset?.timeRecordInterval, 1);
-    const recordCount = getSurfaceCurrentRecordCount(dataset);
-    const endTime =
-      parseTime(dataset?.dateTimeOfLastRecord) ??
-      startTime + intervalSeconds * 1000 * Math.max(0, recordCount - 1);
-    const scale = layer.spec.style?.scale ?? layer.spec.style?.speedScale;
+    const { startTime, endTime } = resolveS111TimeRange(dataset);
+    const scale = resolveS111Scale(layer.spec.style);
 
     if (typeof scale === "number" && Number.isFinite(scale) && scale > 0) {
       this.customScaleState = scale;
@@ -542,7 +538,7 @@ class CoreSurfaceCurrentLayerController implements SurfaceCurrentLayerController
   }
 
   private syncScaleFromLayerSpec(): void {
-    const scale = this.layer.spec.style?.scale ?? this.layer.spec.style?.speedScale;
+    const scale = resolveS111Scale(this.layer.spec.style);
     if (typeof scale === "number" && Number.isFinite(scale) && scale > 0) {
       this.customScaleState = scale;
       this.disableAutoScalingState = true;
@@ -1029,53 +1025,6 @@ const surfaceCurrentDataFromSpec = (
   }
   return undefined;
 };
-
-const parseTime = (value: string | undefined): number | null => {
-  if (!value) {
-    return null;
-  }
-  const parsed = Date.parse(value);
-  if (Number.isFinite(parsed)) {
-    return parsed;
-  }
-
-  const compact = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
-  if (!compact) {
-    return null;
-  }
-
-  const [, year, month, day, hour, minute, second] = compact;
-  return Date.UTC(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second),
-  );
-};
-
-const getSurfaceCurrentRecordCount = (dataset: S111SurfaceCurrentData | undefined): number => {
-  if (typeof dataset?.numberOfTimes === "number" && dataset.numberOfTimes > 0) {
-    return Math.floor(dataset.numberOfTimes);
-  }
-  if (Array.isArray(dataset?.data)) {
-    return dataset.data.length;
-  }
-  const candidateArrays = ["positions", "records", "samples", "values"];
-  for (const key of candidateArrays) {
-    const value = dataset?.[key];
-    if (Array.isArray(value) && value.length > 0) {
-      return value.length;
-    }
-  }
-  return 1;
-};
-
-const normalizePositiveInteger = (value: unknown, fallback: number): number =>
-  typeof value === "number" && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : fallback;
 
 const finiteNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;

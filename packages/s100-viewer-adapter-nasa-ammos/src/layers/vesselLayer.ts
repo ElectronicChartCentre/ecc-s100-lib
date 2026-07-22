@@ -4,6 +4,7 @@ import {
   type VesselLayerSpec,
   type ParametricVesselLayout,
 } from "@ecc/s100-viewer";
+import { resolveVesselDimensions } from "@ecc/s100-viewer/internal/products/vesselPose";
 import { createParametricVesselObject } from "../parametric-vessel-model.js";
 import {
   SeaLevelIndicatorMode,
@@ -17,17 +18,21 @@ import {
 } from "../shared/extensions.js";
 
 export const getVesselDimensions = (spec: VesselLayerSpec): VesselDimensions => {
-  const semantic: Partial<VesselDimensions> = spec.dimensions ?? {};
-  const extension = getNasaAmmosExtension<Partial<VesselDimensions>>(spec, "dimensions") ?? {};
-  const draught = semantic.draught ?? extension.draught ?? spec.style?.draughtMeters ?? 7;
-
-  return {
-    draught,
-    bow: semantic.bow ?? extension.bow ?? 100,
-    stern: semantic.stern ?? extension.stern ?? 100,
-    port: semantic.port ?? extension.port ?? 20,
-    starboard: semantic.starboard ?? extension.starboard ?? 20,
-  };
+  const extensionDimensions = getNasaAmmosExtension<Partial<VesselDimensions>>(spec, "dimensions");
+  return resolveVesselDimensions(
+    {
+      ...(spec.dimensions !== undefined ? { dimensions: spec.dimensions } : {}),
+      ...(spec.style !== undefined ? { style: spec.style } : {}),
+      ...(extensionDimensions !== undefined ? { extensionDimensions } : {}),
+    },
+    {
+      draught: 7,
+      bow: 100,
+      stern: 100,
+      port: 20,
+      starboard: 20,
+    },
+  );
 };
 
 export const createVesselModelSpecification = (

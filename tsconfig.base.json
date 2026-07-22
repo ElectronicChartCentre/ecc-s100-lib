@@ -18,6 +18,7 @@
     "baseUrl": ".",
     "paths": {
       "@ecc/s100-viewer": ["packages/s100-viewer/src/index.ts"],
+      "@ecc/s100-viewer/internal/*": ["packages/s100-viewer/src/internal/*"],
       "@ecc/s100-viewer-adapter-nasa-ammos": [
         "packages/s100-viewer-adapter-nasa-ammos/src/index.ts"
       ],

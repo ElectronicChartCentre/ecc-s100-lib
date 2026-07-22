@@ -5,6 +5,15 @@ import {
   type SpatialExtent,
   type WmsSource,
 } from "@ecc/s100-viewer";
+import { clampNumber } from "@ecc/s100-viewer/internal/adapter-utils/numeric";
+import {
+  resolveEncRasterAlphaOptions,
+  shouldRenderTransparentRaster,
+} from "@ecc/s100-viewer/internal/products/encTransparency";
+import {
+  appendUrlQuery,
+  fillProjectedBboxTemplate,
+} from "@ecc/s100-viewer/internal/adapter-utils/urlTemplate";
 
 export type ProjectedWmsAlphaOptions = {
   mode: "source" | "binary";
@@ -40,7 +49,7 @@ export function createWmsUrlTemplate(source: WmsSource): string {
   for (const [key, value] of Object.entries(source.parameters ?? {})) {
     params.set(key, String(value));
   }
-  return appendQuery(source.url, params)
+  return appendUrlQuery(source.url, params)
     .replaceAll("%7B", "{")
     .replaceAll("%7D", "}")
     .replaceAll("%2C", ",");
@@ -56,17 +65,7 @@ export function fillWmsTemplate(
   width: number,
   height: number,
 ): string {
-  return template
-    .replaceAll("{xmin}", String(extent.minX))
-    .replaceAll("{ymin}", String(extent.minY))
-    .replaceAll("{xmax}", String(extent.maxX))
-    .replaceAll("{ymax}", String(extent.maxY))
-    .replaceAll("%7Bxmin%7D", String(extent.minX))
-    .replaceAll("%7Bymin%7D", String(extent.minY))
-    .replaceAll("%7Bxmax%7D", String(extent.maxX))
-    .replaceAll("%7Bymax%7D", String(extent.maxY))
-    .replace(/([?&]WIDTH=)[^&]*/iu, `$1${width}`)
-    .replace(/([?&]HEIGHT=)[^&]*/iu, `$1${height}`);
+  return fillProjectedBboxTemplate(template, extent, { width, height });
 }
 
 export function projectedWmsImageSize(
@@ -90,22 +89,18 @@ export function isProjectedWmsTranslucent(
   params: URLSearchParams,
   opacity: number,
 ): boolean {
-  if (opacity < 1 || spec.role === "overlay") {
-    return true;
-  }
   const transparent = params.get("TRANSPARENT") ?? params.get("transparent");
-  return transparent?.toLowerCase() === "true";
+  return shouldRenderTransparentRaster(
+    { ...spec, opacity },
+    transparent?.toLowerCase() === "true",
+  );
 }
 
 export function getProjectedWmsAlphaOptions(
   spec: EncLayerSpec | MapOverlayLayerSpec,
 ): ProjectedWmsAlphaOptions {
   const style = spec.style as { alphaMode?: unknown; alphaCutoff?: unknown } | undefined;
-  const mode = style?.alphaMode === "binary" ? "binary" : "source";
-  return {
-    mode,
-    cutoff: mode === "binary" ? normalizeProjectedWmsAlphaCutoff(style?.alphaCutoff) : 0,
-  };
+  return resolveEncRasterAlphaOptions(style);
 }
 
 export function normalizeProjectedExtent(
@@ -170,21 +165,9 @@ export function subtractProjectedExtent(outer: SpatialExtent, cutout: SpatialExt
   );
 }
 
-function appendQuery(url: string, params: URLSearchParams): string {
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}${params.toString()}`;
-}
-
 function getPositiveInteger(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function normalizeProjectedWmsAlphaCutoff(value: unknown): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return 0.01;
-  }
-  return clampNumber(value, 0, 1);
 }
 
 function createProjectedExtentPiece(
@@ -201,8 +184,4 @@ function createProjectedExtentPiece(
     maxX,
     maxY,
   };
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
