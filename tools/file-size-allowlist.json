@@ -10,11 +10,6 @@
     "reason": "Existing NASA runtime compatibility monolith; split after adapter shell extraction."
   },
   {
-    "path": "packages/s100-viewer-adapter-nasa-ammos/src/index.ts",
-    "phase": "P3",
-    "reason": "Existing NASA adapter shell and scene monolith; split first."
-  },
-  {
     "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/compat/map-overlay.ts",
     "phase": "P4",
     "reason": "Existing NASA map renderer; split with runtime extraction."
