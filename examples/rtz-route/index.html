@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>S-100 RTZ Route Demo</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="toolbar">
+        <div class="toolbar__title">
+          <strong>RTZ Route</strong>
+          <span>S-421 hybrid portrayal demo</span>
+        </div>
+        <label class="file-button">
+          <input id="route-file" type="file" accept=".rtz,.xml,text/xml,application/xml" />
+          <span>Open RTZ</span>
+        </label>
+        <button id="sample-button" type="button">Sample</button>
+        <span id="status-pill" class="status-pill">Starting</span>
+      </header>
+      <main class="workspace">
+        <section id="viewer" class="viewer-surface" aria-label="RTZ route viewer"></section>
+        <aside class="side-panel" aria-label="RTZ route controls">
+          <section class="control-section">
+            <h2>Bathymetry</h2>
+            <div class="toggle-list toggle-list--single">
+              <label><input id="s102-toggle" type="checkbox" checked /> S-102 terrain</label>
+            </div>
+            <div id="s102-summary" class="summary-grid summary-grid--wide"></div>
+          </section>
+          <section class="control-section">
+            <h2>Route</h2>
+            <div id="route-summary" class="summary-grid"></div>
+          </section>
+          <section class="control-section">
+            <h2>Portrayal</h2>
+            <div class="toggle-list">
+              <label><input id="centerline-toggle" type="checkbox" checked /> Centerline</label>
+              <label><input id="waypoints-toggle" type="checkbox" checked /> Waypoints</label>
+              <label><input id="corridor-toggle" type="checkbox" checked /> Corridor</label>
+              <label><input id="xtd-toggle" type="checkbox" checked /> XTD boundaries</label>
+              <label><input id="volume-toggle" type="checkbox" /> Route volume</label>
+              <label><input id="sides-toggle" type="checkbox" /> Route sides</label>
+              <label><input id="debug-toggle" type="checkbox" /> Debug geometry</label>
+            </div>
+          </section>
+          <section class="control-section">
+            <h2>Diagnostics</h2>
+            <ol id="diagnostics-list" class="diagnostics-list"></ol>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

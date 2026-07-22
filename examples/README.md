@@ -16,6 +16,7 @@ Additional focused examples:
 - [S-102 and S-101 scene](./s102-s101-scene/main.ts)
 - [S-111 time scene](./s111-time-scene/main.ts)
 - [S-100 Explorer integration pattern](./s100-explorer-integration/main.ts)
+- [RTZ route demo app](./rtz-route)
 - [Engine adapter switcher demo app](./engine-adapter-switcher)
 
 The engine adapter switcher is a private workspace app that exercises the
@@ -41,6 +42,14 @@ The reference app is the fuller session-oriented runnable app:
 cp examples/reference-app/.env.example examples/reference-app/.env.local
 npm run demo:reference
 npm run build:demo:reference
+```
+
+The RTZ route demo is a focused route portrayal app with a bundled sample RTZ
+fixture and file upload:
+
+```sh
+npm run demo:rtz-route
+npm run build:demo:rtz-route
 ```
 
 Until the packages are published to npm, local workspaces and release tarballs

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<route version="1.2" xmlns="http://www.cirm.org/RTZ/1/2">
+  <routeInfo routeName="Bergen Pilot Demo" routeAuthor="ECC" routeStatus="planned" />
+  <waypoints>
+    <defaultWaypoint radius="0.12">
+      <leg starboardXTD="0.08" portsideXTD="0.08" safetyDepth="16" safetyContour="20" geometryType="Loxodrome" speedMin="5" speedMax="12" />
+    </defaultWaypoint>
+    <waypoint id="WP001" revision="1" name="Approach">
+      <position lat="60.3920" lon="5.2450" />
+    </waypoint>
+    <waypoint id="WP002" revision="1" name="Turn North">
+      <position lat="60.4080" lon="5.2780" />
+      <leg starboardXTD="0.06" portsideXTD="0.10" safetyDepth="14" geometryType="Loxodrome" />
+    </waypoint>
+    <waypoint id="WP003" revision="1" name="Inner Fairway">
+      <position lat="60.4270" lon="5.3060" />
+      <leg starboardXTD="0.07" portsideXTD="0.07" safetyDepth="12" geometryType="Loxodrome" />
+    </waypoint>
+    <waypoint id="WP004" revision="1" name="Berth Limit">
+      <position lat="60.4440" lon="5.3330" />
+    </waypoint>
+  </waypoints>
+</route>
