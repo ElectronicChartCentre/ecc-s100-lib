@@ -38,7 +38,6 @@ import { Line2 } from "three/examples/jsm/lines/Line2.js";
 import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { EventEmitter, type Subscription } from "../core/EventEmitter.js";
-import { S100NasaViewer } from "../core/S100NasaViewer.js";
 import type { S100Scene as CoreS100Scene } from "../core/S100Scene.js";
 import type {
   FrameSubscription,
@@ -50,16 +49,16 @@ import { S100NasaLogLevel } from "../core/types.js";
 import {
   TerrainDisplayPropertyAdapter,
   TerrainMaterialController,
-} from "./terrain-shading.js";
+} from "../terrain/terrainShading.js";
 import {
   FlatMapOverlay,
   type MapOverlayExtents,
-} from "./map-overlay.js";
+} from "../map/FlatMapOverlay.js";
 import {
   getSurfaceCurrentRecordCount,
   parseSurfaceCurrentTime,
   SeaCurrentsOverlay,
-} from "./sea-currents.js";
+} from "../s111/SeaCurrentsOverlay.js";
 
 export { EventEmitter };
 export type { Subscription };
@@ -450,37 +449,7 @@ const VESSEL_GLTF_TO_Z_UP_ORIENTATION = new Quaternion().setFromAxisAngle(
 );
 const Z_UP_VECTOR = new Vector3(0, 0, 1);
 
-export class Viewer {
-  readonly runtime = {};
-
-  private constructor(
-    private readonly core: S100NasaViewer,
-    private readonly config: ViewerConfig,
-  ) {}
-
-  static async create(
-    parent: HTMLElement | null,
-    config: ViewerConfig = {},
-  ): Promise<Viewer> {
-    const core = await S100NasaViewer.create(parent, config);
-    return new Viewer(core, config);
-  }
-
-  initialized(): Promise<boolean> {
-    return this.core.initialized();
-  }
-
-  async createScene(): Promise<ViewerScene> {
-    const coreScene = await this.core.createScene();
-    return new ViewerScene(coreScene, this.config);
-  }
-
-  destroy(): void {
-    this.core.destroy();
-  }
-}
-
-export class ViewerScene {
+export class NasaSceneRuntime {
   readonly runtime = {};
   readonly cameraChanged = new EventEmitter<CameraUpdate>();
   readonly Terrain: TerrainFeature;
@@ -561,6 +530,22 @@ export class ViewerScene {
 
   set seaLevel(value: number) {
     this.coreScene.seaLevel = value;
+  }
+
+  getRenderContext(): S100RenderContext | null {
+    return this.coreScene.renderContext;
+  }
+
+  getSeaLevel(): number {
+    return this.coreScene.seaLevel;
+  }
+
+  onBeforeRender(callback: () => void): FrameSubscription {
+    return this.coreScene.onBeforeRender(callback);
+  }
+
+  onCameraInteractionChanged(callback: (active: boolean) => void): Subscription {
+    return this.coreScene.cameraInteractionChanged.subscribe(callback);
   }
 }
 

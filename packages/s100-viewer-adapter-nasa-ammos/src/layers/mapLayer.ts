@@ -10,7 +10,7 @@ import {
 import {
   MapLayerType,
   type MapSpecification,
-} from "../runtime/compat/s100-viewer.js";
+} from "../runtime/scene/NasaSceneRuntime.js";
 import type { NasaSceneGeoreference } from "../adapter/layerNativeTypes.js";
 import {
   getNasaAmmosExtension,

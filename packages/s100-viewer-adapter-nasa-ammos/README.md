@@ -54,7 +54,7 @@ use the shared `latest-confirmed-supported` policy from `@ecc/s100-viewer`.
 
 `scene.getEngineHandles()` exposes:
 
-- `engineInstance`: the compatibility `ViewerScene`.
+- `engineInstance`: the adapter-owned `NasaSceneRuntime`.
 - `instances.viewerScene`, `cameraNavigation`, `picking`, `pickingRay`, and
   `hoverPrism`.
 - `instances.renderer`, `scene`, `camera`, and `canvas` when the render context
@@ -67,5 +67,5 @@ These handles are borrowed and invalid after `scene.destroy()` or
 ## Current Limitations
 
 - WGS84 ellipsoid/ECEF mode is planned for the final major phase.
-- Adapter internals still reuse a local NASA-AMMOS compatibility surface.
+- Some runtime renderer modules remain large and are being split incrementally.
 - `three` is a peer dependency.

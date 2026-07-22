@@ -1,5 +1,5 @@
 import type { S111SurfaceCurrentLayerSpec } from "@ecc/s100-viewer";
-import type { S111View } from "../runtime/compat/s100-viewer.js";
+import type { S111View } from "../runtime/scene/NasaSceneRuntime.js";
 import type { NasaSceneGeoreference } from "../adapter/layerNativeTypes.js";
 
 export const applyS111Style = (

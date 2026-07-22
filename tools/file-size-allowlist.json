@@ -5,14 +5,14 @@
     "reason": "Existing Cesium adapter monolith; split after NASA adapter."
   },
   {
-    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/compat/s100-viewer.ts",
+    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/scene/NasaSceneRuntime.ts",
     "phase": "P4",
-    "reason": "Existing NASA runtime compatibility monolith; split after adapter shell extraction."
+    "reason": "Existing NASA runtime scene remains oversized after removal from compat path; feature extraction continues in Phase 4 follow-up."
   },
   {
-    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/compat/map-overlay.ts",
+    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/map/FlatMapOverlay.ts",
     "phase": "P4",
-    "reason": "Existing NASA map renderer; split with runtime extraction."
+    "reason": "Existing NASA map renderer moved out of compat; split tile-grid and loader internals in a follow-up."
   },
   {
     "path": "packages/s100-viewer/src/products/parametric-vessel.ts",
@@ -25,8 +25,8 @@
     "reason": "Existing controller interface and implementation concentration; split after route controller stabilizes."
   },
   {
-    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/compat/sea-currents.ts",
+    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/s111/SeaCurrentsOverlay.ts",
     "phase": "P4",
-    "reason": "Existing NASA S-111 renderer; split with runtime extraction."
+    "reason": "Existing NASA S-111 renderer moved out of compat; split dataset, arrows, materials, and time internals in a follow-up."
   }
 ]

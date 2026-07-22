@@ -10,7 +10,7 @@ import {
   Vector3,
   type Object3D,
 } from "three";
-import type { PickedInfo } from "../runtime/compat/s100-viewer.js";
+import type { PickedInfo } from "../runtime/scene/NasaSceneRuntime.js";
 
 export const applyPickingRayVisualOptions = (
   pickingRay: {

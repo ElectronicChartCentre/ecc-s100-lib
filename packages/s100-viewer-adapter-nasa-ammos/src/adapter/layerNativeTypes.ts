@@ -15,7 +15,7 @@ import type {
   S111View,
   TerrainView,
   VesselView,
-} from "../runtime/compat/s100-viewer.js";
+} from "../runtime/scene/NasaSceneRuntime.js";
 import type { Vec3 } from "../runtime/index.js";
 import type { NasaRoutePlanView } from "../layers/routePlanLayer.js";
 

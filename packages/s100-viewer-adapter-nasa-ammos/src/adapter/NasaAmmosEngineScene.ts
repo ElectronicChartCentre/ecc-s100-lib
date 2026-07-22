@@ -27,9 +27,9 @@ import {
 } from "@ecc/s100-viewer";
 import { type Vec3 } from "../runtime/index.js";
 import {
-  ViewerScene,
+  NasaSceneRuntime,
   type SurfaceCurrentDataset,
-} from "../runtime/compat/s100-viewer.js";
+} from "../runtime/scene/NasaSceneRuntime.js";
 import * as THREE from "three";
 import {
   createRoutePlanView,
@@ -112,7 +112,7 @@ export class NasaAmmosEngineScene implements EngineScene {
   private disposed = false;
 
   constructor(
-    private readonly scene: ViewerScene,
+    private readonly scene: NasaSceneRuntime,
     private readonly options: NasaAmmosAdapterOptions,
     private readonly georeference: NasaSceneGeoreference,
   ) {
@@ -734,4 +734,3 @@ export class NasaAmmosEngineScene implements EngineScene {
     throw new S100Error("layer-not-found", `NASA-AMMOS layer '${handle.id ?? "<unknown>"}' not found.`);
   }
 }
-

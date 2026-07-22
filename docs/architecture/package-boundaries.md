@@ -93,17 +93,18 @@ packages/s100-viewer-adapter-cesium/src/shared
 Internal modules are not public API. Do not export them from package roots
 unless a deliberate public subpath is designed.
 
-## Temporary Compatibility Debt
+## Runtime Boundaries
 
-NASA-AMMOS still has current runtime code under `runtime/compat`. This is
-allowed temporarily and reported by `npm run boundaries:check`.
+NASA-AMMOS maintained runtime code lives under named feature folders such as
+`runtime/scene`, `runtime/map`, `runtime/s111`, and `runtime/terrain`.
+Production adapter code must not import from `runtime/compat`.
 
 The intended end state is:
 
-- current runtime code moves out of `runtime/compat`
-- any remaining compatibility facade is isolated and small
-- production adapter code no longer depends on compatibility-shaped classes such
-  as `ViewerScene`
+- runtime feature folders continue to split large renderer modules by concern
+- any future compatibility facade is isolated and small
+- production adapter code depends on canonical runtime classes such as
+  `NasaSceneRuntime`
 
 ## Guardrails
 
@@ -117,6 +118,5 @@ This checks:
 
 - file-size thresholds
 - package import boundaries
-- temporary NASA compatibility imports
+- accidental runtime compatibility imports
 - canonical root API boundary assumptions
-

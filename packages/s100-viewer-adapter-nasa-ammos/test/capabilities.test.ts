@@ -19,7 +19,7 @@ import type {
   VesselLayerSpec,
 } from "@ecc/s100-viewer";
 import { createNasaAmmosAdapter, nasaAmmosAdapterCapabilities } from "../src/index.js";
-import { SeaCurrentsOverlay } from "../src/runtime/compat/sea-currents.js";
+import { SeaCurrentsOverlay } from "../src/runtime/s111/SeaCurrentsOverlay.js";
 import {
   routePrimitiveKinds,
   sampleRtz,

@@ -4,7 +4,7 @@ import {
   type S102BathymetryLayerSpec,
   type ThreeDTilesSource,
 } from "@ecc/s100-viewer";
-import type { TerrainView } from "../runtime/compat/s100-viewer.js";
+import type { TerrainView } from "../runtime/scene/NasaSceneRuntime.js";
 import {
   getNasaAmmosExtension,
   getNumberExtension,

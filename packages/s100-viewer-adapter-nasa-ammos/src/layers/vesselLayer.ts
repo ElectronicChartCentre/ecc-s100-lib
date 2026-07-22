@@ -10,7 +10,7 @@ import {
   type ModelAssetSpecification,
   type VesselDimensions,
   type VesselView,
-} from "../runtime/compat/s100-viewer.js";
+} from "../runtime/scene/NasaSceneRuntime.js";
 import {
   getBooleanExtension,
   getNasaAmmosExtension,

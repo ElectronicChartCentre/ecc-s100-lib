@@ -1,1 +1,1 @@
-export type { PickedInfo } from "../runtime/compat/s100-viewer.js";
+export type { PickedInfo } from "../runtime/scene/NasaSceneRuntime.js";

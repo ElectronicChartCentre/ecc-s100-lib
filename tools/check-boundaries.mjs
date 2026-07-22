@@ -68,7 +68,6 @@ const collectSpecifiers = (source) => {
 
 const isPackageFile = (path) => path.startsWith("packages/");
 const isCoreSourceFile = (path) => path.startsWith("packages/s100-viewer/src/");
-const isNasaAdapterFile = (path) => path.startsWith("packages/s100-viewer-adapter-nasa-ammos/");
 const isPackageRootIndex = (path) =>
   /^packages\/[^/]+\/src\/index\.(ts|tsx|js|mjs|cjs)$/.test(path);
 
@@ -78,7 +77,6 @@ for (const scanRoot of rootsToScan) {
 }
 
 const violations = [];
-const notices = [];
 
 const addViolation = (file, specifier, message) => {
   violations.push(`${file.relativePath}: ${message} (${specifier})`);
@@ -109,12 +107,8 @@ for (const file of files) {
       }
     }
 
-    if (specifier.includes("runtime/compat") && !isNasaAdapterFile(file.relativePath)) {
-      addViolation(file, specifier, "runtime/compat imports are limited to NASA adapter internals");
-    }
-
-    if (specifier.includes("runtime/compat") && isNasaAdapterFile(file.relativePath)) {
-      notices.push(`${file.relativePath}: temporary NASA runtime/compat import (${specifier})`);
+    if (specifier.includes("runtime/compat")) {
+      addViolation(file, specifier, "runtime/compat imports are not allowed");
     }
   }
 
@@ -139,10 +133,6 @@ if (existsSync(coreRoot)) {
       );
     }
   }
-}
-
-for (const notice of notices) {
-  console.log(`[notice] ${notice}`);
 }
 
 if (violations.length > 0) {
