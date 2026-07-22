@@ -1,8 +1,8 @@
 [
   {
-    "path": "packages/s100-viewer-adapter-cesium/src/index.ts",
+    "path": "packages/s100-viewer-adapter-cesium/src/adapter/CesiumEngineScene.ts",
     "phase": "P5",
-    "reason": "Existing Cesium adapter monolith; split after NASA adapter."
+    "reason": "Existing Cesium adapter implementation moved behind a small public root; split feature modules through Phase 5."
   },
   {
     "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/scene/NasaSceneRuntime.ts",
