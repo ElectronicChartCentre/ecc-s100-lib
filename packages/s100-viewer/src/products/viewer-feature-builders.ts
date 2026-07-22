@@ -1,4 +1,8 @@
 import type { ModelSource, WmsSource } from "./sources.js";
+import {
+  buildParametricVesselLayout,
+  type ParametricVesselSpec,
+} from "./parametric-vessel.js";
 import type {
   MapOverlayLayerSpec,
   MapOverlayStyle,
@@ -34,6 +38,15 @@ export type CreateVesselLayerOptions = LayerBuilderCommonOptions<VesselStyle> &
     referencePoint?: VesselReferencePoint;
     model?: VesselModelOptions;
   };
+
+export type CreateParametricVesselLayerOptions =
+  LayerBuilderCommonOptions<VesselStyle> &
+    SourceRequestBuilderOptions & {
+      parametric: ParametricVesselSpec;
+      pose: VesselPose;
+      referencePoint?: VesselReferencePoint;
+      model?: VesselModelOptions;
+    };
 
 export type CreateMapOverlayWmsLayerOptions = LayerBuilderCommonOptions<MapOverlayStyle> &
   SourceRequestBuilderOptions & {
@@ -88,6 +101,33 @@ export const createVessel = (options: CreateVesselLayerOptions): VesselLayerSpec
     ...(options.model !== undefined ? { model: compactRecord(options.model) as VesselModelOptions } : {}),
     style: mergeVesselStyle(options.style),
   });
+
+export const createParametricVessel = (
+  options: CreateParametricVesselLayerOptions,
+): VesselLayerSpec => {
+  const layout = buildParametricVesselLayout(options.parametric);
+  return {
+    id: options.id ?? "vessel",
+    product: "vessel",
+    ...commonLayerFields(options),
+    source: {
+      kind: "parametric-vessel",
+      spec: layout.spec,
+      layout,
+      ...requestOptions(options),
+      ...(options.sourceMetadata !== undefined ? { metadata: options.sourceMetadata } : {}),
+    },
+    pose: options.pose,
+    dimensions: layout.dimensions,
+    ...(options.referencePoint !== undefined ? { referencePoint: options.referencePoint } : {}),
+    parametricVessel: {
+      spec: layout.spec,
+      layout,
+    },
+    ...(options.model !== undefined ? { model: compactRecord(options.model) as VesselModelOptions } : {}),
+    style: mergeVesselStyle(options.style),
+  };
+};
 
 export const createMapOverlayWms = (
   options: CreateMapOverlayWmsLayerOptions,
@@ -145,6 +185,7 @@ export const ViewerFeatureLayerBuilder = {
   VesselStyles,
   MapOverlayStyles,
   createVessel,
+  createParametricVessel,
   createMapOverlayWms,
   createMapOverlayWmsTemplate,
 };

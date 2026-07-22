@@ -167,6 +167,9 @@ describe("@ecc/s100-viewer product specs", () => {
         case "S-57":
           return `${spec.standard}:${spec.source.kind}:${spec.role}`;
         case "vessel":
+          if (spec.source.kind !== "model") {
+            return `${spec.product}:${spec.source.kind}:${spec.pose.headingDegrees}`;
+          }
           return `${spec.product}:${spec.source.format}:${spec.pose.headingDegrees}`;
         default:
           return spec.product;

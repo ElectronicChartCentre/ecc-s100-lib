@@ -5,9 +5,12 @@ import type { S100Layer } from "../layers/types.js";
 import type { S100Scene } from "../scene/types.js";
 import { FeatureLifecycleScope } from "../features/index.js";
 import {
+  createParametricVessel,
   createVessel,
+  type CreateParametricVesselLayerOptions,
   type CreateVesselLayerOptions,
 } from "./viewer-feature-builders.js";
+import { vesselDimensionsFromParametricVessel } from "./parametric-vessel.js";
 import type {
   VesselDimensions,
   VesselLayerSpec,
@@ -25,8 +28,7 @@ export type VesselVerticalConstraint = {
   reference?: VesselVerticalPositionLimits["reference"];
 };
 
-export type VesselFeatureSessionOptions =
-  Omit<CreateVesselLayerOptions, "pose" | "style"> & {
+type VesselFeatureSessionCommonOptions = {
     scene: S100Scene;
     pose: VesselPose;
     style?: Partial<VesselStyle>;
@@ -37,6 +39,18 @@ export type VesselFeatureSessionOptions =
     onPositionChanged?: (position: Coordinate) => void;
     onHeadingChanged?: (heading: number) => void;
   };
+
+export type ModelVesselFeatureSessionOptions =
+  Omit<CreateVesselLayerOptions, "pose" | "style"> &
+    VesselFeatureSessionCommonOptions;
+
+export type ParametricVesselFeatureSessionOptions =
+  Omit<CreateParametricVesselLayerOptions, "pose" | "style"> &
+    VesselFeatureSessionCommonOptions;
+
+export type VesselFeatureSessionOptions =
+  | ModelVesselFeatureSessionOptions
+  | ParametricVesselFeatureSessionOptions;
 
 export class VesselFeatureSession {
   private readonly lifecycle = new FeatureLifecycleScope();
@@ -80,18 +94,26 @@ export class VesselFeatureSession {
       style,
       ...layerOptions
     } = options;
-    const pose = normalizePose(inputPose, scene, options.dimensions, constraints?.vertical);
+    const dimensions = sessionDimensions(options);
+    const pose = normalizePose(inputPose, scene, dimensions, constraints?.vertical);
     const layerStyle = withVerticalTransformLimits(
       style,
-      options.dimensions,
+      dimensions,
       constraints?.vertical,
     );
+    const layerSpec = isParametricVesselFeatureSessionOptions(layerOptions)
+      ? createParametricVessel({
+          ...layerOptions,
+          pose,
+          ...(layerStyle !== undefined ? { style: layerStyle } : {}),
+        })
+      : createVessel({
+          ...layerOptions,
+          pose,
+          ...(layerStyle !== undefined ? { style: layerStyle } : {}),
+        });
     const layer = await scene.layers.add(
-      createVessel({
-        ...layerOptions,
-        pose,
-        ...(layerStyle !== undefined ? { style: layerStyle } : {}),
-      }),
+      layerSpec,
     );
     const session = new VesselFeatureSession(
       scene,
@@ -237,6 +259,20 @@ export class VesselFeatureSession {
       listener(pose);
     }
   }
+}
+
+function isParametricVesselFeatureSessionOptions(
+  options: Omit<VesselFeatureSessionOptions, keyof VesselFeatureSessionCommonOptions>,
+): options is Omit<CreateParametricVesselLayerOptions, "pose" | "style"> {
+  return "parametric" in options;
+}
+
+function sessionDimensions(
+  options: VesselFeatureSessionOptions,
+): VesselDimensions | undefined {
+  return isParametricVesselFeatureSessionOptions(options)
+    ? vesselDimensionsFromParametricVessel(options.parametric)
+    : options.dimensions;
 }
 
 function normalizePose(

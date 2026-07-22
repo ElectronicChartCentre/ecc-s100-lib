@@ -1,10 +1,15 @@
 import type { Coordinate } from "../coordinates/types.js";
 import type { BaseLayerSpec } from "../layers/types.js";
 import type { BoundingBoxTuple, QuatTuple } from "../math.js";
+import type {
+  ParametricVesselLayout,
+  ParametricVesselSpec,
+} from "./parametric-vessel.js";
 import type { ProjectedMapSpecification } from "./projected-map-template.js";
 import type {
   ModelSource,
   MvtSource,
+  ParametricVesselSource,
   StaticJsonSource,
   WmsSource,
   WmsTemplateSource,
@@ -103,15 +108,21 @@ export type VesselRenderingOptions = {
   shadowVisible?: boolean;
 };
 
+export type ParametricVesselLayerData = {
+  spec: ParametricVesselSpec;
+  layout: ParametricVesselLayout;
+};
+
 export type MapOverlayRenderingOptions = {
   discardMode?: number;
 };
 
 export interface VesselLayerSpec extends BaseLayerSpec<"vessel"> {
-  source: ModelSource;
+  source: ModelSource | ParametricVesselSource<ParametricVesselSpec, ParametricVesselLayout>;
   pose: VesselPose;
   dimensions?: VesselDimensions;
   referencePoint?: VesselReferencePoint;
+  parametricVessel?: ParametricVesselLayerData;
   model?: VesselModelOptions;
   rendering?: VesselRenderingOptions;
   style?: VesselStyle;

@@ -6,6 +6,7 @@ export * from "./enc.js";
 export * from "./projected-map-template.js";
 export * from "./iho-s100.js";
 export * from "./simulated-water-level.js";
+export * from "./parametric-vessel.js";
 export * from "./viewer-features.js";
 export * from "./enc-builders.js";
 export * from "./enc-wms-session.js";

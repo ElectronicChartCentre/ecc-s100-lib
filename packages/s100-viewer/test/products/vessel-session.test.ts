@@ -53,6 +53,60 @@ describe("VesselFeatureSession", () => {
     );
   });
 
+  it("adds a parametric vessel layer through the same session API", async () => {
+    const layer = createVesselLayer();
+    const scene = createScene(layer, 2);
+
+    await VesselFeatureSession.add({
+      scene,
+      id: "parametric-vessel",
+      parametric: {
+        dimensions: {
+          draught: 6,
+          bow: 102,
+          stern: 18,
+          port: 12,
+          starboard: 12,
+        },
+      },
+      pose: {
+        position: projected(0, 0, 99),
+      },
+      constraints: {
+        vertical: {
+          minMeters: -75,
+          maxMeters: "draught",
+          reference: "sea-level",
+        },
+      },
+    });
+
+    expect(scene.layers.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "parametric-vessel",
+        product: "vessel",
+        source: expect.objectContaining({
+          kind: "parametric-vessel",
+        }),
+        dimensions: {
+          draught: 6,
+          bow: 102,
+          stern: 18,
+          port: 12,
+          starboard: 12,
+        },
+        pose: {
+          position: projected(0, 0, 8),
+        },
+        parametricVessel: expect.objectContaining({
+          layout: expect.objectContaining({
+            kind: "parametric-vessel-layout",
+          }),
+        }),
+      }),
+    );
+  });
+
   it("clamps programmatic position updates", async () => {
     const layer = createVesselLayer();
     const session = await VesselFeatureSession.add({

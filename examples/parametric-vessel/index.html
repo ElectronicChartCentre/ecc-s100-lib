@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>S-100 Parametric Vessel</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="toolbar">
+        <div class="toolbar__title">
+          <strong>Parametric Vessel</strong>
+          <span>Procedural S-100 vessel demo</span>
+        </div>
+        <button id="reset-button" type="button">Reset</button>
+        <span id="status-pill" class="status-pill">Starting</span>
+      </header>
+      <main class="workspace">
+        <section id="viewer" class="viewer-surface" aria-label="Parametric vessel viewer"></section>
+        <aside class="side-panel" aria-label="Parametric vessel controls">
+          <section class="control-section">
+            <h2>AIS Dimensions</h2>
+            <div id="dimension-controls" class="control-list"></div>
+          </section>
+          <section class="control-section">
+            <h2>Derived Shape</h2>
+            <div id="derived-values" class="derived-values"></div>
+          </section>
+          <section class="control-section">
+            <h2>Layout</h2>
+            <div id="layout-controls" class="control-list"></div>
+          </section>
+          <section class="control-section">
+            <h2>Bridge</h2>
+            <div id="bridge-controls" class="control-list"></div>
+          </section>
+          <section class="control-section">
+            <h2>Mast</h2>
+            <div id="mast-controls" class="control-list"></div>
+          </section>
+          <section class="control-section">
+            <h2>Transponder</h2>
+            <div id="transponder-controls" class="control-list"></div>
+          </section>
+          <section class="spec-section">
+            <h2>Spec</h2>
+            <pre id="spec-preview" class="spec-preview"></pre>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

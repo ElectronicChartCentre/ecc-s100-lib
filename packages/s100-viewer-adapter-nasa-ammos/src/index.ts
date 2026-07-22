@@ -1,4 +1,5 @@
 import {
+  buildParametricVesselLayout,
   depthFromElevation,
   getS102SafetyDepthMeters,
   S100Error,
@@ -27,6 +28,7 @@ import {
   type ViewerHostOptions,
   type MapOverlayLayerSpec,
   type ModelSource,
+  type ParametricVesselLayout,
   type RestJsonSource,
   type S102BathymetryLayerSpec,
   type S111SurfaceCurrentLayerSpec,
@@ -46,6 +48,7 @@ import {
   type S100NasaViewerConfig,
   type Vec3,
 } from "./runtime/index.js";
+import { createParametricVesselObject } from "./parametric-vessel-model.js";
 import {
   MapLayerType,
   SeaLevelIndicatorMode,
@@ -114,7 +117,7 @@ export const nasaAmmosAdapterCapabilities: AdapterCapabilities = {
   sceneGeoreferences: ["projected-local"],
   layerProducts: ["S-101", "S-57", "S-102", "S-111", "simulated-water-level", "vessel", "map-overlay", "tool"],
   supportedProductVersions: S100SupportedProductVersions,
-  dataSources: ["3d-tiles", "wms", "wmts", "rest-json", "static-json", "model"],
+  dataSources: ["3d-tiles", "wms", "wmts", "rest-json", "static-json", "model", "parametric-vessel"],
   cameraControls: ["pose", "look-at"],
   picking: true,
   timeDynamicLayers: true,
@@ -736,16 +739,10 @@ class NasaAmmosEngineScene implements EngineScene {
   }
 
   private createVesselLayer(spec: VesselLayerSpec): NasaLayerNative {
-    assertSourceKind(spec, "model");
-    const model = getVesselModel(spec);
+    const model = createVesselModelSpecification(spec);
     const verticalPositionLimits = getVesselTransformGizmoVerticalPositionLimits(spec);
     const view = this.scene.VesselFeature.add({
-      model: {
-        path: spec.source.url,
-        name: spec.title ?? spec.id,
-        boundingBox: model.boundingBox,
-        orientation: model.orientation,
-      },
+      model,
       dimensions: getVesselDimensions(spec),
       ...(verticalPositionLimits !== undefined ? { verticalPositionLimits } : {}),
     });
@@ -1360,6 +1357,49 @@ function getVesselDimensions(spec: VesselLayerSpec): VesselDimensions {
     port: semantic.port ?? extension.port ?? 20,
     starboard: semantic.starboard ?? extension.starboard ?? 20,
   };
+}
+
+function createVesselModelSpecification(spec: VesselLayerSpec): ModelAssetSpecification {
+  const model = getVesselModel(spec);
+  const name = spec.title ?? spec.id;
+  if (spec.source.kind === "model") {
+    return {
+      path: spec.source.url,
+      name,
+      ...(model.boundingBox !== undefined ? { boundingBox: model.boundingBox } : {}),
+      ...(model.orientation !== undefined ? { orientation: model.orientation } : {}),
+    };
+  }
+
+  if (spec.source.kind === "parametric-vessel") {
+    const layout = getParametricVesselLayout(spec);
+    return {
+      path: `parametric-vessel:${spec.id}`,
+      name,
+      object: () => createParametricVesselObject(layout),
+      ...(model.orientation !== undefined ? { orientation: model.orientation } : {}),
+    };
+  }
+
+  throw new S100Error(
+    "invalid-layer-spec",
+    `NASA-AMMOS vessel layer '${spec.id}' requires a model or parametric-vessel source.`,
+    spec,
+  );
+}
+
+function getParametricVesselLayout(spec: VesselLayerSpec): ParametricVesselLayout {
+  if (spec.parametricVessel?.layout) {
+    return spec.parametricVessel.layout;
+  }
+  if (spec.source.kind === "parametric-vessel") {
+    return spec.source.layout ?? buildParametricVesselLayout(spec.source.spec);
+  }
+  throw new S100Error(
+    "invalid-layer-spec",
+    `NASA-AMMOS vessel layer '${spec.id}' does not include parametric vessel layout data.`,
+    spec,
+  );
 }
 
 function getVesselModel(spec: VesselLayerSpec): Partial<ModelAssetSpecification> {

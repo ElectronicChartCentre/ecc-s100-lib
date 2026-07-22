@@ -7,6 +7,7 @@ export type ServiceReadySource =
   | WmtsSource
   | RestJsonSource
   | StaticJsonSource
+  | ParametricVesselSource
   | ModelSource
   | MvtSource;
 
@@ -105,11 +106,29 @@ export type ModelSource = SourceRequestOptions & {
   metadata?: SourceMetadata;
 };
 
+export type ParametricVesselSource<TSpec = unknown, TLayout = unknown> =
+  SourceRequestOptions & {
+    kind: "parametric-vessel";
+    spec: TSpec;
+    layout?: TLayout;
+    metadata?: SourceMetadata;
+  };
+
 export const isServiceReadySource = (source: unknown): source is ServiceReadySource => {
   if (!source || typeof source !== "object" || !("kind" in source)) {
     return false;
   }
 
   const kind = (source as { kind: string }).kind;
-  return ["3d-tiles", "wms", "wms-template", "wmts", "rest-json", "static-json", "model", "mvt"].includes(kind);
+  return [
+    "3d-tiles",
+    "wms",
+    "wms-template",
+    "wmts",
+    "rest-json",
+    "static-json",
+    "parametric-vessel",
+    "model",
+    "mvt",
+  ].includes(kind);
 };

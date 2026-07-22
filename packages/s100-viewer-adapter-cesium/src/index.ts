@@ -1581,7 +1581,7 @@ class CesiumEngineScene implements EngineScene {
     };
     native.entity.position = this.coordinateToCartesian(
       this.vesselModelRootCoordinate(native.spec),
-      native.spec.source,
+      vesselModelSource(native.spec),
     );
     native.entity.orientation = this.createHeadingOrientation(native.spec);
     this.rebuildVesselPresentationDrawables(native);
@@ -1881,9 +1881,9 @@ class CesiumEngineScene implements EngineScene {
   }
 
   private vesselProjectedCenter(spec: VesselLayerSpec): { x: number; y: number; z: number; crs: string } | null {
-    const crs = spec.source.crs ?? this.sceneCrs();
+    const crs = vesselModelSource(spec)?.crs ?? this.sceneCrs();
     if (this.isProjectedLocalScene()) {
-      const cartesian = this.coordinateToCartesian(spec.pose.position, spec.source);
+      const cartesian = this.coordinateToCartesian(spec.pose.position, vesselModelSource(spec));
       const projected = this.worldCartesianToProjected(cartesian);
       if (!projected) {
         return null;
@@ -1971,7 +1971,7 @@ class CesiumEngineScene implements EngineScene {
       native.entity.show = native.spec.visible ?? native.spec.style?.visible ?? true;
       native.entity.position = this.coordinateToCartesian(
         this.vesselModelRootCoordinate(native.spec),
-        native.spec.source,
+        vesselModelSource(native.spec),
       );
       native.entity.orientation = this.createHeadingOrientation(native.spec);
       this.rebuildVesselPresentationDrawables(native);
@@ -3002,7 +3002,7 @@ class CesiumEngineScene implements EngineScene {
       "fromDegrees" in HeadingPitchRoll && typeof HeadingPitchRoll.fromDegrees === "function"
         ? HeadingPitchRoll.fromDegrees(headingDegrees, 0, 0)
         : new (HeadingPitchRoll as CesiumConstructor)(degreesToRadians(this.cesium, headingDegrees), 0, 0);
-    return Transforms.headingPitchRollQuaternion(this.coordinateToCartesian(spec.pose.position, spec.source), hpr);
+    return Transforms.headingPitchRollQuaternion(this.coordinateToCartesian(spec.pose.position, vesselModelSource(spec)), hpr);
   }
 
   private vesselModelRootCoordinate(spec: VesselLayerSpec): Coordinate {
@@ -7120,6 +7120,10 @@ function getVesselDimensions(spec: VesselLayerSpec): VesselDimensionsLike {
     port: finiteNumber(semantic.port ?? extension.port, 20),
     starboard: finiteNumber(semantic.starboard ?? extension.starboard, 20),
   };
+}
+
+function vesselModelSource(spec: VesselLayerSpec): ModelSource | undefined {
+  return spec.source.kind === "model" ? spec.source : undefined;
 }
 
 function parseVesselBoundingBox(value: unknown): { min: Vector3Fields; max: Vector3Fields } | null {

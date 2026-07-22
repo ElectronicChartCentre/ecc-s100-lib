@@ -207,6 +207,7 @@ export type VesselDimensions = {
 export type ModelAssetSpecification = {
   path: string;
   name: string;
+  object?: () => Object3D;
   orientation?: unknown;
   boundingBox?: unknown;
 };
@@ -1812,20 +1813,19 @@ export class CustomModelView {
   }
 
   private async loadModel(): Promise<boolean> {
-    if (!this.scene || !this.specification.path) {
+    if (!this.scene || (!this.specification.path && !this.specification.object)) {
       return false;
     }
 
     const url = resolveModelAssetURL(this.specification.path, this.config);
     this.setLoadStatus("loading");
     try {
-      const gltf = await new GLTFLoader().loadAsync(url);
+      const object = await loadCustomModelObject(this.specification, url);
       if (this.destroyed) {
-        disposeObjectTree(gltf.scene);
+        disposeObjectTree(object);
         return false;
       }
 
-      const object = gltf.scene;
       object.name = this.specification.name ?? object.name ?? "s100-model";
       configureModelObjectForRendering(
         object,
@@ -1848,7 +1848,7 @@ export class CustomModelView {
       this.setLoadStatus("loaded", { object });
       return true;
     } catch (error) {
-      this.config.logger?.warn?.("Failed to load GLB model", url, error);
+      this.config.logger?.warn?.("Failed to load model", url, error);
       this.setLoadStatus("error", { error });
       return false;
     }
@@ -3884,6 +3884,17 @@ function resolveModelAssetURL(path: string, config: ViewerConfig): string {
     return `/${staticFiles}/${normalizedPath}`;
   }
   return `/${normalizedPath}`;
+}
+
+async function loadCustomModelObject(
+  specification: CustomModelSpecification,
+  url: string,
+): Promise<Object3D> {
+  if (specification.object) {
+    return specification.object();
+  }
+  const gltf = await new GLTFLoader().loadAsync(url);
+  return gltf.scene;
 }
 
 function configureModelObjectForRendering(
