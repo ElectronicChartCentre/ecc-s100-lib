@@ -62,6 +62,20 @@ import {
   type DeferredImageSource,
 } from "../environment/imageCompatibility.js";
 import {
+  getCesiumEquirectangularSkyboxUrl,
+  getNumberMetadata,
+  getStringMetadata,
+  isKtx2EnvironmentMap,
+  resolveCesiumSkyboxSources,
+} from "../environment/skybox.js";
+import {
+  CESIUM_PROJECTED_LOCAL_SOUTH_LIGHT_DIRECTION,
+  cesiumSunDirectionFromTime,
+  createDefaultS102LightingFallbackState,
+  resolveS102LightingFallbackState,
+  type S102LightingFallbackState,
+} from "../environment/lighting.js";
+import {
   applyCesiumCameraControls,
   cesiumPanMetersPerPixel,
   disableCesiumNativeCameraRotate,
@@ -207,28 +221,9 @@ type VesselGizmoPickInfo = {
   axis: VesselGizmoAxis;
 };
 
-type CesiumSkyboxFaces = {
-  positiveX: string;
-  negativeX: string;
-  positiveY: string;
-  negativeY: string;
-  positiveZ: string;
-  negativeZ: string;
-};
-
-type S102LightingFallbackState = {
-  enabled: boolean;
-  directionWC: Vector3Fields;
-  ambientIntensity: number;
-  directionalIntensity: number;
-};
-
 const DEFAULT_PROJECTED_MAP_HEIGHT_OFFSET_METERS = 0.5;
 const DEFAULT_S111_HEIGHT_OFFSET_METERS = 1;
 const PROJECTED_S102_MAXIMUM_SCREEN_SPACE_ERROR = 0.25;
-const CESIUM_PROJECTED_LOCAL_SOUTH_LIGHT_DIRECTION: Vector3Fields = { x: 0, y: 0.55, z: -0.83 };
-const S102_LIGHTING_FALLBACK_AMBIENT_INTENSITY = 0.48;
-const S102_LIGHTING_FALLBACK_DIRECTIONAL_INTENSITY = 0.82;
 const CESIUM_TILE_CONTENT_STATE_UNLOADED = 0;
 const CESIUM_TILE_CONTENT_STATE_FAILED = 5;
 const S102_FAILED_TILE_RETRY_INITIAL_DELAY_MS = 1000;
@@ -285,12 +280,7 @@ export class CesiumEngineScene implements EngineScene {
   private environmentTextureLightingAvailable = false;
   private lastSceneLightDirectionWC: Vector3Fields = CESIUM_PROJECTED_LOCAL_SOUTH_LIGHT_DIRECTION;
   private lastSceneLightIntensity = 1.35;
-  private s102LightingFallbackState: S102LightingFallbackState = {
-    enabled: true,
-    directionWC: CESIUM_PROJECTED_LOCAL_SOUTH_LIGHT_DIRECTION,
-    ambientIntensity: S102_LIGHTING_FALLBACK_AMBIENT_INTENSITY,
-    directionalIntensity: S102_LIGHTING_FALLBACK_DIRECTIONAL_INTENSITY,
-  };
+  private s102LightingFallbackState: S102LightingFallbackState = createDefaultS102LightingFallbackState();
   private lastCameraPose: EngineCameraPose = {
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0, w: 1 },
@@ -630,7 +620,7 @@ export class CesiumEngineScene implements EngineScene {
   }
 
   private updateDynamicLightingForTime(time: Date): void {
-    const direction = this.sunDirectionFromTime(time);
+    const direction = cesiumSunDirectionFromTime(time);
     const worldDirection = this.projectedLocalVectorToWorld(direction) ?? direction;
     this.setSceneDirectionalLight(worldDirection, this.environmentLightingState?.directionalIntensity ?? 1.25);
     const scene = getObject(this.viewer, "scene");
@@ -656,28 +646,14 @@ export class CesiumEngineScene implements EngineScene {
   }
 
   private updateS102LightingFallbackState(directionWC: Vector3Fields, sceneLightIntensity: number): void {
-    this.lastSceneLightDirectionWC = normalizeVector3(directionWC) ?? CESIUM_PROJECTED_LOCAL_SOUTH_LIGHT_DIRECTION;
+    this.s102LightingFallbackState = resolveS102LightingFallbackState({
+      directionWC,
+      sceneLightIntensity,
+      lighting: this.environmentLightingState,
+      environmentTextureLightingAvailable: this.environmentTextureLightingAvailable,
+    });
+    this.lastSceneLightDirectionWC = this.s102LightingFallbackState.directionWC;
     this.lastSceneLightIntensity = normalizePositiveNumber(sceneLightIntensity, 1.25);
-    const lighting = this.environmentLightingState;
-    const enabled = !this.environmentTextureLightingAvailable;
-    this.s102LightingFallbackState = {
-      enabled,
-      directionWC: this.lastSceneLightDirectionWC,
-      ambientIntensity: enabled
-        ? Math.max(
-            normalizePositiveNumber(lighting?.ambientIntensity, 0),
-            normalizePositiveNumber(lighting?.environmentIntensity, 0) * 0.75,
-            S102_LIGHTING_FALLBACK_AMBIENT_INTENSITY,
-          )
-        : normalizePositiveNumber(lighting?.ambientIntensity, 0),
-      directionalIntensity: enabled
-        ? Math.max(
-            normalizePositiveNumber(lighting?.directionalIntensity, 0),
-            this.lastSceneLightIntensity,
-            S102_LIGHTING_FALLBACK_DIRECTIONAL_INTENSITY,
-          )
-        : normalizePositiveNumber(lighting?.directionalIntensity, this.lastSceneLightIntensity),
-    };
     this.updateS102LightingFallbackUniforms();
   }
 
@@ -687,19 +663,6 @@ export class CesiumEngineScene implements EngineScene {
         updateS102TilesetLightingFallback(native.primitive, this.s102LightingFallbackState);
       }
     }
-  }
-
-  private sunDirectionFromTime(time: Date): Vector3Fields {
-    const hours = time.getUTCHours() + time.getUTCMinutes() / 60 + time.getUTCSeconds() / 3600;
-    const dayProgress = hours / 24;
-    const daylight = Math.sin((dayProgress - 0.25) * Math.PI * 2);
-    const elevation = Math.max(0.12, daylight) * (Math.PI / 3);
-    const horizontal = Math.cos(elevation);
-    return normalizeVector3({
-      x: 0,
-      y: horizontal,
-      z: -Math.sin(elevation),
-    }) ?? CESIUM_PROJECTED_LOCAL_SOUTH_LIGHT_DIRECTION;
   }
 
   async addLayer(spec: BaseLayerSpec): Promise<EngineLayerHandle> {
@@ -3547,80 +3510,6 @@ function normalizeDegrees(value: number): number {
   return ((value % 360) + 360) % 360;
 }
 
-function resolveCesiumSkyboxSources(state: EnvironmentState): CesiumSkyboxFaces | null {
-  const explicitFaces = normalizeCesiumSkyboxFaces(state.skyboxFaces ?? getObject(state.metadata, "skyboxFaces"));
-  if (explicitFaces) {
-    return explicitFaces;
-  }
-
-  const template = getStringMetadata(state, "skyboxUrlTemplate");
-  if (template) {
-    return createSkyboxFacesFromTemplate(template);
-  }
-
-  return null;
-}
-
-function getCesiumEquirectangularSkyboxUrl(state: EnvironmentState): string | null {
-  const url = state.skyboxUrl;
-  if (!url || state.skyboxFaces || isHdrEnvironmentMap(url) || isKtx2EnvironmentMap(url)) {
-    return null;
-  }
-  return url;
-}
-
-function normalizeCesiumSkyboxFaces(value: unknown): CesiumSkyboxFaces | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  const faces = {
-    positiveX: record.positiveX,
-    negativeX: record.negativeX,
-    positiveY: record.positiveY,
-    negativeY: record.negativeY,
-    positiveZ: record.positiveZ,
-    negativeZ: record.negativeZ,
-  };
-  if (Object.values(faces).every((face) => typeof face === "string" && face.length > 0)) {
-    return faces as CesiumSkyboxFaces;
-  }
-  return null;
-}
-
-function createSkyboxFacesFromTemplate(template: string): CesiumSkyboxFaces {
-  const replaceFace = (face: string) =>
-    template
-      .replaceAll("{face}", face)
-      .replaceAll("{FACE}", face.toUpperCase());
-  return {
-    positiveX: replaceFace("positiveX"),
-    negativeX: replaceFace("negativeX"),
-    positiveY: replaceFace("positiveY"),
-    negativeY: replaceFace("negativeY"),
-    positiveZ: replaceFace("positiveZ"),
-    negativeZ: replaceFace("negativeZ"),
-  };
-}
-
-function getStringMetadata(state: EnvironmentState, key: string): string | undefined {
-  const value = state.metadata?.[key];
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function getNumberMetadata(state: EnvironmentState, key: string, fallback: number): number {
-  const value = state.metadata?.[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function isHdrEnvironmentMap(url: string): boolean {
-  return /\.hdr(?:[?#].*)?$/i.test(url);
-}
-
-function isKtx2EnvironmentMap(url: string): boolean {
-  return /\.ktx2(?:[?#].*)?$/i.test(url);
-}
-
 function mergeLayerSpecPatch<TSpec extends BaseLayerSpec>(spec: TSpec, patch: LayerPatch): TSpec {
   return {
     ...spec,
@@ -4280,15 +4169,6 @@ function updateS102TilesetLightingFallback(
     }
   }
   return updated;
-}
-
-function createDefaultS102LightingFallbackState(): S102LightingFallbackState {
-  return {
-    enabled: true,
-    directionWC: CESIUM_PROJECTED_LOCAL_SOUTH_LIGHT_DIRECTION,
-    ambientIntensity: S102_LIGHTING_FALLBACK_AMBIENT_INTENSITY,
-    directionalIntensity: S102_LIGHTING_FALLBACK_DIRECTIONAL_INTENSITY,
-  };
 }
 
 function configureS102TilesetRefinement(
