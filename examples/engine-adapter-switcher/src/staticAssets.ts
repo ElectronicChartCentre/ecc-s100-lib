@@ -25,7 +25,7 @@ export const loadDemoEnvironment = async (engineId?: string): Promise<Environmen
       },
       metadata: {
         ...environment.metadata,
-        environmentMapSource: "s100-explorer-webapp kloofendal HDRI",
+        environmentMapSource: "shared demo kloofendal HDRI",
       },
     };
     delete nasaEnvironment.skyboxFaces;
@@ -38,7 +38,7 @@ export const loadDemoEnvironment = async (engineId?: string): Promise<Environmen
       skyboxUrl: demoCesiumEnvironmentMapUrl,
       metadata: {
         ...environment.metadata,
-        environmentMapSource: "s100-explorer-webapp kloofendal HDRI",
+        environmentMapSource: "shared demo kloofendal HDRI",
       },
     };
     delete cesiumEnvironment.skyboxFaces;

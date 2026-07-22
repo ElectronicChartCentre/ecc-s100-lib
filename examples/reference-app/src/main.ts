@@ -13,7 +13,7 @@ import { createNasaAmmosAdapter } from "@ecc/s100-viewer-adapter-nasa-ammos";
 import {
   createFeatureSessions,
   type FeatureSessions,
-} from "../../getting-started/main";
+} from "../../shared/featureSessions";
 import {
   configuredValue,
   createReferenceEncAvailabilityRequests,

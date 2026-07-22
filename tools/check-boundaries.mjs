@@ -70,6 +70,11 @@ const isPackageFile = (path) => path.startsWith("packages/");
 const isCoreSourceFile = (path) => path.startsWith("packages/s100-viewer/src/");
 const isPackageRootIndex = (path) =>
   /^packages\/[^/]+\/src\/index\.(ts|tsx|js|mjs|cjs)$/.test(path);
+const exampleName = (path) => /^examples\/([^/]+)\//.exec(path)?.[1];
+const isExampleFile = (path) => path.startsWith("examples/");
+const isPrivatePackageSubpathImport = (specifier) =>
+  specifier.startsWith("@ecc/s100-viewer/") ||
+  /^@ecc\/s100-viewer-adapter-[^/]+\//u.test(specifier);
 
 const files = [];
 for (const scanRoot of rootsToScan) {
@@ -109,6 +114,39 @@ for (const file of files) {
 
     if (specifier.includes("runtime/compat")) {
       addViolation(file, specifier, "runtime/compat imports are not allowed");
+    }
+
+    if (isExampleFile(file.relativePath)) {
+      const importerExample = exampleName(file.relativePath);
+      const importedExample = resolved ? exampleName(resolved) : undefined;
+      if (
+        importerExample !== undefined &&
+        importedExample !== undefined &&
+        importerExample !== importedExample &&
+        importedExample !== "shared"
+      ) {
+        addViolation(
+          file,
+          specifier,
+          "examples must not import sibling example app code; move shared logic to examples/shared",
+        );
+      }
+
+      if (isPrivatePackageSubpathImport(specifier)) {
+        addViolation(
+          file,
+          specifier,
+          "examples must import package-level public APIs, not private package subpaths",
+        );
+      }
+
+      if (resolved?.startsWith("packages/") && resolved.includes("/src/")) {
+        addViolation(
+          file,
+          specifier,
+          "examples must not reach into package source through relative imports",
+        );
+      }
     }
   }
 

@@ -44,6 +44,11 @@ npm run demo:reference
 npm run build:demo:reference
 ```
 
+Shared example-only workflow helpers live under `examples/shared`. Runnable
+examples may import from `examples/shared`, but should not import each other's
+app entrypoints or source files. The boundary check enforces that package code
+never imports examples and examples only use package-level public imports.
+
 The RTZ route demo is a focused route portrayal app with a bundled sample RTZ
 fixture and file upload:
 

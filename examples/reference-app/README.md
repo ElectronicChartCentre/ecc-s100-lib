@@ -44,6 +44,8 @@ npm run build:demo:reference
 ## Relationship To Getting Started
 
 The lightweight app in `examples/getting-started` is the succinct API
-ergonomics benchmark. This app is the fuller integration benchmark: same session
-API, plus realistic lifecycle, configuration, controls, logging, shared demo
-assets, vessel setup, and teardown.
+ergonomics benchmark. This app is the fuller integration benchmark: same public
+session API, plus realistic lifecycle, configuration, controls, logging, shared
+demo assets, vessel setup, and teardown. Shared example-only workflow helpers
+live in `examples/shared` so runnable examples do not import each other's app
+entrypoints.

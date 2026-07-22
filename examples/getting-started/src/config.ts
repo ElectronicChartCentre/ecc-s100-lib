@@ -2,7 +2,7 @@ import type { PrimarEncAvailabilityRequests } from "@ecc/s100-viewer";
 import type {
   FeatureSessionWorkflowOptions,
   LatLonBounds,
-} from "../main";
+} from "../../shared/featureSessions";
 
 export type GettingStartedConfig = {
   crs: string;
