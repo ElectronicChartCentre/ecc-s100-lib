@@ -11,8 +11,7 @@ import {
   type RouteWaypoint,
   type RouteWaypointLeg,
 } from "./route-plan.js";
-
-const NAUTICAL_MILE_METERS = 1852;
+import { nauticalMilesToMeters } from "./route-geodesy.js";
 
 export type RtzParseOptions = {
   id?: string;
@@ -43,9 +42,6 @@ type WaypointDefaults = {
   legAttributes: Record<string, string>;
   legExtensions: readonly RouteExtension[];
 };
-
-export const nauticalMilesToMeters = (value: number): number =>
-  value * NAUTICAL_MILE_METERS;
 
 export const parseRtzRoute = (
   xml: string,
@@ -860,4 +856,3 @@ const childrenByLocalName = (
   childName: string,
 ): XmlNode[] =>
   node.children.filter((child) => localName(child.name) === childName);
-

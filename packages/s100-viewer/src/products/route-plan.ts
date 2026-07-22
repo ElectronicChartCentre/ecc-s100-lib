@@ -138,6 +138,7 @@ export type RoutePrimitiveMetadata = {
   primitiveKind: "centerline" | "waypoint" | "xtd-boundary" | "corridor" | "route-volume" | "debug";
   waypointId?: string;
   legId?: string;
+  side?: "portside" | "starboard";
 };
 
 export type RouteLayoutPosition = {
@@ -174,6 +175,7 @@ export type RouteMeshPrimitive = {
 export type RoutePlanLayout = {
   routeId: string;
   sourceFormat: RouteSourceFormat;
+  origin?: GeographicPosition;
   bounds?: RouteBounds;
   centerline?: RouteLinePrimitive;
   waypoints: readonly RoutePointPrimitive[];
@@ -279,4 +281,3 @@ export const createEmptyRoutePlanLayout = (
   debug: [],
   diagnostics: routePlan.diagnostics,
 });
-
