@@ -3,6 +3,8 @@ import { EncLayerBuilder } from "./enc-builders.js";
 import type { EncLayerSpec } from "./enc.js";
 import { S100IhoProductLayerBuilder } from "./iho-builders.js";
 import type { S100IhoProductLayerSpec } from "./iho-s100.js";
+import { RoutePlanLayerBuilder } from "./route-builders.js";
+import type { RoutePlanLayerSpec } from "./route-plan.js";
 import { isServiceReadySource } from "./sources.js";
 import { SimulatedWaterLevelLayerBuilder } from "./simulated-water-level-builders.js";
 import type { SimulatedWaterLevelLayerSpec } from "./simulated-water-level.js";
@@ -12,6 +14,7 @@ import type { ViewerFeatureLayerSpec } from "./viewer-features.js";
 export type S100ProductLayerSpec =
   | S100IhoProductLayerSpec
   | EncLayerSpec
+  | RoutePlanLayerSpec
   | SimulatedWaterLevelLayerSpec
   | ViewerFeatureLayerSpec;
 
@@ -20,6 +23,7 @@ export type S100ServiceProductType = S100ProductLayerSpec["product"];
 export const LayerBuilder = {
   ...EncLayerBuilder,
   ...S100IhoProductLayerBuilder,
+  ...RoutePlanLayerBuilder,
   ...SimulatedWaterLevelLayerBuilder,
   ...ViewerFeatureLayerBuilder,
 };

@@ -8,6 +8,7 @@ export type ServiceReadySource =
   | RestJsonSource
   | StaticJsonSource
   | ParametricVesselSource
+  | RoutePlanSource
   | ModelSource
   | MvtSource;
 
@@ -114,6 +115,13 @@ export type ParametricVesselSource<TSpec = unknown, TLayout = unknown> =
     metadata?: SourceMetadata;
   };
 
+export type RoutePlanSource<TPlan = unknown, TLayout = unknown> = {
+  kind: "route-plan";
+  routePlan: TPlan;
+  layout?: TLayout;
+  metadata?: SourceMetadata;
+};
+
 export const isServiceReadySource = (source: unknown): source is ServiceReadySource => {
   if (!source || typeof source !== "object" || !("kind" in source)) {
     return false;
@@ -128,6 +136,7 @@ export const isServiceReadySource = (source: unknown): source is ServiceReadySou
     "rest-json",
     "static-json",
     "parametric-vessel",
+    "route-plan",
     "model",
     "mvt",
   ].includes(kind);

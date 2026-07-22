@@ -82,6 +82,7 @@ export type {
   BaseLayerControllers,
   LayerControllers,
   MapLayerController,
+  RouteLayerController,
   SurfaceCurrentLayerController,
   SurfaceCurrentTimeController,
   TerrainContourOptions,

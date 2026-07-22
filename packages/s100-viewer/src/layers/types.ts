@@ -9,7 +9,7 @@ export const S100ProductType = {
 } as const;
 
 export type S100ProductType = (typeof S100ProductType)[keyof typeof S100ProductType];
-export type OperationalLayerType = "vessel" | "map-overlay" | "simulated-water-level" | "tool";
+export type OperationalLayerType = "vessel" | "map-overlay" | "simulated-water-level" | "route-plan" | "tool";
 export type LayerProduct = S100ProductType | OperationalLayerType | string;
 
 export type LayerMetadata = {

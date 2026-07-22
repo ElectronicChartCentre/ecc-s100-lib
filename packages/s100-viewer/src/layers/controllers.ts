@@ -17,6 +17,14 @@ import type {
   VesselPose,
   VesselTransformControlMode,
 } from "../products/viewer-features.js";
+import {
+  RoutePlanProductType,
+  RouteStyles,
+  type RouteDiagnostic,
+  type RouteFeatureStyle,
+  type RoutePlan,
+  type RoutePlanLayerSpec,
+} from "../products/route-plan.js";
 
 export type LayerControllerContext = {
   setSceneTime?(time: Date): void;
@@ -140,15 +148,25 @@ export type VesselLayerController = {
   destroy(): void;
 };
 
+export type RouteLayerController = {
+  readonly kind: "route";
+  getRoutePlan(): RoutePlan;
+  getDiagnostics(): readonly RouteDiagnostic[];
+  setStyle(style: Partial<RouteFeatureStyle>): Promise<void>;
+  setHybrid3d(enabled: boolean): Promise<void>;
+  setDebugGeometryVisible(visible: boolean): Promise<void>;
+};
+
 export type BaseLayerControllers = {
   terrain?: TerrainLayerController;
   surfaceCurrent?: SurfaceCurrentLayerController;
   map?: MapLayerController;
   vessel?: VesselLayerController;
+  route?: RouteLayerController;
 };
 
 export type LayerControllers<TSpec extends BaseLayerSpec = BaseLayerSpec> =
-  Omit<BaseLayerControllers, "terrain" | "surfaceCurrent" | "map" | "vessel"> &
+  Omit<BaseLayerControllers, "terrain" | "surfaceCurrent" | "map" | "vessel" | "route"> &
     (TSpec extends S102BathymetryLayerSpec
       ? { terrain: TerrainLayerController }
       : { terrain?: TerrainLayerController }) &
@@ -160,7 +178,10 @@ export type LayerControllers<TSpec extends BaseLayerSpec = BaseLayerSpec> =
       : { map?: MapLayerController }) &
     (TSpec extends VesselLayerSpec
       ? { vessel: VesselLayerController }
-      : { vessel?: VesselLayerController });
+      : { vessel?: VesselLayerController }) &
+    (TSpec extends RoutePlanLayerSpec
+      ? { route: RouteLayerController }
+      : { route?: RouteLayerController });
 
 export const createLayerControllers = <TSpec extends BaseLayerSpec>(
   layer: S100Layer<TSpec>,
@@ -190,6 +211,12 @@ export const createLayerControllers = <TSpec extends BaseLayerSpec>(
   if (isVesselLayerSpec(layer.spec)) {
     controllers.vessel = new CoreVesselLayerController(
       layer as unknown as S100Layer<VesselLayerSpec>,
+    );
+  }
+
+  if (isRoutePlanLayerSpec(layer.spec)) {
+    controllers.route = new CoreRouteLayerController(
+      layer as unknown as S100Layer<RoutePlanLayerSpec>,
     );
   }
 
@@ -366,6 +393,49 @@ class CoreTerrainLayerController implements TerrainLayerController {
         ...this.layer.spec.debug,
         showTileBounds: this.settingsState.renderBBoxes,
       },
+    });
+  }
+}
+
+class CoreRouteLayerController implements RouteLayerController {
+  readonly kind = "route" as const;
+
+  constructor(private readonly layer: S100Layer<RoutePlanLayerSpec>) {}
+
+  getRoutePlan(): RoutePlan {
+    return this.layer.spec.source.routePlan;
+  }
+
+  getDiagnostics(): readonly RouteDiagnostic[] {
+    return [
+      ...this.layer.spec.source.routePlan.diagnostics,
+      ...(this.layer.spec.source.layout?.diagnostics ?? []),
+    ];
+  }
+
+  async setStyle(style: Partial<RouteFeatureStyle>): Promise<void> {
+    await this.layer.update({
+      style: {
+        ...this.layer.spec.style,
+        ...style,
+      },
+    });
+  }
+
+  async setHybrid3d(enabled: boolean): Promise<void> {
+    await this.setStyle({
+      ...(enabled
+        ? RouteStyles.s421Hybrid3d(this.layer.spec.style)
+        : RouteStyles.s421Defaults(this.layer.spec.style)),
+      visualization: enabled ? "hybrid-3d" : "standard",
+      showRouteVolume: enabled,
+      showRouteSides: enabled,
+    });
+  }
+
+  async setDebugGeometryVisible(visible: boolean): Promise<void> {
+    await this.setStyle({
+      showTurnDebugGeometry: visible,
     });
   }
 }
@@ -944,6 +1014,9 @@ const isMapLayerSpec = (spec: BaseLayerSpec): spec is EncLayerSpec | MapOverlayL
 
 const isVesselLayerSpec = (spec: BaseLayerSpec): spec is VesselLayerSpec =>
   spec.product === "vessel";
+
+const isRoutePlanLayerSpec = (spec: BaseLayerSpec): spec is RoutePlanLayerSpec =>
+  spec.product === RoutePlanProductType.RoutePlan;
 
 const surfaceCurrentDataFromSpec = (
   spec: S111SurfaceCurrentLayerSpec,
