@@ -23,6 +23,7 @@ import {
   type LivePickingOptions,
   type PickRequest,
   type PickResult,
+  type RoutePlanLayerSpec,
   type S100EngineAdapter,
   type SceneOptions,
   type ViewerHostOptions,
@@ -65,6 +66,11 @@ import {
   type VesselView,
 } from "./runtime/compat/s100-viewer.js";
 import * as THREE from "three";
+import {
+  createRoutePlanView,
+  getRoutePickValues,
+  type NasaRoutePlanView,
+} from "./route-plan-layer.js";
 import {
   AmbientLight,
   Color,
@@ -111,13 +117,14 @@ type NasaLayerNative =
   | { kind: "simulated-water-level"; spec: SimulatedWaterLevelLayerSpec; data: unknown }
   | { kind: "map"; spec: EncLayerSpec | MapOverlayLayerSpec; view: MapView }
   | { kind: "vessel"; spec: VesselLayerSpec; view: VesselView }
+  | { kind: "route-plan"; spec: RoutePlanLayerSpec; view: NasaRoutePlanView }
   | { kind: "model"; spec: BaseLayerSpec; view: CustomModelView };
 
 export const nasaAmmosAdapterCapabilities: AdapterCapabilities = {
   sceneGeoreferences: ["projected-local"],
-  layerProducts: ["S-101", "S-57", "S-102", "S-111", "simulated-water-level", "vessel", "map-overlay", "tool"],
+  layerProducts: ["S-101", "S-57", "S-102", "S-111", "simulated-water-level", "vessel", "route-plan", "map-overlay", "tool"],
   supportedProductVersions: S100SupportedProductVersions,
-  dataSources: ["3d-tiles", "wms", "wmts", "rest-json", "static-json", "model", "parametric-vessel"],
+  dataSources: ["3d-tiles", "wms", "wmts", "rest-json", "static-json", "model", "parametric-vessel", "route-plan"],
   cameraControls: ["pose", "look-at"],
   picking: true,
   timeDynamicLayers: true,
@@ -428,6 +435,8 @@ class NasaAmmosEngineScene implements EngineScene {
       : undefined;
 
     if (hit) {
+      const pickableRoot = getPickableRootForObject(hit.object);
+      const routePickValues = getRoutePickValues(hit.object, pickableRoot);
       return {
         screen: { x: request.screenX, y: request.screenY },
         world: {
@@ -439,6 +448,7 @@ class NasaAmmosEngineScene implements EngineScene {
         },
         source: "geometry",
         depthMeters: depthFromElevation(hit.point.z, this.scene.seaLevel),
+        ...pickValuesToResultFields(routePickValues),
         native: request.includeNative ? hit : undefined,
       };
     }
@@ -671,6 +681,8 @@ class NasaAmmosEngineScene implements EngineScene {
         return this.createMapLayer(spec as MapOverlayLayerSpec);
       case "vessel":
         return this.createVesselLayer(spec as VesselLayerSpec);
+      case "route-plan":
+        return this.createRoutePlanLayer(spec as RoutePlanLayerSpec);
       default:
         throw new S100Error(
           "adapter-capability",
@@ -755,6 +767,16 @@ class NasaAmmosEngineScene implements EngineScene {
     return { kind: "vessel", spec, view };
   }
 
+  private createRoutePlanLayer(spec: RoutePlanLayerSpec): NasaLayerNative {
+    assertSourceKind(spec, "route-plan");
+    const renderContext = getRenderContext(this.scene);
+    const view = createRoutePlanView(spec, renderContext?.scene);
+    view.setVisibility(spec.visible ?? spec.style.visible ?? true);
+    view.setOpacity(spec.opacity ?? spec.style.opacity ?? 1);
+
+    return { kind: "route-plan", spec, view };
+  }
+
   private applyLayerPatch(native: NasaLayerNative, patch: LayerPatch): void {
     if (native.kind === "terrain") {
       applyTerrainStyle(native.view, native.spec);
@@ -800,6 +822,10 @@ class NasaAmmosEngineScene implements EngineScene {
         applyVesselPresentation(native.view, native.spec);
       }
     }
+
+    if (native.kind === "route-plan") {
+      native.view.update(native.spec, patch as LayerPatch<RoutePlanLayerSpec>);
+    }
   }
 
   private async disposeNativeLayer(native: NasaLayerNative): Promise<void> {
@@ -815,6 +841,9 @@ class NasaAmmosEngineScene implements EngineScene {
         return;
       case "vessel":
         this.scene.VesselFeature.remove(native.view);
+        return;
+      case "route-plan":
+        native.view.dispose();
         return;
       case "model":
         this.scene.CustomModels.remove(native.view);
@@ -1589,6 +1618,30 @@ function legacyPickToPickResult(pick: PickedInfo): PickResult | null {
   };
   if (pick.hasDepth) {
     result.depthMeters = depthFromElevation(pick.xyz[2], pick.seaLevel ?? 0);
+  }
+  return result;
+}
+
+function pickValuesToResultFields(
+  values: Record<string, unknown> | undefined,
+): Partial<Pick<PickResult, "product" | "layerId" | "featureId" | "values">> {
+  if (values === undefined) {
+    return {};
+  }
+
+  const result: Partial<Pick<PickResult, "product" | "layerId" | "featureId" | "values">> = {
+    values,
+  };
+  if (typeof values.product === "string") {
+    result.product = values.product;
+  }
+  if (typeof values.layerId === "string") {
+    result.layerId = values.layerId;
+  }
+  if (typeof values.waypointId === "string") {
+    result.featureId = values.waypointId;
+  } else if (typeof values.legId === "string") {
+    result.featureId = values.legId;
   }
   return result;
 }

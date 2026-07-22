@@ -129,6 +129,7 @@ describe("RouteFeatureSession", () => {
       showRouteVolume: true,
       showRouteSides: true,
     });
+    expect(handle.layout.routeVolumes).toHaveLength(1);
     expect(scene.layers.add).toHaveBeenCalledTimes(1);
   });
 
@@ -262,7 +263,7 @@ const sampleRtz = `<?xml version="1.0" encoding="utf-8"?>
   <routeInfo routeName="Pilot Route" />
   <waypoints>
     <defaultWaypoint radius="0.1">
-      <leg starboardXTD="0.1" portsideXTD="0.1" geometryType="Loxodrome" />
+      <leg starboardXTD="0.1" portsideXTD="0.1" safetyDepth="12" geometryType="Loxodrome" />
     </defaultWaypoint>
     <waypoint id="1" revision="1">
       <position lat="60" lon="5" />

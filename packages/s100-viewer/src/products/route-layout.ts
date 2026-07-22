@@ -12,6 +12,7 @@ import type {
   RouteDiagnostic,
   RouteLayoutPosition,
   RouteLinePrimitive,
+  RouteMeshPrimitive,
   RoutePlan,
   RoutePlanLayout,
   RoutePointPrimitive,
@@ -64,6 +65,9 @@ export const buildRoutePlanLayout = (
   const corridors = includeCorridor
     ? buildCorridorPolygons(routePlan, projection)
     : [];
+  const routeVolumes = options.includeRouteVolume === true || options.includeRouteSides === true
+    ? buildRouteVolumeMeshes(routePlan, projection, options.seaLevelMeters ?? 0)
+    : [];
   const debug = options.includeTurnDebugGeometry === true
     ? buildTurnDebugGeometry(
         routePlan,
@@ -81,7 +85,7 @@ export const buildRoutePlanLayout = (
     waypoints,
     legBoundaries,
     corridors,
-    routeVolumes: [],
+    routeVolumes,
     debug,
     diagnostics,
   };
@@ -234,6 +238,54 @@ const buildCorridorPolygons = (
   });
 };
 
+const buildRouteVolumeMeshes = (
+  routePlan: RoutePlan,
+  projection: RouteProjection,
+  seaLevelMeters: number,
+): RouteMeshPrimitive[] => {
+  const waypointsById = waypointMap(routePlan);
+  return routePlan.legs.flatMap((leg) => {
+    const boundary = routeLegOffset(leg, waypointsById);
+    const safetyDepthMeters = leg.safetyDepthMeters;
+    if (!boundary || safetyDepthMeters === undefined || safetyDepthMeters <= 0) {
+      return [];
+    }
+
+    const top = [
+      projection.project(boundary.starboard.from),
+      projection.project(boundary.starboard.to),
+      projection.project(boundary.portside.to),
+      projection.project(boundary.portside.from),
+    ].map((position) => withZ(position, seaLevelMeters));
+    const bottom = top.map((position) => withZ(position, seaLevelMeters - safetyDepthMeters));
+
+    return [{
+      id: `${routePlan.id}:leg:${leg.id}:safety-depth-volume`,
+      positions: [
+        ...top,
+        ...bottom,
+      ],
+      indices: [
+        0, 1, 2,
+        0, 2, 3,
+        4, 6, 5,
+        4, 7, 6,
+        0, 4, 5,
+        0, 5, 1,
+        1, 5, 6,
+        1, 6, 2,
+        2, 6, 7,
+        2, 7, 3,
+        3, 7, 4,
+        3, 4, 0,
+      ],
+      metadata: metadata(routePlan, "route-volume", {
+        legId: leg.id,
+      }),
+    }];
+  });
+};
+
 const buildTurnDebugGeometry = (
   routePlan: RoutePlan,
   projection: RouteProjection,
@@ -304,3 +356,11 @@ const degreesToRadians = (value: number): number =>
 
 const normalizeLongitudeDelta = (delta: number): number =>
   ((delta + 180) % 360 + 360) % 360 - 180;
+
+const withZ = (
+  position: RouteLayoutPosition,
+  z: number,
+): RouteLayoutPosition => ({
+  ...position,
+  z,
+});

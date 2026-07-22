@@ -4,6 +4,7 @@ import type { S100Layer } from "../layers/types.js";
 import type { S100Scene } from "../scene/types.js";
 import {
   createRoutePlan,
+  mergeRouteStyle,
 } from "./route-builders.js";
 import {
   buildRoutePlanLayout,
@@ -204,7 +205,16 @@ export class RouteFeatureSession {
     token: number,
   ): Promise<RouteFeatureHandle> {
     this.lifecycle.assertActive(token);
+    const style = mergeRouteStyle({
+      ...this.options.defaults,
+      ...options.style,
+    });
     const layout = buildRoutePlanLayout(routePlan, {
+      includeCorridor: style.showCorridor,
+      includeXtdBoundaries: style.showXtdBoundaries,
+      includeRouteVolume: style.showRouteVolume,
+      includeRouteSides: style.showRouteSides,
+      includeTurnDebugGeometry: style.showTurnDebugGeometry,
       ...this.options.layoutOptions,
       ...options.layoutOptions,
       georeference: this.options.scene.georeference,
@@ -229,10 +239,7 @@ export class RouteFeatureSession {
         ...(options.extensions !== undefined ? { extensions: options.extensions } : {}),
         routePlan,
         layout,
-        style: {
-          ...this.options.defaults,
-          ...options.style,
-        },
+        style,
       }),
     );
 

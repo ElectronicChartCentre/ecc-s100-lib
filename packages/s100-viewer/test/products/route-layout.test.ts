@@ -80,6 +80,30 @@ describe("buildRoutePlanLayout", () => {
     expect(debugPrimitive.positions).toHaveLength(13);
   });
 
+  it("creates optional safety-depth route volume meshes", () => {
+    const routePlan = parseRtzRoute(sampleRtz);
+    const layout = buildRoutePlanLayout(routePlan, {
+      includeRouteVolume: true,
+      seaLevelMeters: 2,
+    });
+
+    expect(layout.routeVolumes).toHaveLength(1);
+    expect(layout.routeVolumes[0]).toMatchObject({
+      id: "North Route:leg:1:2:safety-depth-volume",
+      positions: expect.arrayContaining([
+        expect.objectContaining({ z: 2 }),
+        expect.objectContaining({ z: -10 }),
+      ]),
+      indices: expect.arrayContaining([0, 1, 2, 3, 4, 0]),
+      metadata: {
+        routeId: "North Route",
+        sourceFormat: "rtz",
+        primitiveKind: "route-volume",
+        legId: "1:2",
+      },
+    });
+  });
+
   it("omits corridor primitives when XTD values are missing", () => {
     const routePlan = parseRtzRoute(`
       <route version="1.2" xmlns="http://www.cirm.org/RTZ/1/2">
@@ -130,7 +154,7 @@ const sampleRtz = `<?xml version="1.0" encoding="utf-8"?>
   <routeInfo routeName="North Route" />
   <waypoints>
     <defaultWaypoint radius="0.1">
-      <leg starboardXTD="0.1" portsideXTD="0.1" geometryType="Loxodrome" />
+      <leg starboardXTD="0.1" portsideXTD="0.1" safetyDepth="12" geometryType="Loxodrome" />
     </defaultWaypoint>
     <waypoint id="1" revision="1">
       <position lat="60" lon="5" />
