@@ -1,0 +1,48 @@
+[
+  {
+    "path": "packages/s100-viewer-adapter-cesium/src/index.ts",
+    "phase": "P5",
+    "reason": "Existing Cesium adapter monolith; split after NASA adapter."
+  },
+  {
+    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/compat/s100-viewer.ts",
+    "phase": "P4",
+    "reason": "Existing NASA runtime compatibility monolith; split after adapter shell extraction."
+  },
+  {
+    "path": "packages/s100-viewer-adapter-cesium/test/package.test.ts",
+    "phase": "P2",
+    "reason": "Existing Cesium package test with inline mocks; fixtures and feature tests to be extracted."
+  },
+  {
+    "path": "packages/s100-viewer-adapter-nasa-ammos/src/index.ts",
+    "phase": "P3",
+    "reason": "Existing NASA adapter shell and scene monolith; split first."
+  },
+  {
+    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/compat/map-overlay.ts",
+    "phase": "P4",
+    "reason": "Existing NASA map renderer; split with runtime extraction."
+  },
+  {
+    "path": "packages/s100-viewer/src/products/parametric-vessel.ts",
+    "phase": "P7",
+    "reason": "New parametric vessel product module; split after adapter cleanup."
+  },
+  {
+    "path": "packages/s100-viewer/src/layers/controllers.ts",
+    "phase": "P7",
+    "reason": "Existing controller interface and implementation concentration; split after route controller stabilizes."
+  },
+  {
+    "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/compat/sea-currents.ts",
+    "phase": "P4",
+    "reason": "Existing NASA S-111 renderer; split with runtime extraction."
+  },
+  {
+    "path": "packages/s100-viewer/test/viewer-core.test.ts",
+    "phase": "P2",
+    "reason": "Existing broad core package test; split only after adapter contracts are added."
+  }
+]
+
