@@ -153,10 +153,11 @@ export const createSceneAlignedSampleRouteXml = (
   config: RtzRouteDemoConfig,
 ): string | undefined => {
   const offsets = [
-    { id: "WP001", name: "Approach", x: -1600, y: -650 },
-    { id: "WP002", name: "Turn North", x: -560, y: -120 },
-    { id: "WP003", name: "Inner Fairway", x: 480, y: 220 },
-    { id: "WP004", name: "Berth Limit", x: 1620, y: 640 },
+    { id: "WP001", name: "Approach", x: -1550, y: -900 },
+    { id: "WP002", name: "Starboard Turn", x: -620, y: -120 },
+    { id: "WP003", name: "Port Turn", x: 80, y: -760 },
+    { id: "WP004", name: "Inner Fairway", x: 720, y: 40 },
+    { id: "WP005", name: "Berth Limit", x: 1520, y: 720 },
   ];
   const waypoints: SampleWaypoint[] = [];
   for (const offset of offsets) {
@@ -175,7 +176,7 @@ export const createSceneAlignedSampleRouteXml = (
 <route version="1.2" xmlns="http://www.cirm.org/RTZ/1/2">
   <routeInfo routeName="Scene-Aligned S-102 Demo" routeAuthor="ECC" routeStatus="planned" />
   <waypoints>
-    <defaultWaypoint radius="0.12">
+    <defaultWaypoint radius="0.18">
       <leg starboardXTD="0.08" portsideXTD="0.08" safetyDepth="16" safetyContour="20" geometryType="Loxodrome" speedMin="5" speedMax="12" />
     </defaultWaypoint>
 ${waypoints.map((waypoint, index) => waypointXml(waypoint, index)).join("\n")}
@@ -221,8 +222,10 @@ function waypointXml(
   const leg = index === 1
     ? `\n      <leg starboardXTD="0.06" portsideXTD="0.10" safetyDepth="14" geometryType="Loxodrome" />`
     : index === 2
-      ? `\n      <leg starboardXTD="0.07" portsideXTD="0.07" safetyDepth="12" geometryType="Loxodrome" />`
-      : "";
+      ? `\n      <leg starboardXTD="0.10" portsideXTD="0.06" safetyDepth="13" geometryType="Loxodrome" />`
+      : index === 3
+        ? `\n      <leg starboardXTD="0.07" portsideXTD="0.07" safetyDepth="12" geometryType="Loxodrome" />`
+        : "";
   return `    <waypoint id="${waypoint.id}" revision="1" name="${waypoint.name}">
       <position lat="${waypoint.geographic.lat.toFixed(7)}" lon="${waypoint.geographic.lon.toFixed(7)}" />${leg}
     </waypoint>`;

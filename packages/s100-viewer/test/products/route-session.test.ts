@@ -79,7 +79,9 @@ describe("RouteFeatureSession", () => {
       }),
     );
     expect(handle.id).toBe("pilot-route");
-    expect(handle.layer.spec.source.layout?.corridors).toHaveLength(1);
+    expect(handle.layer.spec.source.layout?.corridors).toHaveLength(2);
+    expect(handle.layer.spec.source.layout?.corridors.map((corridor) => corridor.metadata.side))
+      .toEqual(["starboard", "portside"]);
     expect(diagnostics).toHaveBeenCalledWith([
       expect.objectContaining({
         code: "route-layout-local-tangent-projection",
@@ -129,7 +131,7 @@ describe("RouteFeatureSession", () => {
       showRouteVolume: true,
       showRouteSides: true,
     });
-    expect(handle.layout.routeVolumes).toHaveLength(1);
+    expect(handle.layout.routeVolumes).toHaveLength(8);
     expect(scene.layers.add).toHaveBeenCalledTimes(1);
   });
 

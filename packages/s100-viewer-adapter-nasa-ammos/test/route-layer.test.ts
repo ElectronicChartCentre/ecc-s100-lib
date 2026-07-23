@@ -54,6 +54,11 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos route layer", () => {
       "waypoint",
       "xtd-boundary",
     ]));
+    expect(routeMetadata(native?.view.root).filter((metadata) => metadata.primitiveKind === "corridor"))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ side: "starboard" }),
+        expect.objectContaining({ side: "portside" }),
+      ]));
     expect(routePrimitiveKinds(native?.view.root)).not.toContain("route-volume");
     expect(routePrimitiveKinds(native?.view.root)).not.toContain("debug");
 
@@ -89,6 +94,12 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos route layer", () => {
     const originalChildren = new Set(native?.view.root.children ?? []);
 
     expect(routePrimitiveKinds(native?.view.root)).toContain("route-volume");
+    expect(routeMetadata(native?.view.root).filter((metadata) => metadata.primitiveKind === "route-volume"))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ side: "starboard", depthBand: "safety-depth" }),
+        expect.objectContaining({ side: "portside", depthBand: "safety-depth" }),
+        expect.objectContaining({ depthBand: "below-safety-depth" }),
+      ]));
     expect(routePrimitiveKinds(native?.view.root)).not.toContain("debug");
 
     await route.controllers.route.setDebugGeometryVisible(true);
@@ -102,3 +113,13 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos route layer", () => {
     await viewer.destroy();
   });
 });
+
+const routeMetadata = (root: Object3D | undefined): Array<Record<string, unknown>> => {
+  if (!root) {
+    return [];
+  }
+  return root.children
+    .map((child) => child.userData.s100PickMetadata)
+    .filter((value): value is Record<string, unknown> =>
+      typeof value === "object" && value !== null);
+};

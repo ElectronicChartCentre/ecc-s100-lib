@@ -8,11 +8,11 @@ npm run build:demo:rtz-route
 ```
 
 Copy `.env.example` to `.env.local` to enable S-102 bathymetry beneath the
-route volume. The route demo defaults to `EPSG:32632` and a Bergen-centered
-origin for the bundled sample route; use `VITE_RTZ_ROUTE_CRS` and the origin
-variables when testing RTZ files over a different S-102 dataset. The demo also
-recognizes the `VITE_DEMO_*` and `VITE_REFERENCE_*` S-102/scene variables used
-by the other examples when copied into this demo's `.env.local`.
+route. The route demo defaults to `EPSG:32632` and a Bergen-centered origin for
+the bundled sample route; use `VITE_RTZ_ROUTE_CRS` and the origin variables
+when testing RTZ files over a different S-102 dataset. The demo also recognizes
+the `VITE_DEMO_*` and `VITE_REFERENCE_*` S-102/scene variables used by the other
+examples when copied into this demo's `.env.local`.
 
 The built-in sample route is generated around the configured projected origin
 so it can sit over the configured S-102 dataset. The checked-in RTZ fixture is
@@ -29,7 +29,12 @@ await routes.addRtz({
 });
 ```
 
-Hybrid 3D route portrayal is opt-in through route style:
+Hybrid 3D route portrayal is opt-in through route style. The 3D route geometry
+uses COGS-inspired safety-depth side walls and caps that depth-test against the
+loaded S-102 terrain; it does not sample or drape itself onto the S-102 mesh.
+The demo opens with side walls enabled and the full below-depth volume disabled
+so the route remains readable over bathymetry. Enable the full depth volume
+toggle when inspecting the complete safety-depth extrusion.
 
 ```ts
 await routes.addRtz({
@@ -43,6 +48,7 @@ await routes.addRtz({
 });
 ```
 
-The demo keeps RTZ parsing, waypoint defaults, unit conversion, XTD layout,
-corridor geometry, route volume layout, adapter object creation, and cleanup in
-the library. The app supplies route source and presentation intent.
+The demo keeps RTZ parsing, waypoint defaults, unit conversion, turn-radius
+sampling, XTD layout, split port/starboard corridor geometry, route side-wall
+layout, adapter object creation, and cleanup in the library. The app supplies
+route source and presentation intent.

@@ -145,6 +145,7 @@ export type RoutePrimitiveMetadata = {
   waypointId?: string;
   legId?: string;
   side?: "portside" | "starboard";
+  depthBand?: "safety-depth" | "below-safety-depth";
 };
 
 export type RouteLayoutPosition = {

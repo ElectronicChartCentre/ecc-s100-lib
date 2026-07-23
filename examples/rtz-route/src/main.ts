@@ -132,6 +132,8 @@ async function startDemo(): Promise<void> {
       layoutOptions: {
         projection: createProjectedRouteProjection(config),
         seaLevelMeters: 0,
+        routeVolumeBottomDepthMeters: 120,
+        turnArcSegmentAngleDegrees: 2,
         turnDebugSegments: 36,
       },
     });
@@ -307,8 +309,8 @@ function renderRouteSummary(handle: RouteFeatureHandle, sourceId: string): void 
     summaryItem("Name", routePlan.routeInfo.name ?? routePlan.routeInfo.routeName ?? routePlan.id),
     summaryItem("Waypoints", String(routePlan.waypoints.length)),
     summaryItem("Legs", String(routePlan.legs.length)),
-    summaryItem("Corridors", String(handle.layout.corridors.length)),
-    summaryItem("Volumes", String(handle.layout.routeVolumes.length)),
+    summaryItem("Corridor surfaces", String(handle.layout.corridors.length)),
+    summaryItem("3D meshes", String(handle.layout.routeVolumes.length)),
   );
 }
 

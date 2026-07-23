@@ -43,6 +43,7 @@ export const metadata = (
     waypointId?: string;
     legId?: string;
     side?: "portside" | "starboard";
+    depthBand?: "safety-depth" | "below-safety-depth";
   } = {},
 ): RoutePrimitiveMetadata => ({
   routeId: routePlan.id,
@@ -51,6 +52,7 @@ export const metadata = (
   ...(details.waypointId !== undefined ? { waypointId: details.waypointId } : {}),
   ...(details.legId !== undefined ? { legId: details.legId } : {}),
   ...(details.side !== undefined ? { side: details.side } : {}),
+  ...(details.depthBand !== undefined ? { depthBand: details.depthBand } : {}),
 });
 
 export const withZ = (

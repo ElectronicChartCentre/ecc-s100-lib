@@ -9,6 +9,7 @@ import {
   resolveRouteProjection,
 } from "./projection.js";
 import { buildRouteVolumeMeshes } from "./routeVolume.js";
+import { buildRouteLayoutLegSections } from "./sections.js";
 import type { RouteLayoutOptions } from "./types.js";
 
 export type { RouteLayoutOptions, RouteProjection } from "./types.js";
@@ -25,17 +26,28 @@ export const buildRoutePlanLayout = (
   const diagnostics = [...resolvedProjection.diagnostics];
   const includeXtdBoundaries = options.includeXtdBoundaries ?? true;
   const includeCorridor = options.includeCorridor ?? true;
-  const centerline = buildCenterline(routePlan, projection);
+  const legSections = buildRouteLayoutLegSections(
+    routePlan,
+    projection,
+    options.turnArcSegmentAngleDegrees,
+  );
+  diagnostics.push(...legSections.diagnostics);
+  const centerline = buildCenterline(routePlan, projection, legSections.sections);
   const waypoints = buildWaypointPoints(routePlan, projection);
   const bounds = computeRouteBounds(routePlan);
   const legBoundaries = includeXtdBoundaries
-    ? buildLegBoundaryLines(routePlan, projection)
+    ? buildLegBoundaryLines(routePlan, legSections.sections)
     : [];
   const corridors = includeCorridor
-    ? buildCorridorPolygons(routePlan, projection)
+    ? buildCorridorPolygons(routePlan, legSections.sections)
     : [];
   const routeVolumes = options.includeRouteVolume === true || options.includeRouteSides === true
-    ? buildRouteVolumeMeshes(routePlan, projection, options.seaLevelMeters ?? 0)
+    ? buildRouteVolumeMeshes(
+        routePlan,
+        legSections.sections,
+        options.seaLevelMeters ?? 0,
+        options.routeVolumeBottomDepthMeters,
+      )
     : [];
   const debug = options.includeTurnDebugGeometry === true
     ? buildTurnDebugGeometry(

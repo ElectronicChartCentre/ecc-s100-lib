@@ -132,6 +132,9 @@ class CoreNasaRoutePlanView implements NasaRoutePlanView {
 
     if (style.showRouteVolume || style.showRouteSides) {
       for (const primitive of layout.routeVolumes) {
+        if (!shouldRenderRouteVolumePrimitive(primitive, style)) {
+          continue;
+        }
         const mesh = createRouteVolumeMesh(this.spec, primitive, style);
         if (mesh) {
           this.root.add(mesh);
@@ -144,7 +147,7 @@ class CoreNasaRoutePlanView implements NasaRoutePlanView {
         const mesh = createPolygonMesh(
           this.spec,
           primitive,
-          style.corridorFillColor,
+          corridorColor(style, primitive),
           this.layerOpacity,
           ROUTE_SURFACE_Z_OFFSET_METERS,
         );
@@ -308,7 +311,7 @@ const createPolygonMesh = (
       3,
     ),
   );
-  geometry.setIndex(triangleFanIndices(positions.length));
+  geometry.setIndex(polygonIndices(primitive, positions.length));
   geometry.computeVertexNormals();
 
   const colorAlpha = colorToThree(color, 0.2);
@@ -349,7 +352,10 @@ const createRouteVolumeMesh = (
   geometry.setIndex([...primitive.indices]);
   geometry.computeVertexNormals();
 
-  const colorAlpha = colorToThree(colorOverride ?? style.routeVolumeFillColor, 0.22);
+  const colorAlpha = colorToThree(
+    colorOverride ?? routeVolumeColor(style, primitive),
+    0.22,
+  );
   const layerOpacity = clamp01(spec.opacity ?? style.opacity ?? 1);
   const material = new MeshBasicMaterial({
     color: colorAlpha.color,
@@ -363,6 +369,44 @@ const createRouteVolumeMesh = (
   mesh.renderOrder = 3;
   applyRouteObjectMetadata(mesh, spec, primitive.metadata);
   return mesh;
+};
+
+const shouldRenderRouteVolumePrimitive = (
+  primitive: RouteMeshPrimitive,
+  style: RouteFeatureStyle,
+): boolean =>
+  style.showRouteVolume ||
+  (style.showRouteSides &&
+    primitive.metadata.side !== undefined &&
+    primitive.metadata.depthBand === "safety-depth");
+
+const routeVolumeColor = (
+  style: RouteFeatureStyle,
+  primitive: RouteMeshPrimitive,
+): ColorValue | undefined => {
+  if (primitive.metadata.depthBand === "below-safety-depth") {
+    return style.routeVolumeFillColor;
+  }
+  if (primitive.metadata.side === "starboard") {
+    return style.starboardBoundaryColor ?? style.routeVolumeFillColor;
+  }
+  if (primitive.metadata.side === "portside") {
+    return style.portsideBoundaryColor ?? style.routeVolumeFillColor;
+  }
+  return style.routeVolumeFillColor;
+};
+
+const corridorColor = (
+  style: RouteFeatureStyle,
+  primitive: RoutePolygonPrimitive,
+): ColorValue | undefined => {
+  if (primitive.metadata.side === "starboard") {
+    return style.starboardBoundaryColor ?? style.corridorFillColor;
+  }
+  if (primitive.metadata.side === "portside") {
+    return style.portsideBoundaryColor ?? style.corridorFillColor;
+  }
+  return style.corridorFillColor;
 };
 
 const applyRouteObjectMetadata = (
@@ -379,6 +423,7 @@ const applyRouteObjectMetadata = (
     ...(metadata.waypointId !== undefined ? { waypointId: metadata.waypointId } : {}),
     ...(metadata.legId !== undefined ? { legId: metadata.legId } : {}),
     ...(metadata.side !== undefined ? { side: metadata.side } : {}),
+    ...(metadata.depthBand !== undefined ? { depthBand: metadata.depthBand } : {}),
   };
   object.name = `s100-route:${spec.id}:${metadata.primitiveKind}`;
   object.userData.s100Pickable = true;
@@ -455,6 +500,37 @@ const removeClosingDuplicate = (
     return positions.slice(0, -1);
   }
   return positions;
+};
+
+const polygonIndices = (
+  primitive: RoutePolygonPrimitive,
+  vertexCount: number,
+): number[] =>
+  isCorridorStrip(primitive, vertexCount)
+    ? corridorStripIndices(vertexCount)
+    : triangleFanIndices(vertexCount);
+
+const isCorridorStrip = (
+  primitive: RoutePolygonPrimitive,
+  vertexCount: number,
+): boolean =>
+  primitive.metadata.primitiveKind === "corridor" &&
+  primitive.metadata.side !== undefined &&
+  vertexCount >= 4 &&
+  vertexCount % 2 === 0;
+
+const corridorStripIndices = (vertexCount: number): number[] => {
+  const linePointCount = vertexCount / 2;
+  const indices: number[] = [];
+  for (let index = 0; index < linePointCount - 1; index += 1) {
+    const near0 = index;
+    const near1 = index + 1;
+    const far0 = vertexCount - 1 - index;
+    const far1 = vertexCount - 2 - index;
+    indices.push(near0, near1, far1);
+    indices.push(near0, far1, far0);
+  }
+  return indices;
 };
 
 const triangleFanIndices = (vertexCount: number): number[] => {

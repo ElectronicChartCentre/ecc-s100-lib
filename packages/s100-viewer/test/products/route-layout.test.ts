@@ -3,6 +3,7 @@ import {
   buildRoutePlanLayout,
   nauticalMilesToMeters,
   parseRtzRoute,
+  type RoutePlan,
   RouteStyles,
 } from "../../src/index.js";
 
@@ -14,7 +15,11 @@ describe("buildRoutePlanLayout", () => {
     expect(layout.centerline?.positions).toHaveLength(2);
     expect(layout.waypoints).toHaveLength(2);
     expect(layout.legBoundaries).toHaveLength(2);
-    expect(layout.corridors).toHaveLength(1);
+    expect(layout.corridors).toHaveLength(2);
+    expect(layout.corridors.map((corridor) => corridor.metadata.side)).toEqual([
+      "starboard",
+      "portside",
+    ]);
     expect(layout.diagnostics).toEqual([
       expect.objectContaining({
         code: "route-layout-local-tangent-projection",
@@ -22,12 +27,17 @@ describe("buildRoutePlanLayout", () => {
       }),
     ]);
 
-    const ring = layout.corridors[0]?.rings[0];
-    expect(ring).toHaveLength(5);
-    const startWidth = projectedDistance(ring?.[0], ring?.[3]);
-    expect(Math.abs(startWidth - nauticalMilesToMeters(0.2))).toBeLessThan(1);
-    expect(ring?.[0]?.x).toBeGreaterThan(0);
-    expect(ring?.[3]?.x).toBeLessThan(0);
+    const starboardRing = layout.corridors[0]?.rings[0];
+    const portsideRing = layout.corridors[1]?.rings[0];
+    expect(starboardRing).toHaveLength(5);
+    expect(portsideRing).toHaveLength(5);
+    const starboardHalfWidth = projectedDistance(starboardRing?.[0], starboardRing?.[3]);
+    const portsideHalfWidth = projectedDistance(portsideRing?.[0], portsideRing?.[3]);
+    expect(
+      Math.abs((starboardHalfWidth + portsideHalfWidth) - nauticalMilesToMeters(0.2)),
+    ).toBeLessThan(1);
+    expect(starboardRing?.[3]?.x).toBeGreaterThan(0);
+    expect(portsideRing?.[0]?.x).toBeLessThan(0);
   });
 
   it("uses a caller-provided projection without local tangent diagnostics", () => {
@@ -80,28 +90,81 @@ describe("buildRoutePlanLayout", () => {
     expect(debugPrimitive.positions).toHaveLength(13);
   });
 
-  it("creates optional safety-depth route volume meshes", () => {
+  it("creates optional COGS-style route side and cap meshes", () => {
     const routePlan = parseRtzRoute(sampleRtz);
     const layout = buildRoutePlanLayout(routePlan, {
       includeRouteVolume: true,
       seaLevelMeters: 2,
     });
 
-    expect(layout.routeVolumes).toHaveLength(1);
+    expect(layout.routeVolumes).toHaveLength(8);
     expect(layout.routeVolumes[0]).toMatchObject({
-      id: "North Route:leg:1:2:safety-depth-volume",
+      id: "North Route:leg:1:2:starboard-safety-depth-side",
       positions: expect.arrayContaining([
         expect.objectContaining({ z: 2 }),
         expect.objectContaining({ z: -10 }),
       ]),
-      indices: expect.arrayContaining([0, 1, 2, 3, 4, 0]),
+      indices: [0, 1, 2, 0, 2, 3],
       metadata: {
         routeId: "North Route",
         sourceFormat: "rtz",
         primitiveKind: "route-volume",
         legId: "1:2",
+        side: "starboard",
+        depthBand: "safety-depth",
       },
     });
+    expect(layout.routeVolumes[4]).toEqual(expect.objectContaining({
+      id: "North Route:leg:1:2:starboard-below-safety-depth-side",
+      positions: expect.arrayContaining([
+        expect.objectContaining({ z: -10 }),
+        expect.objectContaining({ z: -98 }),
+      ]),
+      metadata: expect.objectContaining({
+        side: "starboard",
+        depthBand: "below-safety-depth",
+      }),
+    }));
+    expect(layout.routeVolumes.map((volume) => volume.id)).toEqual([
+      "North Route:leg:1:2:starboard-safety-depth-side",
+      "North Route:leg:1:2:portside-safety-depth-side",
+      "North Route:leg:1:2:start-safety-depth-cap",
+      "North Route:leg:1:2:end-safety-depth-cap",
+      "North Route:leg:1:2:starboard-below-safety-depth-side",
+      "North Route:leg:1:2:portside-below-safety-depth-side",
+      "North Route:leg:1:2:start-below-safety-depth-cap",
+      "North Route:leg:1:2:end-below-safety-depth-cap",
+    ]);
+  });
+
+  it("samples waypoint turn radii into curved centerline, corridor, and volume geometry", () => {
+    const routePlan = sampleRightTurnRoutePlan();
+    const layout = buildRoutePlanLayout(routePlan, {
+      includeRouteVolume: true,
+      projection: directPlanarProjection(),
+      seaLevelMeters: 1,
+      turnArcSegmentAngleDegrees: 10,
+    });
+
+    expect(layout.diagnostics).toEqual([]);
+    expect(layout.centerline?.positions.length).toBeGreaterThan(3);
+    expect(layout.centerline?.positions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ x: expect.closeTo(0, 6), y: expect.closeTo(80, 6) }),
+      expect.objectContaining({ x: expect.closeTo(20, 6), y: expect.closeTo(100, 6) }),
+    ]));
+    expect(layout.centerline?.positions).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ x: expect.closeTo(0, 6), y: expect.closeTo(100, 6) }),
+    ]));
+    expect(layout.legBoundaries).toHaveLength(4);
+    expect(layout.legBoundaries.every((boundary) => boundary.positions.length > 2)).toBe(true);
+    expect(layout.corridors).toHaveLength(4);
+    expect(layout.corridors.every((corridor) => (corridor.rings[0]?.length ?? 0) > 5)).toBe(true);
+    expect(layout.routeVolumes).toHaveLength(16);
+    expect(
+      layout.routeVolumes
+        .filter((volume) => volume.metadata.side !== undefined)
+        .every((volume) => volume.positions.length > 8),
+    ).toBe(true);
   });
 
   it("omits corridor primitives when XTD values are missing", () => {
@@ -164,3 +227,66 @@ const sampleRtz = `<?xml version="1.0" encoding="utf-8"?>
     </waypoint>
   </waypoints>
 </route>`;
+
+const directPlanarProjection = () => ({
+  crs: "test-planar",
+  project(position: { lon: number; lat: number; heightMeters?: number }) {
+    return {
+      x: position.lon,
+      y: position.lat,
+      z: position.heightMeters ?? 0,
+    };
+  },
+});
+
+const sampleRightTurnRoutePlan = (): RoutePlan => ({
+  id: "right-turn-route",
+  sourceFormat: "route-plan",
+  routeInfo: {
+    name: "Right turn route",
+    values: {},
+  },
+  waypoints: [
+    {
+      id: "A",
+      position: { lon: 0, lat: 0 },
+      extensions: [],
+    },
+    {
+      id: "B",
+      position: { lon: 0, lat: 100 },
+      radiusMeters: 20,
+      extensions: [],
+    },
+    {
+      id: "C",
+      position: { lon: 100, lat: 100 },
+      extensions: [],
+    },
+  ],
+  legs: [
+    {
+      id: "A:B",
+      fromWaypointId: "A",
+      toWaypointId: "B",
+      geometryType: "loxodrome",
+      portsideXtdMeters: 10,
+      starboardXtdMeters: 10,
+      safetyDepthMeters: 12,
+      extensions: [],
+    },
+    {
+      id: "B:C",
+      fromWaypointId: "B",
+      toWaypointId: "C",
+      geometryType: "loxodrome",
+      portsideXtdMeters: 10,
+      starboardXtdMeters: 10,
+      safetyDepthMeters: 12,
+      extensions: [],
+    },
+  ],
+  schedules: [],
+  extensions: [],
+  diagnostics: [],
+});

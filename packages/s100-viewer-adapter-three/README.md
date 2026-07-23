@@ -18,10 +18,10 @@ basic rendering for:
 - S-102 3D Tiles through `3d-tiles-renderer`
 - S-111 static/rest JSON arrow rendering
 - vessel model or procedural fallback rendering
-- route-plan centerline, boundary, and waypoint rendering
+- route-plan centerline, XTD boundary, corridor, waypoint, and hybrid-volume rendering
 - simulated-water-level time updates
 
-It does not yet provide NASA-AMMOS feature parity for terrain styling,
+It does not yet provide full NASA-AMMOS feature parity for terrain styling,
 interactive vessel transform gizmos, depth-ray visualization, or advanced
 S-111 portrayal.
 
