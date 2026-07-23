@@ -3,7 +3,7 @@ import type {
   GeographicPosition,
   RouteProjection,
   RouteLayoutPosition,
-} from "@ecc/s100-viewer";
+} from "@ecc/s100-viewer/products/route";
 
 const WGS84_CRS = "EPSG:4326";
 const DEFAULT_ROUTE_CRS = "EPSG:32632";

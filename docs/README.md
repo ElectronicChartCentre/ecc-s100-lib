@@ -11,6 +11,7 @@ shape.
   [package boundaries](./architecture/package-boundaries.md),
   [scene and layer lifecycle](./architecture/scene-layer-lifecycle.md),
   [coordinates and depth](./architecture/coordinates-and-depth.md),
+  [maintainability refactor](./architecture/maintainability-refactor.md),
   [adapter authoring](./architecture/adapter-authoring-guide.md)
 - [Cogs adapter extraction plan](./cogs-adapter-extraction-plan.md)
 - [API docs](./api/README.md), including the

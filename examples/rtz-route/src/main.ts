@@ -2,18 +2,20 @@ import "./styles.css";
 import sampleRouteXml from "./sample-route.rtz?raw";
 import {
   CameraControlPresets,
-  PrimarServices,
-  RouteFeatureSession,
-  RouteStyles,
-  S102TerrainSession,
   SceneBuilder,
   createS100Viewer,
-  type RouteFeatureHandle,
-  type RouteFeatureStyle,
-  type RoutePlanLayout,
   type S100Scene,
   type S100Viewer,
 } from "@ecc/s100-viewer";
+import { PrimarServices } from "@ecc/s100-viewer/products";
+import {
+  RouteFeatureSession,
+  RouteStyles,
+  type RouteFeatureHandle,
+  type RouteFeatureStyle,
+  type RoutePlanLayout,
+} from "@ecc/s100-viewer/products/route";
+import { S102TerrainSession } from "@ecc/s100-viewer/products/s102";
 import { createNasaAmmosAdapter } from "@ecc/s100-viewer-adapter-nasa-ammos";
 import {
   createSceneAlignedSampleRouteXml,

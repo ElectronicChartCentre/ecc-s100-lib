@@ -1,6 +1,5 @@
 import { type S100EngineAdapter } from "@ecc/s100-viewer";
 import { cesiumAdapterCapabilities } from "./capabilities.js";
-import { CesiumViewerHost } from "./CesiumViewerHost.js";
 import { ensureConstructibleBrowserImageGlobal } from "../environment/imageCompatibility.js";
 import type {
   CesiumAdapterOptions,
@@ -22,6 +21,7 @@ export const createCesiumAdapter = (
     if (options.accessToken !== undefined) {
       setCesiumAccessToken(cesium, options.accessToken);
     }
+    const { CesiumViewerHost } = await import("./CesiumViewerHost.js");
     return new CesiumViewerHost(cesium, parent, options, hostOptions);
   },
   async destroyViewerHost(host) {

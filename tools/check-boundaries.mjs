@@ -72,8 +72,15 @@ const isPackageRootIndex = (path) =>
   /^packages\/[^/]+\/src\/index\.(ts|tsx|js|mjs|cjs)$/.test(path);
 const exampleName = (path) => /^examples\/([^/]+)\//.exec(path)?.[1];
 const isExampleFile = (path) => path.startsWith("examples/");
+const isPublicCoreSubpathImport = (specifier) =>
+  specifier === "@ecc/s100-viewer/math" ||
+  specifier === "@ecc/s100-viewer/features" ||
+  specifier === "@ecc/s100-viewer/products" ||
+  /^@ecc\/s100-viewer\/products\/(?:enc|route|s102|s111|simulated-water-level|vessel)$/u.test(
+    specifier,
+  );
 const isPrivatePackageSubpathImport = (specifier) =>
-  specifier.startsWith("@ecc/s100-viewer/") ||
+  (specifier.startsWith("@ecc/s100-viewer/") && !isPublicCoreSubpathImport(specifier)) ||
   /^@ecc\/s100-viewer-adapter-[^/]+\//u.test(specifier);
 
 const files = [];

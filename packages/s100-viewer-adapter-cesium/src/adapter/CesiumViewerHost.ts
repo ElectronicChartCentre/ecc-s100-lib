@@ -7,9 +7,6 @@ import {
   type ViewerHostOptions,
 } from "@ecc/s100-viewer";
 import {
-  CesiumEngineScene,
-} from "./CesiumEngineScene.js";
-import {
   createEngineVersionFields,
   getCesiumConstructor,
   getObject,
@@ -78,8 +75,9 @@ export class CesiumViewerHost implements EngineViewerHost {
     };
   }
 
-  createScene(options: SceneOptions): Promise<EngineScene> {
-    return Promise.resolve(new CesiumEngineScene(this.cesium, this.viewer, options, this.options));
+  async createScene(options: SceneOptions): Promise<EngineScene> {
+    const { CesiumEngineScene } = await import("./CesiumEngineScene.js");
+    return new CesiumEngineScene(this.cesium, this.viewer, options, this.options);
   }
 
   destroy(): void {

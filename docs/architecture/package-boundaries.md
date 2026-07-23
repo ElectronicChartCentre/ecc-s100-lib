@@ -32,6 +32,26 @@ planning artifacts, but those are not release targets unless they are added to
 The core package must not import engine adapters, app code, examples, or
 adapter-native objects.
 
+## Public Feature Entrypoints
+
+The root `@ecc/s100-viewer` export remains the canonical convenience API for
+viewer and scene setup. Product-specific application code may use public
+feature entrypoints:
+
+```text
+@ecc/s100-viewer/products
+@ecc/s100-viewer/products/enc
+@ecc/s100-viewer/products/s102
+@ecc/s100-viewer/products/s111
+@ecc/s100-viewer/products/route
+@ecc/s100-viewer/products/vessel
+@ecc/s100-viewer/products/simulated-water-level
+@ecc/s100-viewer/features
+```
+
+These entrypoints are barrels over core package modules. They must not import
+adapters or `src/internal` modules.
+
 ## Adapter Package Responsibilities
 
 Adapter packages own engine-specific rendering and lifecycle integration.
@@ -120,3 +140,4 @@ This checks:
 - package import boundaries
 - accidental runtime compatibility imports
 - canonical root API boundary assumptions
+- bundle-shape assumptions for feature entrypoints and adapter eager paths

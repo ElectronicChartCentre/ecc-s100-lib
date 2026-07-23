@@ -34,6 +34,38 @@
       "types": "./dist/math.d.ts",
       "import": "./dist/math.js"
     },
+    "./features": {
+      "types": "./dist/entrypoints/features.d.ts",
+      "import": "./dist/entrypoints/features.js"
+    },
+    "./products": {
+      "types": "./dist/entrypoints/products.d.ts",
+      "import": "./dist/entrypoints/products.js"
+    },
+    "./products/enc": {
+      "types": "./dist/entrypoints/products/enc.d.ts",
+      "import": "./dist/entrypoints/products/enc.js"
+    },
+    "./products/route": {
+      "types": "./dist/entrypoints/products/route.d.ts",
+      "import": "./dist/entrypoints/products/route.js"
+    },
+    "./products/s102": {
+      "types": "./dist/entrypoints/products/s102.d.ts",
+      "import": "./dist/entrypoints/products/s102.js"
+    },
+    "./products/s111": {
+      "types": "./dist/entrypoints/products/s111.d.ts",
+      "import": "./dist/entrypoints/products/s111.js"
+    },
+    "./products/simulated-water-level": {
+      "types": "./dist/entrypoints/products/simulated-water-level.d.ts",
+      "import": "./dist/entrypoints/products/simulated-water-level.js"
+    },
+    "./products/vessel": {
+      "types": "./dist/entrypoints/products/vessel.d.ts",
+      "import": "./dist/entrypoints/products/vessel.js"
+    },
     "./internal/*": {
       "types": "./dist/internal/*.d.ts",
       "import": "./dist/internal/*.js"

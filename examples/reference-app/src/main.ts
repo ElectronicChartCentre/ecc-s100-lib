@@ -1,7 +1,6 @@
 import "./styles.css";
 import {
   CameraControlPresets,
-  EncStandard,
   SceneBuilder,
   createS100Viewer,
   type EnvironmentState,
@@ -9,6 +8,7 @@ import {
   type S100Unsubscribe,
   type S100Viewer,
 } from "@ecc/s100-viewer";
+import { EncStandard } from "@ecc/s100-viewer/products/enc";
 import { createNasaAmmosAdapter } from "@ecc/s100-viewer-adapter-nasa-ammos";
 import {
   createFeatureSessions,

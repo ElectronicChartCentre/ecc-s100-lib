@@ -1,9 +1,9 @@
 import type { S100EngineAdapter } from "@ecc/s100-viewer";
-import { S100NasaViewer, type S100NasaViewerConfig } from "../runtime/index.js";
-import { getHtmlElement } from "../coordinates/projectedLocal.js";
-import type { NasaAmmosAdapterOptions } from "../options.js";
+import type {
+  NasaAmmosAdapterOptions,
+  S100NasaViewerConfig,
+} from "../options.js";
 import { nasaAmmosAdapterCapabilities } from "./capabilities.js";
-import { NasaAmmosViewerHost } from "./NasaAmmosViewerHost.js";
 
 export const createNasaAmmosAdapter = (
   options: NasaAmmosAdapterOptions = {},
@@ -13,6 +13,12 @@ export const createNasaAmmosAdapter = (
   capabilities: nasaAmmosAdapterCapabilities,
   getCapabilities: () => nasaAmmosAdapterCapabilities,
   async createViewerHost(hostOptions) {
+    const [{ S100NasaViewer }, { getHtmlElement }, { NasaAmmosViewerHost }] =
+      await Promise.all([
+        import("../runtime/index.js"),
+        import("../coordinates/projectedLocal.js"),
+        import("./NasaAmmosViewerHost.js"),
+      ]);
     const parent = getHtmlElement(hostOptions.container);
     const viewerConfig: S100NasaViewerConfig = { ...options };
     const logger = options.logger ?? hostOptions.logger;

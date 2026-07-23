@@ -1,19 +1,27 @@
 import {
+  PrimarServices,
+  type PrimarEncAvailabilityRequests,
+} from "@ecc/s100-viewer/products";
+import {
   EncStandard,
   EncWmsSession,
-  PrimarServices,
-  S102TerrainSession,
-  S111SurfaceCurrentSession,
-  VesselFeatureSession,
   resolveEncWmsAvailability,
-  type Coordinate,
   type EncWmsAvailability,
-  type PrimarEncAvailabilityRequests,
   type ProjectedMapCenter,
-  type S100Scene,
+} from "@ecc/s100-viewer/products/enc";
+import { S102TerrainSession } from "@ecc/s100-viewer/products/s102";
+import {
+  S111SurfaceCurrentSession,
   type S111WorkflowDataset,
   type S111WorkflowStatus,
+} from "@ecc/s100-viewer/products/s111";
+import {
+  VesselFeatureSession,
   type VesselDimensions,
+} from "@ecc/s100-viewer/products/vessel";
+import {
+  type Coordinate,
+  type S100Scene,
 } from "@ecc/s100-viewer";
 
 export type LatLonBounds = {

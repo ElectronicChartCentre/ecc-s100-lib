@@ -1,4 +1,4 @@
-import type { PrimarEncAvailabilityRequests } from "@ecc/s100-viewer";
+import type { PrimarEncAvailabilityRequests } from "@ecc/s100-viewer/products";
 import type {
   FeatureSessionWorkflowOptions,
   LatLonBounds,

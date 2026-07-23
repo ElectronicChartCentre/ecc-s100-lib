@@ -132,6 +132,31 @@ LayerBuilder.MapOverlayStyles.DEFAULT;
 `defineS100LayerSpec(...)` remains available as a low-level helper when an
 application wants to spell out a complete spec object.
 
+## Feature Entrypoints
+
+The root package is still the canonical convenience import for viewer, scene,
+math, and common layer APIs. Product-specific application code can use public
+feature entrypoints to keep imports narrower:
+
+```ts
+import { SceneBuilder, createS100Viewer } from "@ecc/s100-viewer";
+import { EncWmsSession } from "@ecc/s100-viewer/products/enc";
+import { S102TerrainSession } from "@ecc/s100-viewer/products/s102";
+import { S111SurfaceCurrentSession } from "@ecc/s100-viewer/products/s111";
+import { RouteFeatureSession } from "@ecc/s100-viewer/products/route";
+import { VesselFeatureSession } from "@ecc/s100-viewer/products/vessel";
+```
+
+Public product entrypoints:
+
+- `@ecc/s100-viewer/products`
+- `@ecc/s100-viewer/products/enc`
+- `@ecc/s100-viewer/products/s102`
+- `@ecc/s100-viewer/products/s111`
+- `@ecc/s100-viewer/products/route`
+- `@ecc/s100-viewer/products/vessel`
+- `@ecc/s100-viewer/products/simulated-water-level`
+
 ## Feature Sessions
 
 Feature sessions are the recommended high-level API for app integrations that
@@ -145,14 +170,14 @@ sessions together, see
 [`examples/getting-started`](../../examples/getting-started).
 
 ```ts
+import { PrimarServices } from "@ecc/s100-viewer/products";
 import {
-  S102TerrainSession,
-  S111SurfaceCurrentSession,
   EncWmsSession,
-  VesselFeatureSession,
-  PrimarServices,
   resolveEncWmsAvailability,
-} from "@ecc/s100-viewer";
+} from "@ecc/s100-viewer/products/enc";
+import { S102TerrainSession } from "@ecc/s100-viewer/products/s102";
+import { S111SurfaceCurrentSession } from "@ecc/s100-viewer/products/s111";
+import { VesselFeatureSession } from "@ecc/s100-viewer/products/vessel";
 ```
 
 S-102 terrain:

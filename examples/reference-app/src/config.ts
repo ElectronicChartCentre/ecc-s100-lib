@@ -1,9 +1,9 @@
 import type {
   Coordinate,
-  PrimarEncAvailabilityRequests,
-  S111WorkflowDataset,
-  VesselDimensions,
 } from "@ecc/s100-viewer";
+import type { PrimarEncAvailabilityRequests } from "@ecc/s100-viewer/products";
+import type { S111WorkflowDataset } from "@ecc/s100-viewer/products/s111";
+import type { VesselDimensions } from "@ecc/s100-viewer/products/vessel";
 
 export type LatLonBounds = {
   north: number;

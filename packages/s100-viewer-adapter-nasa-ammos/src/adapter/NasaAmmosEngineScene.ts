@@ -25,16 +25,12 @@ import {
   type VesselLayerSpec,
 } from "@ecc/s100-viewer";
 import { depthFromElevation } from "@ecc/s100-viewer/internal/products/depthStyle";
-import { type Vec3 } from "../runtime/index.js";
-import {
+import type { Vec3 } from "../runtime/index.js";
+import type {
   NasaSceneRuntime,
-  type SurfaceCurrentDataset,
+  SurfaceCurrentDataset,
 } from "../runtime/scene/NasaSceneRuntime.js";
 import * as THREE from "three";
-import {
-  createRoutePlanView,
-  getRoutePickValues,
-} from "../layers/routePlanLayer.js";
 import type { NasaAmmosAdapterOptions } from "../options.js";
 import {
   type NasaLayerNative,
@@ -50,26 +46,7 @@ import {
   applyNasaLighting,
   isHdrEnvironmentMap,
 } from "../environment/environmentController.js";
-import {
-  createMapSpecification,
-} from "../layers/mapLayer.js";
 import { resolveWaterLevel } from "../layers/simulatedWaterLevelLayer.js";
-import {
-  applyS111Style,
-  getS111OriginOffset,
-} from "../layers/s111SurfaceCurrentLayer.js";
-import {
-  applyTerrainStyle,
-  buildAdditionalUrlParameters,
-  getAuthorizationBearer,
-  getS102DetailFactor,
-} from "../layers/s102TerrainLayer.js";
-import {
-  applyVesselPresentation,
-  createVesselModelSpecification,
-  getVesselDimensions,
-  getVesselTransformGizmoVerticalPositionLimits,
-} from "../layers/vesselLayer.js";
 import {
   applyPickingRayVisualOptions,
   getCanvasPointer,
@@ -84,6 +61,13 @@ import { getNasaAmmosExtension } from "../shared/extensions.js";
 import { getRenderContext } from "../shared/nativeHandles.js";
 import { assertSourceKind, loadJsonSource } from "../shared/source.js";
 import { applyVisibility } from "../shared/visibility.js";
+import {
+  loadNasaMapLayerModule,
+  loadNasaRoutePlanLayerModule,
+  loadNasaS102TerrainLayerModule,
+  loadNasaS111SurfaceCurrentLayerModule,
+  loadNasaVesselLayerModule,
+} from "./layerModules.js";
 import {
   CubeTextureLoader,
   EquirectangularReflectionMapping,
@@ -265,7 +249,7 @@ export class NasaAmmosEngineScene implements EngineScene {
   async updateLayer(handle: EngineLayerHandle, patch: LayerPatch): Promise<void> {
     const native = this.getNativeLayer(handle);
     Object.assign(native.spec, patch);
-    this.applyLayerPatch(native, patch);
+    await this.applyLayerPatch(native, patch);
   }
 
   async removeLayer(handle: EngineLayerHandle): Promise<void> {
@@ -308,6 +292,7 @@ export class NasaAmmosEngineScene implements EngineScene {
 
     if (hit) {
       const pickableRoot = getPickableRootForObject(hit.object);
+      const { getRoutePickValues } = await loadNasaRoutePlanLayerModule();
       const routePickValues = getRoutePickValues(hit.object, pickableRoot);
       return {
         screen: { x: request.screenX, y: request.screenY },
@@ -564,8 +549,14 @@ export class NasaAmmosEngineScene implements EngineScene {
     }
   }
 
-  private createTerrainLayer(spec: S102BathymetryLayerSpec): NasaLayerNative {
+  private async createTerrainLayer(spec: S102BathymetryLayerSpec): Promise<NasaLayerNative> {
     assertSourceKind(spec, "3d-tiles");
+    const {
+      applyTerrainStyle,
+      buildAdditionalUrlParameters,
+      getAuthorizationBearer,
+      getS102DetailFactor,
+    } = await loadNasaS102TerrainLayerModule();
     const terrainDataset: {
       baseURL: string;
       additionalURLParameters: string;
@@ -590,6 +581,7 @@ export class NasaAmmosEngineScene implements EngineScene {
   }
 
   private async createS111Layer(spec: S111SurfaceCurrentLayerSpec): Promise<NasaLayerNative> {
+    const { applyS111Style, getS111OriginOffset } = await loadNasaS111SurfaceCurrentLayerModule();
     const data = await loadJsonSource(spec.source, this.options.fetchHandler);
     const view = this.scene.S111.add(data as SurfaceCurrentDataset, {
       originOffset: getS111OriginOffset(spec, this.georeference),
@@ -613,7 +605,8 @@ export class NasaAmmosEngineScene implements EngineScene {
     return { kind: "simulated-water-level", spec, data };
   }
 
-  private createMapLayer(spec: EncLayerSpec | MapOverlayLayerSpec): NasaLayerNative {
+  private async createMapLayer(spec: EncLayerSpec | MapOverlayLayerSpec): Promise<NasaLayerNative> {
+    const { createMapSpecification } = await loadNasaMapLayerModule();
     const mapSpecification = createMapSpecification(spec, this.georeference);
     const view = this.scene.Map.add(mapSpecification);
     view.alpha = spec.opacity ?? 1;
@@ -622,7 +615,13 @@ export class NasaAmmosEngineScene implements EngineScene {
     return { kind: "map", spec, view };
   }
 
-  private createVesselLayer(spec: VesselLayerSpec): NasaLayerNative {
+  private async createVesselLayer(spec: VesselLayerSpec): Promise<NasaLayerNative> {
+    const {
+      applyVesselPresentation,
+      createVesselModelSpecification,
+      getVesselDimensions,
+      getVesselTransformGizmoVerticalPositionLimits,
+    } = await loadNasaVesselLayerModule();
     const model = createVesselModelSpecification(spec);
     const verticalPositionLimits = getVesselTransformGizmoVerticalPositionLimits(spec);
     const view = this.scene.VesselFeature.add({
@@ -639,8 +638,9 @@ export class NasaAmmosEngineScene implements EngineScene {
     return { kind: "vessel", spec, view };
   }
 
-  private createRoutePlanLayer(spec: RoutePlanLayerSpec): NasaLayerNative {
+  private async createRoutePlanLayer(spec: RoutePlanLayerSpec): Promise<NasaLayerNative> {
     assertSourceKind(spec, "route-plan");
+    const { createRoutePlanView } = await loadNasaRoutePlanLayerModule();
     const renderContext = getRenderContext(this.scene);
     const view = createRoutePlanView(spec, renderContext?.scene);
     view.setVisibility(spec.visible ?? spec.style.visible ?? true);
@@ -649,14 +649,16 @@ export class NasaAmmosEngineScene implements EngineScene {
     return { kind: "route-plan", spec, view };
   }
 
-  private applyLayerPatch(native: NasaLayerNative, patch: LayerPatch): void {
+  private async applyLayerPatch(native: NasaLayerNative, patch: LayerPatch): Promise<void> {
     if (native.kind === "terrain") {
+      const { applyTerrainStyle } = await loadNasaS102TerrainLayerModule();
       applyTerrainStyle(native.view, native.spec);
       applyVisibility(native.view, patch.visible);
       return;
     }
 
     if (native.kind === "s111") {
+      const { applyS111Style } = await loadNasaS111SurfaceCurrentLayerModule();
       applyS111Style(native.view, native.spec);
       applyVisibility(native.view, patch.visible);
       return;
@@ -671,6 +673,11 @@ export class NasaAmmosEngineScene implements EngineScene {
     }
 
     if (native.kind === "vessel") {
+      const {
+        applyVesselPresentation,
+        getVesselDimensions,
+        getVesselTransformGizmoVerticalPositionLimits,
+      } = await loadNasaVesselLayerModule();
       const vesselPatch = patch as LayerPatch<VesselLayerSpec>;
       if (vesselPatch.pose) {
         const position = this.coordinateToEngineVec3(native.spec.pose.position);

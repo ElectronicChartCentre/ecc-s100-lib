@@ -64,6 +64,16 @@ const s102: S102LayerSpec = LayerBuilder.createS102({
 await scene.layers.add(s102);
 ```
 
+For product-specific application code, prefer feature entrypoints. The root
+package remains convenient for viewer and scene basics, while product subpaths
+keep imports narrower and easier for bundlers to analyze:
+
+```ts
+import { createS100Viewer, SceneBuilder } from "@ecc/s100-viewer";
+import { S111SurfaceCurrentSession } from "@ecc/s100-viewer/products/s111";
+import { RouteFeatureSession } from "@ecc/s100-viewer/products/route";
+```
+
 `LayerBuilder` fills obvious S-100 boilerplate such as layer ids, product types,
 source kinds, roles, default styles, and the product-specification version
 policy. By default, product layers use `latest-confirmed-supported`; pass
@@ -109,6 +119,7 @@ npm run pack:release-target:dry-run
 - [Step-by-step engine switcher learning guide](./docs/learn/engine-switcher-practical-guide.md)
 - [Package readiness](./docs/package-readiness.md)
 - [Developer ergonomics review](./docs/developer-ergonomics-review.md)
+- [Maintainability refactor](./docs/architecture/maintainability-refactor.md)
 - [Cogs adapter extraction plan](./docs/cogs-adapter-extraction-plan.md)
 - [API docs](./docs/api/README.md)
 - [Examples](./examples/README.md)

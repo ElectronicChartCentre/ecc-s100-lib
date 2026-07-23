@@ -1026,6 +1026,18 @@ The package root `@ecc/s100-viewer` re-exports the public developer surface.
 Use this inventory as a mastery checklist and then inspect
 `packages/s100-viewer/src/index.ts` for the exact current export list.
 
+For product-specific application code, prefer the public feature entrypoints
+when they make imports clearer:
+
+```ts
+import { S111SurfaceCurrentSession } from "@ecc/s100-viewer/products/s111";
+import { RouteFeatureSession } from "@ecc/s100-viewer/products/route";
+import { VesselFeatureSession } from "@ecc/s100-viewer/products/vessel";
+```
+
+Keep adapter imports at the adapter package root, and use dynamic imports when
+an engine is optional at runtime.
+
 | Area | Main exports | What to use them for |
 | --- | --- | --- |
 | Viewer | `createS100Viewer`, `S100Viewer`, `CreateS100ViewerOptions` | Create adapter-backed viewers, scenes, and viewer-level camera controls. |

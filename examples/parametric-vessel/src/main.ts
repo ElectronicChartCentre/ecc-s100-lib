@@ -2,12 +2,14 @@ import "./styles.css";
 import {
   CameraControlPresets,
   SceneBuilder,
-  VesselFeatureSession,
   createS100Viewer,
-  type ParametricVesselSpec,
   type S100Scene,
   type S100Viewer,
 } from "@ecc/s100-viewer";
+import {
+  VesselFeatureSession,
+  type ParametricVesselSpec,
+} from "@ecc/s100-viewer/products/vessel";
 import { createNasaAmmosAdapter } from "@ecc/s100-viewer-adapter-nasa-ammos";
 
 type ControlGroup =

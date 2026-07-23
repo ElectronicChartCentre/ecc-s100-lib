@@ -6,11 +6,9 @@ import {
   type SceneOptions,
 } from "@ecc/s100-viewer";
 import * as THREE from "three";
-import { S100NasaViewer, type Vec3 } from "../runtime/index.js";
-import { NasaSceneRuntime } from "../runtime/scene/NasaSceneRuntime.js";
+import type { S100NasaViewer, Vec3 } from "../runtime/index.js";
 import { getProjectedOrigin } from "../coordinates/projectedLocal.js";
 import type { NasaAmmosAdapterOptions } from "../options.js";
-import { NasaAmmosEngineScene } from "./NasaAmmosEngineScene.js";
 
 export class NasaAmmosViewerHost implements EngineViewerHost {
   constructor(
@@ -54,6 +52,11 @@ export class NasaAmmosViewerHost implements EngineViewerHost {
     if (origin !== undefined) {
       sceneOptions.origin = origin;
     }
+
+    const [{ NasaSceneRuntime }, { NasaAmmosEngineScene }] = await Promise.all([
+      import("../runtime/scene/NasaSceneRuntime.js"),
+      import("./NasaAmmosEngineScene.js"),
+    ]);
 
     const coreScene = await this.viewer.createScene(sceneOptions);
     const scene = new NasaSceneRuntime(coreScene, this.options);

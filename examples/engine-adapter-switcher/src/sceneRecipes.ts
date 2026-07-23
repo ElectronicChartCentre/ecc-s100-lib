@@ -1,14 +1,16 @@
 import {
   createBoundingBox,
   createQuatIdentity,
-  createPrimarS111Service,
   LayerBuilder,
-  S111Workflow,
   type AdapterCapabilities,
   type S100Scene,
-  type S111ProjectedBounds,
-  type VesselDimensions,
 } from "@ecc/s100-viewer";
+import {
+  createPrimarS111Service,
+  S111Workflow,
+  type S111ProjectedBounds,
+} from "@ecc/s100-viewer/products/s111";
+import type { VesselDimensions } from "@ecc/s100-viewer/products/vessel";
 import {
   getDemoSceneSettings,
   getDemoLookAtTarget,
