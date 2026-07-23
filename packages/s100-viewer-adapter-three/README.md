@@ -9,6 +9,9 @@ Instead, it gives maintainers a compact adapter that demonstrates how a
 browser-oriented Three.js engine can implement the canonical viewer, scene,
 layer, camera, picking, and environment surfaces.
 
+Projected-local scenes use the same z-up engine frame as the NASA-AMMOS
+adapter: `x` and `y` are horizontal projected metres and `z` is vertical metres.
+
 ## Status
 
 This adapter is experimental. It currently targets projected-local scenes and
@@ -17,13 +20,13 @@ basic rendering for:
 - S-101/S-57 and map-overlay raster planes
 - S-102 3D Tiles through `3d-tiles-renderer`
 - S-111 static/rest JSON arrow rendering
-- vessel model or procedural fallback rendering
+- vessel model or procedural fallback rendering with vessel-local ocean surface
+  and native transform controls
 - route-plan centerline, XTD boundary, corridor, waypoint, and hybrid-volume rendering
 - simulated-water-level time updates
 
 It does not yet provide full NASA-AMMOS feature parity for terrain styling,
-interactive vessel transform gizmos, depth-ray visualization, or advanced
-S-111 portrayal.
+depth-ray visualization, or advanced S-111 portrayal.
 
 The package is part of the workspace for reference-adapter development and the
 engine-switcher demo, but it is not currently included in the release-target

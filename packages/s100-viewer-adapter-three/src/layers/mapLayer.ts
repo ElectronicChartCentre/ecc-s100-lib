@@ -79,7 +79,6 @@ const createMapMesh = (
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.copy(center);
-  mesh.rotation.x = -Math.PI / 2;
   mesh.renderOrder = spec.zOrder ?? 0;
   setLayerUserData(mesh, spec, "raster", spec.id);
   return mesh;

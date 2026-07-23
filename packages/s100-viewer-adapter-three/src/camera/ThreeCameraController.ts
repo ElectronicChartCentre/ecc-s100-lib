@@ -17,7 +17,7 @@ export class ThreeCameraController {
   private static readonly MAX_DISTANCE = 1_000_000;
   private static readonly ROTATE_SPEED = 0.005;
   private static readonly WHEEL_INTERACTION_IDLE_MS = 140;
-  private static readonly WORLD_UP = new THREE.Vector3(0, 1, 0);
+  private static readonly WORLD_UP = new THREE.Vector3(0, 0, 1);
 
   private config: CameraControlConfig = normalizeCameraControlConfig(undefined);
   private readonly target = new THREE.Vector3();
@@ -28,6 +28,7 @@ export class ThreeCameraController {
   private lastClientY = 0;
   private focalDistance = 100;
   private panAnchor: THREE.Vector3 | null = null;
+  private interactionSuppressed = false;
   private destroyed = false;
 
   constructor(
@@ -89,8 +90,8 @@ export class ThreeCameraController {
     const horizontal = Math.cos(pitch) * range;
     const position = new THREE.Vector3(
       this.target.x + Math.sin(heading) * horizontal,
-      this.target.y + Math.sin(pitch) * range,
-      this.target.z + Math.cos(heading) * horizontal,
+      this.target.y - Math.cos(heading) * horizontal,
+      this.target.z + Math.sin(pitch) * range,
     );
     this.camera.position.copy(position);
     this.camera.lookAt(this.target);
@@ -100,6 +101,14 @@ export class ThreeCameraController {
 
   setControls(config: CameraControlConfig): void {
     this.config = normalizeCameraControlConfig(config);
+  }
+
+  setInteractionSuppressed(suppressed: boolean): void {
+    this.interactionSuppressed = suppressed;
+    if (suppressed) {
+      this.activePointerId = null;
+      this.panAnchor = null;
+    }
   }
 
   update(): void {
@@ -139,7 +148,7 @@ export class ThreeCameraController {
   }
 
   private onPointerDown(event: PointerEvent): void {
-    if (this.config.enabled === false || this.destroyed) {
+    if (this.config.enabled === false || this.interactionSuppressed || this.destroyed) {
       return;
     }
     this.activePointerId = event.pointerId;
@@ -158,6 +167,12 @@ export class ThreeCameraController {
   }
 
   private onPointerMove(event: PointerEvent): void {
+    if (this.interactionSuppressed) {
+      this.activePointerId = null;
+      this.panAnchor = null;
+      return;
+    }
+
     if (this.activePointerId !== event.pointerId) {
       return;
     }
@@ -195,7 +210,12 @@ export class ThreeCameraController {
   }
 
   private onWheel(event: WheelEvent): void {
-    if (this.config.enabled === false || this.config.wheel === false || this.destroyed) {
+    if (
+      this.config.enabled === false ||
+      this.config.wheel === false ||
+      this.interactionSuppressed ||
+      this.destroyed
+    ) {
       return;
     }
     event.preventDefault();
@@ -254,21 +274,21 @@ export class ThreeCameraController {
       this.minDistance(),
       this.maxDistance(),
     );
-    const horizontalDistance = Math.hypot(offset.x, offset.z);
+    const horizontalDistance = Math.hypot(offset.x, offset.y);
     const rotateSpeed =
       ThreeCameraController.ROTATE_SPEED * (this.config.speeds?.orbit ?? 1);
-    const azimuth = Math.atan2(offset.x, offset.z) - deltaX * rotateSpeed;
+    const azimuth = Math.atan2(offset.y, offset.x) - deltaX * rotateSpeed;
     const polar = THREE.MathUtils.clamp(
-      Math.atan2(horizontalDistance, offset.y) - deltaY * rotateSpeed,
+      Math.atan2(horizontalDistance, offset.z) - deltaY * rotateSpeed,
       this.minPolarAngle(),
       this.maxPolarAngle(),
     );
 
     const sinPolar = Math.sin(polar);
     offset.set(
+      radius * sinPolar * Math.cos(azimuth),
       radius * sinPolar * Math.sin(azimuth),
       radius * Math.cos(polar),
-      radius * sinPolar * Math.cos(azimuth),
     );
 
     this.focalDistance = radius;
@@ -371,7 +391,7 @@ export class ThreeCameraController {
       return null;
     }
 
-    const distanceToPlane = (this.getSeaLevel() - ray.origin.y) / denominator;
+    const distanceToPlane = (this.getSeaLevel() - ray.origin.z) / denominator;
     if (!Number.isFinite(distanceToPlane) || distanceToPlane <= 0) {
       return null;
     }

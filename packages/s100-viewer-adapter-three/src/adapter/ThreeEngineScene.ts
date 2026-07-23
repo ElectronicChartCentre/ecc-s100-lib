@@ -69,7 +69,8 @@ export class ThreeEngineScene implements EngineScene {
     const size = new THREE.Vector2();
     this.renderer.getSize(size);
     this.camera = new THREE.PerspectiveCamera(45, size.x / Math.max(1, size.y), 0.1, 10_000_000);
-    this.camera.position.set(0, 900, 900);
+    this.camera.up.set(0, 0, 1);
+    this.camera.position.set(700, -900, 550);
     this.camera.lookAt(0, 0, 0);
     this.cameraController = new ThreeCameraController(
       this.camera,
@@ -91,6 +92,7 @@ export class ThreeEngineScene implements EngineScene {
       adapterOptions.fetchHandler,
       () => this.seaLevel,
       (value) => this.setSeaLevel(value),
+      (suppressed) => this.cameraController.setInteractionSuppressed(suppressed),
     );
     this.picking = new ThreePicking(
       this.camera,

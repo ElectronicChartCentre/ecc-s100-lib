@@ -15,5 +15,12 @@ describe("@ecc/s100-viewer-adapter-three capabilities", () => {
     expect(adapter.capabilities.dataSources).toEqual(
       expect.arrayContaining(["wms-template", "3d-tiles", "static-json", "model"]),
     );
+    expect(adapter.capabilities.visualFeatures).toMatchObject({
+      vesselTransformGizmo: {
+        supported: true,
+        modes: ["translate", "rotate", "translate-rotate"],
+      },
+      vesselOceanSurface: true,
+    });
   });
 });

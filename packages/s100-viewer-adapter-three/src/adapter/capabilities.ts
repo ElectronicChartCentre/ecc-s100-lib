@@ -39,8 +39,11 @@ export const threeAdapterCapabilities: AdapterCapabilities = {
   visualFeatures: {
     depthRay: false,
     hoverPrism: true,
-    vesselTransformGizmo: false,
-    vesselOceanSurface: false,
+    vesselTransformGizmo: {
+      supported: true,
+      modes: ["translate", "rotate", "translate-rotate"],
+    },
+    vesselOceanSurface: true,
     vesselShadow: false,
     staticLighting: true,
     dynamicLighting: false,

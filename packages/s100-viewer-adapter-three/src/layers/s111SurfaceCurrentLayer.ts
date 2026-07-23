@@ -357,7 +357,7 @@ const createCurrentMaterial = (
       uZOffset: { value: verticalOffsetMeters },
       uOpacity: { value: 1 },
     },
-    vertexShader: createS111ArrowVertexShader("y-up-xz"),
+    vertexShader: createS111ArrowVertexShader("z-up-xy"),
     fragmentShader: createS111ArrowFragmentShader(outline),
     depthTest: true,
     depthWrite: false,

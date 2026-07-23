@@ -65,6 +65,14 @@ import {
   renderedEngineZFromVesselPose,
   vesselPoseZFromRenderedEngineZ,
 } from "@ecc/s100-viewer/internal/products/vesselPose";
+import {
+  createS100OceanSurfaceUniforms,
+  getS100OceanSurfaceTimeSeconds,
+  patchS100OceanSurfaceShader,
+  S100_OCEAN_SURFACE_SHADER_CACHE_KEY,
+  updateS100OceanSurfaceTime,
+  type S100OceanSurfaceUniforms,
+} from "@ecc/s100-viewer/internal/products/oceanSurfaceShader";
 
 export { EventEmitter };
 export type { Subscription };
@@ -4084,162 +4092,43 @@ function createSeaLevelSurface(
   return surface;
 }
 
-type SeaLevelSurfaceUniforms = {
-  s100WaterTime: { value: number };
-  s100WaterBumpScale: { value: number };
-  s100WaterWaveSpeed: { value: number };
-};
-
 type SeaLevelSurfaceMaterial = MeshPhysicalMaterial & {
   userData: MeshPhysicalMaterial["userData"] & {
     s100WaterAnimationStart?: number;
-    s100WaterUniforms?: SeaLevelSurfaceUniforms;
+    s100WaterUniforms?: S100OceanSurfaceUniforms;
   };
 };
 
 function configureSeaLevelSurfaceMaterial(material: MeshPhysicalMaterial): void {
   const surfaceMaterial = material as SeaLevelSurfaceMaterial;
-  const uniforms: SeaLevelSurfaceUniforms = {
-    s100WaterTime: { value: 0 },
-    s100WaterBumpScale: { value: DEFAULT_SEA_LEVEL_SURFACE_BUMP_SCALE },
-    s100WaterWaveSpeed: { value: SEA_LEVEL_SURFACE_WAVE_SPEED },
-  };
-  surfaceMaterial.userData.s100WaterAnimationStart = getCurrentTimeSeconds();
+  const uniforms = createS100OceanSurfaceUniforms({
+    bumpScale: DEFAULT_SEA_LEVEL_SURFACE_BUMP_SCALE,
+    waveSpeed: SEA_LEVEL_SURFACE_WAVE_SPEED,
+  });
+  surfaceMaterial.userData.s100WaterAnimationStart = getS100OceanSurfaceTimeSeconds();
   surfaceMaterial.userData.s100WaterUniforms = uniforms;
-  material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        `#include <common>
-varying vec2 vS100WaterLocalPosition;
-varying vec3 vS100WaterViewTangentX;
-varying vec3 vS100WaterViewTangentY;`,
-      )
-      .replace(
-        "#include <begin_vertex>",
-        `#include <begin_vertex>
-vS100WaterLocalPosition = position.xy;
-vS100WaterViewTangentX = normalize((modelViewMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz);
-vS100WaterViewTangentY = normalize((modelViewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);`,
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        `#include <common>
-uniform float s100WaterTime;
-uniform float s100WaterBumpScale;
-uniform float s100WaterWaveSpeed;
-varying vec2 vS100WaterLocalPosition;
-varying vec3 vS100WaterViewTangentX;
-varying vec3 vS100WaterViewTangentY;
-
-float s100WaterHash(vec2 value) {
-  return fract(sin(dot(value, vec2(127.1, 311.7))) * 43758.5453123);
-}
-
-vec2 s100WaterGradient(vec2 cell) {
-  float angle = s100WaterHash(cell) * 6.28318530718;
-  return vec2(cos(angle), sin(angle));
-}
-
-float s100WaterPerlin(vec2 position) {
-  vec2 cell = floor(position);
-  vec2 local = fract(position);
-  vec2 blend = local * local * local * (local * (local * 6.0 - 15.0) + 10.0);
-  float a = dot(s100WaterGradient(cell + vec2(0.0, 0.0)), local - vec2(0.0, 0.0));
-  float b = dot(s100WaterGradient(cell + vec2(1.0, 0.0)), local - vec2(1.0, 0.0));
-  float c = dot(s100WaterGradient(cell + vec2(0.0, 1.0)), local - vec2(0.0, 1.0));
-  float d = dot(s100WaterGradient(cell + vec2(1.0, 1.0)), local - vec2(1.0, 1.0));
-  return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);
-}
-
-float s100WaterWaveHeight(vec2 localPosition) {
-  float time = s100WaterTime * s100WaterWaveSpeed;
-  vec2 p = localPosition * 0.035;
-  float wave =
-    s100WaterPerlin(p + vec2(time * 0.74, time * 0.31)) * 0.50 +
-    s100WaterPerlin(p * 2.1 + vec2(-time * 0.42, time * 0.67)) * 0.26 +
-    s100WaterPerlin(p * 4.4 + vec2(time * 0.18, -time * 0.52)) * 0.16 +
-    s100WaterPerlin(p * 9.2 + vec2(-time * 0.64, -time * 0.23)) * 0.08;
-  vec2 midDetailPosition = localPosition / 1.20;
-  float midDetailRipple =
-    s100WaterPerlin(midDetailPosition + vec2(-time * 0.96, time * 0.83)) * 0.02275;
-  vec2 microPosition = localPosition / 0.30;
-  float microRipple =
-    s100WaterPerlin(microPosition + vec2(time * 1.43, -time * 1.17)) * 0.01225;
-  return wave + midDetailRipple + microRipple;
-}
-
-vec2 s100WaterWaveGradient(vec2 localPosition) {
-  float sampleDistance = 0.0375;
-  float left = s100WaterWaveHeight(localPosition - vec2(sampleDistance, 0.0));
-  float right = s100WaterWaveHeight(localPosition + vec2(sampleDistance, 0.0));
-  float down = s100WaterWaveHeight(localPosition - vec2(0.0, sampleDistance));
-  float up = s100WaterWaveHeight(localPosition + vec2(0.0, sampleDistance));
-  return vec2(right - left, up - down) / (sampleDistance * 2.0);
-}
-
-vec3 s100WaterSurfaceColor(float waveHeight, float slope) {
-  float waveBand = smoothstep(-0.20, 0.28, waveHeight);
-  vec3 deepWater = vec3(0.015, 0.144, 0.30);
-  vec3 blueWater = vec3(0.015, 0.344, 0.62);
-  vec3 crestWater = vec3(0.34, 0.78, 0.92);
-  vec3 baseWater = mix(deepWater, blueWater, waveBand);
-  return mix(baseWater, crestWater, clamp(slope * 0.95, 0.0, 0.58));
-}`,
-      )
-      .replace(
-        "#include <normal_fragment_maps>",
-        `#include <normal_fragment_maps>
-vec2 s100WaterGradientValue = s100WaterWaveGradient(vS100WaterLocalPosition);
-float s100WaterWaveValue = s100WaterWaveHeight(vS100WaterLocalPosition);
-float s100WaterSlopeValue = clamp(length(s100WaterGradientValue) * 10.0, 0.0, 1.0);
-float s100WaterFaceDirection = gl_FrontFacing ? 1.0 : -1.0;
-vec3 s100WaterPerturbation =
-  (-vS100WaterViewTangentX * s100WaterGradientValue.x -
-   vS100WaterViewTangentY * s100WaterGradientValue.y) *
-  s100WaterBumpScale *
-  s100WaterFaceDirection;
-normal = normalize(normal + s100WaterPerturbation);
-nonPerturbedNormal = normal;`,
-      )
-      .replace(
-        "#include <output_fragment>",
-        `float s100WaterTopsideBlend = gl_FrontFacing ? 0.62 : 0.30;
-float s100WaterCrest = smoothstep(0.10, 0.26, s100WaterWaveValue);
-vec3 s100WaterColor = s100WaterSurfaceColor(
-  s100WaterWaveValue,
-  s100WaterSlopeValue
-);
-outgoingLight = mix(outgoingLight, s100WaterColor, s100WaterTopsideBlend);
-outgoingLight += vec3(0.18, 0.50, 0.62) *
-  s100WaterCrest *
-  (gl_FrontFacing ? 0.10 : 0.06);
-diffuseColor.a = clamp(diffuseColor.a + s100WaterSlopeValue * 0.08, 0.0, 0.76);
-#include <output_fragment>`,
-      );
+  const previousOnBeforeCompile = material.onBeforeCompile.bind(material);
+  const previousProgramCacheKey = material.customProgramCacheKey.bind(material);
+  material.onBeforeCompile = (shader, renderer) => {
+    previousOnBeforeCompile(shader, renderer);
+    patchS100OceanSurfaceShader(shader, uniforms);
   };
+  material.customProgramCacheKey = (): string =>
+    `${previousProgramCacheKey()}|${S100_OCEAN_SURFACE_SHADER_CACHE_KEY}`;
 }
 
 function updateSeaLevelSurfaceAnimation(
   surface: Mesh<CircleGeometry, MeshPhysicalMaterial>,
 ): void {
   const material = surface.material as SeaLevelSurfaceMaterial;
-  const start = material.userData.s100WaterAnimationStart ?? getCurrentTimeSeconds();
+  const start =
+    material.userData.s100WaterAnimationStart ?? getS100OceanSurfaceTimeSeconds();
   material.userData.s100WaterAnimationStart = start;
   const uniforms = material.userData.s100WaterUniforms;
   if (!uniforms) {
     return;
   }
-  uniforms.s100WaterTime.value = getCurrentTimeSeconds() - start;
-}
-
-function getCurrentTimeSeconds(): number {
-  if (typeof performance !== "undefined" && typeof performance.now === "function") {
-    return performance.now() / 1000;
-  }
-  return Date.now() / 1000;
+  updateS100OceanSurfaceTime(uniforms, start);
 }
 
 function createVesselModelTransform(

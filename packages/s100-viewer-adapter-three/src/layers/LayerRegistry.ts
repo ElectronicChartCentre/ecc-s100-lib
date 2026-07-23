@@ -28,6 +28,7 @@ export class LayerRegistry {
     private readonly fetchHandler: FetchLike | undefined,
     private readonly getSeaLevel: () => number,
     private readonly setSeaLevel: (value: number) => void,
+    private readonly setCameraInteractionSuppressed: (suppressed: boolean) => void,
   ) {}
 
   async addLayer(spec: BaseLayerSpec): Promise<EngineLayerHandle> {
@@ -109,7 +110,15 @@ export class LayerRegistry {
 
     if (spec.product === "vessel") {
       const { createVesselLayer } = await loadThreeVesselLayerModule();
-      return createVesselLayer(spec, this.scene, this.reference);
+      return createVesselLayer(
+        spec,
+        this.scene,
+        this.reference,
+        this.getSeaLevel,
+        this.camera,
+        this.renderer.domElement,
+        this.setCameraInteractionSuppressed,
+      );
     }
 
     if (spec.product === "route-plan") {

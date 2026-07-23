@@ -63,7 +63,7 @@ export class ThreePicking {
   }
 
   private pickSeaLevelPlane(request: PickRequest): PickResult | null {
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.getSeaLevel());
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -this.getSeaLevel());
     const point = new THREE.Vector3();
     if (!this.raycaster.ray.intersectPlane(plane, point)) {
       return null;

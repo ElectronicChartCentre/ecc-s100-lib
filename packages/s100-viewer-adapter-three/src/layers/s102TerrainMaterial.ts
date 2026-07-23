@@ -103,7 +103,7 @@ export class ThreeS102TerrainMaterialController {
       patchThreeTerrainShader(shader, this.uniforms);
     };
     terrainMaterial.customProgramCacheKey = (): string =>
-      `${previousProgramCacheKey()}|${S100_TERRAIN_SHADER_CACHE_KEY}|three-y-up`;
+      `${previousProgramCacheKey()}|${S100_TERRAIN_SHADER_CACHE_KEY}|three-z-up`;
     terrainMaterial.needsUpdate = true;
   }
 }
@@ -132,7 +132,7 @@ const patchThreeTerrainShader = (
   uniforms: S100TerrainShaderUniforms,
 ): void => {
   assignS100TerrainShaderUniforms(shader.uniforms, uniforms);
-  const patched = patchS100TerrainShaderSource(shader, { verticalAxis: "y" });
+  const patched = patchS100TerrainShaderSource(shader, { verticalAxis: "z" });
   shader.vertexShader = patched.vertexShader;
   shader.fragmentShader = patched.fragmentShader;
 };

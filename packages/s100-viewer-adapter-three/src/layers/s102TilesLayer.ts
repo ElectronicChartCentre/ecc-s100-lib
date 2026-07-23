@@ -106,11 +106,10 @@ const alignTilesToProjectedLocalScene = (
     return;
   }
 
-  group.rotation.x = -Math.PI / 2;
   group.position.set(
     -reference.origin.x,
+    -reference.origin.y,
     -reference.origin.z,
-    reference.origin.y,
   );
   group.updateMatrixWorld(true);
 };

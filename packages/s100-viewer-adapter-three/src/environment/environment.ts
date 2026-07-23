@@ -1,10 +1,15 @@
 import type { EnvironmentState } from "@ecc/s100-viewer";
 import * as THREE from "three";
+import {
+  createThreeZUpSkyDome,
+  disposeThreeSkyDome,
+} from "./skyDome.js";
 
 export class ThreeEnvironmentController {
   private readonly ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
   private readonly directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
   private environmentTexture: THREE.Texture | null = null;
+  private skyDome: THREE.Mesh | null = null;
   private loadSerial = 0;
 
   constructor(
@@ -24,8 +29,8 @@ export class ThreeEnvironmentController {
     if (state.lighting?.sunDirection) {
       this.directionalLight.position.set(
         state.lighting.sunDirection.x,
+        state.lighting.sunDirection.y,
         state.lighting.sunDirection.z,
-        -state.lighting.sunDirection.y,
       );
     }
 
@@ -48,7 +53,7 @@ export class ThreeEnvironmentController {
 
     const skyboxUrl = state.skyboxUrl ?? state.lighting?.environmentMapUrl;
     if (skyboxUrl) {
-      this.loadEquirectangularTexture(skyboxUrl);
+      this.loadEquirectangularTexture(skyboxUrl, state);
       return;
     }
 
@@ -85,7 +90,7 @@ export class ThreeEnvironmentController {
     );
   }
 
-  private loadEquirectangularTexture(url: string): void {
+  private loadEquirectangularTexture(url: string, state: EnvironmentState): void {
     const serial = ++this.loadSerial;
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin("anonymous");
@@ -96,15 +101,37 @@ export class ThreeEnvironmentController {
       }
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.mapping = THREE.EquirectangularReflectionMapping;
-      this.replaceEnvironmentTexture(texture);
+      this.replaceEnvironmentTexture(
+        texture,
+        {
+          useZUpSkyDome: true,
+          ...(state.backgroundIntensity !== undefined
+            ? { backgroundIntensity: state.backgroundIntensity }
+            : {}),
+        },
+      );
     });
   }
 
-  private replaceEnvironmentTexture(texture: THREE.Texture): void {
+  private replaceEnvironmentTexture(
+    texture: THREE.Texture,
+    options: { backgroundIntensity?: number; useZUpSkyDome?: boolean } = {},
+  ): void {
     this.clearEnvironmentTexture();
     this.environmentTexture = texture;
-    this.scene.background = texture;
     this.scene.environment = texture;
+    if (options.useZUpSkyDome) {
+      this.scene.background = null;
+      this.skyDome = createThreeZUpSkyDome(
+        texture,
+        options.backgroundIntensity !== undefined
+          ? { backgroundIntensity: options.backgroundIntensity }
+          : {},
+      );
+      this.scene.add(this.skyDome);
+    } else {
+      this.scene.background = texture;
+    }
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1;
   }
@@ -115,6 +142,8 @@ export class ThreeEnvironmentController {
       this.environmentTexture.dispose();
       this.environmentTexture = null;
     }
+    disposeThreeSkyDome(this.skyDome);
+    this.skyDome = null;
     this.scene.environment = null;
   }
 }

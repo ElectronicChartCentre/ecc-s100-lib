@@ -1,6 +1,7 @@
 import {
   S100Error,
   type Coordinate,
+  type ProjectedCoordinate,
   type SceneOptions,
 } from "@ecc/s100-viewer";
 import * as THREE from "three";
@@ -68,14 +69,14 @@ export const coordinateToWorld = (
   }
 
   if (coordinate.kind === "engine-local") {
-    return new THREE.Vector3(coordinate.x, coordinate.z, -coordinate.y);
+    return new THREE.Vector3(coordinate.x, coordinate.y, coordinate.z);
   }
 
   if (coordinate.kind === "ecef") {
-    return new THREE.Vector3(coordinate.x, coordinate.z, -coordinate.y);
+    return new THREE.Vector3(coordinate.x, coordinate.y, coordinate.z);
   }
 
-  return new THREE.Vector3(0, coordinate.height ?? 0, 0);
+  return new THREE.Vector3(0, 0, coordinate.height ?? 0);
 };
 
 export const projectedMetersToWorld = (
@@ -86,19 +87,19 @@ export const projectedMetersToWorld = (
 ): THREE.Vector3 =>
   new THREE.Vector3(
     x - reference.origin.x,
+    y - reference.origin.y,
     z - reference.origin.z,
-    -(y - reference.origin.y),
   );
 
 export const worldToProjectedCoordinate = (
   world: THREE.Vector3,
   reference: ThreeProjectedLocalReference,
-): Coordinate => ({
+): ProjectedCoordinate => ({
   kind: "projected",
   crs: reference.crs,
   x: world.x + reference.origin.x,
-  y: reference.origin.y - world.z,
-  z: world.y + reference.origin.z,
+  y: world.y + reference.origin.y,
+  z: world.z + reference.origin.z,
 });
 
 const projectedOrigin = (
