@@ -11,6 +11,12 @@ inside of the library match the API direction already chosen: an engine-neutral
 core package, renderer adapters, product sessions, typed controllers, and
 examples that consume the same public package surfaces as applications.
 
+The most recent completed work is Phase 9: bundle-aware public entrypoints and
+lazy adapter loading. That phase does not change the app mental model. It makes
+the package easier for maintainers and bundlers to reason about by separating
+root viewer setup, product-focused imports, adapter factory imports, scene
+runtime imports, and heavy layer-family imports.
+
 ## Why This Refactor Was Needed
 
 The repository had grown quickly while the viewer API, NASA-AMMOS renderer,
@@ -67,7 +73,104 @@ Adapter packages own native engine integration: renderer setup, layer
 translation, native objects, picking, camera controls, lifecycle, materials,
 shaders, image compatibility, and engine-specific cleanup.
 
+## Maintained Import Model
+
+The root package remains the broad convenience API:
+
+```ts
+import { createS100Viewer, LayerBuilder, SceneBuilder } from "@ecc/s100-viewer";
+```
+
+Product-specific code should prefer the public feature entrypoints introduced
+in Phase 9:
+
+```ts
+import { S111Workflow } from "@ecc/s100-viewer/products/s111";
+import { RouteFeatureSession } from "@ecc/s100-viewer/products/route";
+import { VesselFeatureSession } from "@ecc/s100-viewer/products/vessel";
+```
+
+Those subpaths are intentionally still part of the core package. They are not
+separate packages and they do not create a second app model. They give
+application code, examples, tests, and bundlers a narrower place to start when a
+screen only needs one product family.
+
+```mermaid
+flowchart TD
+  Root["@ecc/s100-viewer"] --> Kernel["viewer, scene, layers, coordinates, controllers"]
+  Root --> BroadProducts["broad product convenience exports"]
+
+  Enc["@ecc/s100-viewer/products/enc"] --> EncModules["ENC and WMS sessions"]
+  S102["@ecc/s100-viewer/products/s102"] --> S102Modules["S-102 builders and terrain session"]
+  S111["@ecc/s100-viewer/products/s111"] --> S111Modules["S-111 service, session, workflow"]
+  Route["@ecc/s100-viewer/products/route"] --> RouteModules["RTZ parser, route layout, route session"]
+  Vessel["@ecc/s100-viewer/products/vessel"] --> VesselModules["vessel session and parametric vessel"]
+
+  Enc -. "must not import" .-> Nasa["@ecc/s100-viewer-adapter-nasa-ammos"]
+  S111 -. "must not import" .-> Cesium["@ecc/s100-viewer-adapter-cesium"]
+```
+
+The public subpaths are guarded in two places:
+
+- `packages/s100-viewer/test/public-entrypoints.test.ts` checks the export map
+  and prevents entrypoints from importing adapters or internal modules.
+- `tools/check-bundle-shape.mjs` checks selected static import graphs so major
+  product families do not accidentally pull in unrelated product workflows.
+
+## Lazy Adapter Loading Model
+
+Phase 9 also changed adapter loading from eager implementation imports to
+progressive runtime loading.
+
+```mermaid
+sequenceDiagram
+  participant App as App or example
+  participant Factory as Adapter factory import
+  participant Host as Viewer host module
+  participant Scene as Engine scene module
+  participant Layer as Heavy layer helper
+
+  App->>Factory: import adapter package root
+  App->>Factory: createS100Viewer({ adapter })
+  Factory->>Host: dynamic import on createViewerHost()
+  App->>Host: viewer.createScene(sceneOptions)
+  Host->>Scene: dynamic import on createScene()
+  App->>Scene: scene.layers.add(productLayer)
+  Scene->>Layer: cached dynamic import for matching layer family
+```
+
+This creates two different benefits:
+
+- importing an adapter package root no longer eagerly loads its full renderer
+  scene implementation
+- using one layer family does not require the NASA-AMMOS adapter shell to
+  statically import every other heavy layer helper
+
+The current implementation is asymmetric by design. NASA-AMMOS now has cached
+dynamic layer helper imports for ENC/map, route, S-102, S-111, and vessel layer
+families. Cesium now defers `CesiumEngineScene` until a Cesium scene is created,
+but its internal layer families still live inside that scene file and remain a
+future split.
+
 ## What Changed
+
+### Phase Timeline
+
+The maintainability work was intentionally sequenced so each phase left the
+repo in a runnable state:
+
+| Phase | Result |
+| --- | --- |
+| 0 | Captured repo status, branch coordination, and validation baseline. |
+| 1 | Added release-target and maintainability guardrails before large moves. |
+| 2 | Made public adapter roots smaller and clearer. |
+| 3 | Moved NASA-AMMOS production runtime code away from legacy compat naming. |
+| 4 | Split NASA-AMMOS runtime and renderer code by feature folder. |
+| 5 | Split Cesium public shell from Cesium implementation helpers. |
+| 6 | Extracted shared engine-neutral product semantics into core internals. |
+| 7 | Split RTZ route, route session, and route layout code into focused modules. |
+| 8 | Split parametric vessel and controller hotspots, then verified apps/demos. |
+| 9 | Added public feature entrypoints, lazy adapter loading, and bundle-shape checks. |
 
 ### Guardrails Were Added First
 
@@ -88,6 +191,13 @@ The boundary check now protects the intended dependency direction:
 - examples cannot import private package subpaths
 - runnable examples cannot import each other, except shared helpers under
   `examples/shared`
+
+The bundle-shape check added in Phase 9 is deliberately static and conservative.
+It follows local static import edges, ignores type-only and dynamic imports, and
+fails when selected entrypoints or adapter roots accidentally regain eager
+dependency edges. It is not a byte-size budget, but it prevents the most likely
+maintainability regression: a clean public import silently pulling a large
+unrelated product or renderer implementation back into the graph.
 
 ### NASA-AMMOS Adapter Was Split
 
@@ -127,6 +237,22 @@ runtime/
 The canonical adapter shell now depends on `NasaSceneRuntime`, not a
 compatibility-named `ViewerScene` facade.
 
+After Phase 9, the adapter root, viewer-host creation, scene creation, and
+heavy layer helper loading are separated:
+
+```text
+src/index.ts
+src/adapter/createNasaAmmosAdapter.ts
+src/adapter/NasaAmmosViewerHost.ts
+src/adapter/NasaAmmosEngineScene.ts
+src/adapter/layerModules.ts
+src/layers/
+```
+
+`layerModules.ts` owns cached dynamic imports for optional layer-family helpers.
+That keeps the adapter shell readable and makes eager dependency edges
+searchable.
+
 ### Cesium Adapter Was Split Into A Public Shell And Feature Helpers
 
 The Cesium package root is also a small public barrel:
@@ -149,6 +275,12 @@ packages/s100-viewer-adapter-cesium/src/
 This makes the public API surface easier to inspect and gives maintainers a
 place to continue moving Cesium renderer internals out of
 `adapter/CesiumEngineScene.ts` as follow-up work.
+
+After Phase 9, the Cesium adapter root defers the viewer-host module until
+`createViewerHost()` is called, and the viewer host defers `CesiumEngineScene`
+until `createScene()` is called. The large scene file is still a known
+maintainability hotspot; it is now at least behind a lazy boundary rather than
+loaded by importing the package root.
 
 ### Shared Product Semantics Were Extracted
 
@@ -300,6 +432,29 @@ Completed on the maintainability branch:
   assumptions for feature entrypoints and adapter eager paths.
 - Local validation has covered release-target checks, demo checks, demo builds,
   and manual localhost startup for S-100 Explorer plus the main demos.
+
+Validation commands used for the Phase 9 state:
+
+```sh
+npm run check:release-target
+npm run test:release-target
+npm run build:release-target
+npm run maintainability:check
+npm run pack:release-target:dry-run
+npm run check:demo:engine-switcher
+npm run check:demo:parametric-vessel
+npm run check:demo:rtz-route
+npm run check:demo:getting-started
+npm run check:demo:reference
+npm run build:demo:engine-switcher
+npm run build:demo:parametric-vessel
+npm run build:demo:rtz-route
+npm run build:demo:getting-started
+npm run build:demo:reference
+```
+
+Manual localhost verification used the S-100 Explorer app and the five demo
+apps on ports `5173` through `5178`.
 
 Known remaining maintainability debt:
 

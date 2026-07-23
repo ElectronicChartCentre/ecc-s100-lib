@@ -1,7 +1,7 @@
 # S-100 Interoperability Package Docs
 
-This folder contains Phase 8 package-readiness docs for the future npm package
-shape.
+This folder contains package-readiness, architecture, API, and maintainability
+docs for the current `ecc-s100-lib` package shape.
 
 - [Learning guides](./learn/README.md)
 - [Step-by-step engine switcher learning guide](./learn/engine-switcher-practical-guide.md)

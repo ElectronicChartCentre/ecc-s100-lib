@@ -52,6 +52,21 @@ feature entrypoints:
 These entrypoints are barrels over core package modules. They must not import
 adapters or `src/internal` modules.
 
+Feature entrypoints are intended to be the normal import surface for
+application code that is focused on one product family. For example, S-111
+workflow code should prefer `@ecc/s100-viewer/products/s111` over importing the
+entire root package just to reach S-111 sessions and workflow helpers.
+
+When adding a new feature entrypoint:
+
+- add a source file under `packages/s100-viewer/src/entrypoints`
+- add a matching package export in `packages/s100-viewer/package.json`
+- add a matching TypeScript path alias in `tsconfig.base.json`
+- update `packages/s100-viewer/test/public-entrypoints.test.ts`
+- update `tools/check-boundaries.mjs` if the subpath is public
+- update `tools/check-bundle-shape.mjs` when the feature must stay isolated
+  from another large product family
+
 ## Adapter Package Responsibilities
 
 Adapter packages own engine-specific rendering and lifecycle integration.
@@ -73,6 +88,31 @@ Adapter code may contain:
 Adapter code should not define product semantics that can be shared in the core
 package, such as positive depth normalization, S-111 speed-band selection, route
 style defaults, or ENC opacity rules.
+
+## Lazy Adapter Loading
+
+Adapter roots should stay small. Importing an adapter package should expose the
+factory, capabilities, public options, and public types without eagerly loading
+the full renderer implementation.
+
+The intended shape is:
+
+```text
+adapter package root
+  -> adapter factory
+    -> dynamic import of viewer host when createViewerHost() is called
+      -> dynamic import of scene/runtime when createScene() is called
+        -> dynamic import of heavy layer helpers when that layer family is used
+```
+
+This is most important for browser applications that can choose an engine at
+runtime. A project that imports the NASA-AMMOS adapter should not also pay for
+Cesium, and a project that imports an adapter should not load every optional
+layer implementation before it creates a scene.
+
+Use cached dynamic imports for heavy renderer modules so repeated layer
+creation does not reload module code. Keep type-only imports type-only; a
+non-type import from a runtime or layer module is an eager dependency edge.
 
 ## Examples
 
