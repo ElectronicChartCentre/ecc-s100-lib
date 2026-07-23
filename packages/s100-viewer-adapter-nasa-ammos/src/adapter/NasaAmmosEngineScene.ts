@@ -42,6 +42,7 @@ import { tupleCameraPoseToObjectPose } from "../camera/cameraPose.js";
 import { coordinateToVec3 } from "../coordinates/projectedLocal.js";
 import {
   applyNasaBackground,
+  applyNasaEquirectangularEnvironmentTexture,
   applyNasaEnvironmentTexture,
   applyNasaLighting,
   isHdrEnvironmentMap,
@@ -433,7 +434,12 @@ export class NasaAmmosEngineScene implements EngineScene {
         const environmentTexture = pmremGenerator.fromEquirectangular(texture).texture;
         pmremGenerator.dispose();
         this.replaceEnvironmentTextures([texture, environmentTexture]);
-        applyNasaEnvironmentTexture(renderContext, texture, environmentTexture, state);
+        applyNasaEquirectangularEnvironmentTexture(
+          renderContext,
+          texture,
+          environmentTexture,
+          state,
+        );
       },
       undefined,
       (error) => {
@@ -463,7 +469,12 @@ export class NasaAmmosEngineScene implements EngineScene {
         const environmentTexture = pmremGenerator.fromEquirectangular(texture).texture;
         pmremGenerator.dispose();
         this.replaceEnvironmentTextures([texture, environmentTexture]);
-        applyNasaEnvironmentTexture(renderContext, texture, environmentTexture, state);
+        applyNasaEquirectangularEnvironmentTexture(
+          renderContext,
+          texture,
+          environmentTexture,
+          state,
+        );
       },
       undefined,
       (error) => {

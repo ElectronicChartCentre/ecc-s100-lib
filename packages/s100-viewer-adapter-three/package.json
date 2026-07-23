@@ -1,0 +1,53 @@
+{
+  "name": "@ecc/s100-viewer-adapter-three",
+  "version": "0.1.0-alpha.9",
+  "private": false,
+  "type": "module",
+  "description": "Reference Three.js adapter package for @ecc/s100-viewer.",
+  "keywords": [
+    "s-100",
+    "threejs",
+    "3d-tiles",
+    "geospatial",
+    "adapter",
+    "reference"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ElectronicChartCentre/ecc-s100-lib.git",
+    "directory": "packages/s100-viewer-adapter-three"
+  },
+  "bugs": {
+    "url": "https://github.com/ElectronicChartCentre/ecc-s100-lib/issues"
+  },
+  "homepage": "https://github.com/ElectronicChartCentre/ecc-s100-lib/tree/main/packages/s100-viewer-adapter-three#readme",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@ecc/s100-viewer": "0.1.0-alpha.9",
+    "3d-tiles-renderer": "^0.4.27"
+  },
+  "peerDependencies": {
+    "three": ">=0.184.0"
+  },
+  "license": "MIT"
+}

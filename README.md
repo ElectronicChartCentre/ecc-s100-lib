@@ -13,6 +13,12 @@ Release-target packages for the current phase:
 - `@ecc/s100-viewer-adapter-cesium`: Cesium adapter and initial globe-native
   integration target.
 
+Experimental workspace packages:
+
+- `@ecc/s100-viewer-adapter-three`: plain Three.js reference adapter used by the
+  engine-switcher demo and maintainability work. It is intentionally not listed
+  in `tools/release-targets.mjs` yet.
+
 S-100 Explorer owns any application-specific migration bridge in the webapp.
 The public package contract is the main `@ecc/s100-viewer` entry point plus
 adapter packages.
@@ -33,6 +39,12 @@ Cesium applications use the Cesium adapter package plus the Cesium runtime:
 
 ```sh
 npm install @ecc/s100-viewer @ecc/s100-viewer-adapter-cesium cesium
+```
+
+Reference-adapter experiments can use the plain Three.js package:
+
+```sh
+npm install @ecc/s100-viewer @ecc/s100-viewer-adapter-three three
 ```
 
 ```ts

@@ -5,7 +5,7 @@ export const demoVesselModelUrl =
 export const demoEnvironmentUrl = "/demo-assets/environment/demo-environment.json";
 export const demoNasaAmmosEnvironmentMapUrl =
   "/demo-assets/environment/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr";
-export const demoCesiumEnvironmentMapUrl =
+export const demoBrowserEnvironmentMapUrl =
   "/demo-assets/environment/hdri/kloofendal_48d_partly_cloudy_puresky_4k.jpg";
 
 export const loadDemoEnvironment = async (engineId?: string): Promise<EnvironmentState> => {
@@ -32,17 +32,21 @@ export const loadDemoEnvironment = async (engineId?: string): Promise<Environmen
     return nasaEnvironment;
   }
 
-  if (engineId === "cesium") {
-    const cesiumEnvironment: EnvironmentState = {
+  if (engineId === "cesium" || engineId === "three") {
+    const browserEnvironment: EnvironmentState = {
       ...environment,
-      skyboxUrl: demoCesiumEnvironmentMapUrl,
+      skyboxUrl: demoBrowserEnvironmentMapUrl,
+      lighting: {
+        ...environment.lighting,
+        environmentMapUrl: demoBrowserEnvironmentMapUrl,
+      },
       metadata: {
         ...environment.metadata,
         environmentMapSource: "shared demo kloofendal HDRI",
       },
     };
-    delete cesiumEnvironment.skyboxFaces;
-    return cesiumEnvironment;
+    delete browserEnvironment.skyboxFaces;
+    return browserEnvironment;
   }
 
   return environment;

@@ -44,6 +44,12 @@ The maintained package set is still:
 - `@ecc/s100-viewer-adapter-nasa-ammos`
 - `@ecc/s100-viewer-adapter-cesium`
 
+The branch also contains `@ecc/s100-viewer-adapter-three` as an experimental
+workspace package. It was merged from the local `threejs-adapter` worktree and
+adapted to the current package boundaries as a plain Three.js reference adapter.
+It is useful for adapter-authoring and engine-switcher validation, but it is not
+in `tools/release-targets.mjs` yet.
+
 Applications and examples import the core package plus one or more adapters.
 Adapters import the core package contracts, but the core package does not import
 adapters.
@@ -57,12 +63,15 @@ flowchart LR
   Examples["Examples and demos"] --> Core
   Examples --> Nasa
   Examples --> Cesium
+  Examples --> Three["experimental @ecc/s100-viewer-adapter-three"]
 
   Nasa --> Core
   Cesium --> Core
+  Three --> Core
 
   Core -. "must not import" .-> Nasa
   Core -. "must not import" .-> Cesium
+  Core -. "must not import" .-> Three
 ```
 
 The core package owns canonical viewer contracts, scene contracts, layer specs,
@@ -282,6 +291,34 @@ until `createScene()` is called. The large scene file is still a known
 maintainability hotspot; it is now at least behind a lazy boundary rather than
 loaded by importing the package root.
 
+### Three.js Reference Adapter Was Integrated
+
+The local `threejs-adapter` worktree has been brought into the maintainability
+branch as:
+
+```text
+packages/s100-viewer-adapter-three/
+```
+
+This package is deliberately positioned as a reference implementation, not as a
+replacement for NASA-AMMOS. It implements the public adapter contract directly
+on plain Three.js, targets projected-local scenes, and keeps the same lazy shape
+as the refactored adapters:
+
+```text
+src/index.ts
+src/adapter/createThreeAdapter.ts
+src/adapter/ThreeViewerHost.ts
+src/adapter/ThreeEngineScene.ts
+src/adapter/layerModules.ts
+src/layers/
+```
+
+The adapter currently covers basic ENC/map raster planes, S-102 3D Tiles,
+S-111 vector arrows, vessel rendering, route plans, simulated water level,
+camera pose/look-at, projected picking, and scene environment setup. Missing
+NASA-AMMOS parity remains explicit in the package README.
+
 ### Shared Product Semantics Were Extracted
 
 Engine-neutral rendering rules were moved into core internal modules so adapters
@@ -428,6 +465,9 @@ Completed on the maintainability branch:
   large scene implementation modules. NASA-AMMOS layer helpers for S-102,
   S-111, ENC/map, vessel, and route rendering are loaded through cached dynamic
   imports when those layer families are used.
+- The experimental `@ecc/s100-viewer-adapter-three` package is integrated into
+  the workspace and engine-switcher demo, with the same root, host, scene, and
+  layer lazy-loading boundaries guarded by `bundle-shape:check`.
 - `npm run bundle-shape:check` verifies important static import-graph
   assumptions for feature entrypoints and adapter eager paths.
 - Local validation has covered release-target checks, demo checks, demo builds,
@@ -441,6 +481,9 @@ npm run test:release-target
 npm run build:release-target
 npm run maintainability:check
 npm run pack:release-target:dry-run
+npm run build:adapter-three
+npm run check:adapter-three
+npm run test:adapter-three
 npm run check:demo:engine-switcher
 npm run check:demo:parametric-vessel
 npm run check:demo:rtz-route
@@ -468,6 +511,9 @@ Known remaining maintainability debt:
   is still the largest remaining adapter file. It is loaded lazily from the
   viewer host, but its internal layer families still need a deeper follow-up
   split.
+- `@ecc/s100-viewer-adapter-three` is intentionally incomplete. It should remain
+  out of the release-target list until its supported feature matrix and example
+  behavior are stable enough for external consumers.
 - Some file-size allowlist entries can be reconciled after the split barrels
   and core product modules have stabilized.
 

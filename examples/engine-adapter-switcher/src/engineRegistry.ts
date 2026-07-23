@@ -1,7 +1,7 @@
 import type { LoggerLike, S100EngineAdapter } from "@ecc/s100-viewer";
 import { createNasaAmmosAdapter } from "@ecc/s100-viewer-adapter-nasa-ammos";
 
-export type DemoEngineId = "nasa-ammos" | "cesium";
+export type DemoEngineId = "nasa-ammos" | "cesium" | "three";
 
 export type DemoEngineDefinition = {
   id: DemoEngineId;
@@ -55,12 +55,28 @@ export const engineDefinitions = {
       });
     },
   },
+  three: {
+    id: "three",
+    label: "Three.js Reference",
+    description: "Plain Three.js projected-local reference adapter.",
+    async load(logger) {
+      const { createThreeAdapter } = await import("@ecc/s100-viewer-adapter-three");
+      const adapterOptions = {
+        fetchHandler: window.fetch.bind(window),
+        backgroundColor: 0x17202a,
+      };
+
+      return createThreeAdapter(
+        logger === undefined ? adapterOptions : { ...adapterOptions, logger },
+      );
+    },
+  },
 } satisfies Record<DemoEngineId, DemoEngineDefinition>;
 
 export const allEngineDefinitions = Object.values(engineDefinitions);
 
 export const getEngineDefinition = (id: string): DemoEngineDefinition => {
-  if (id === "nasa-ammos" || id === "cesium") {
+  if (id === "nasa-ammos" || id === "cesium" || id === "three") {
     return engineDefinitions[id];
   }
 

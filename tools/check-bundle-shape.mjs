@@ -151,6 +151,34 @@ const checks = [
       "packages/s100-viewer-adapter-cesium/src/adapter/CesiumEngineScene.ts",
     ],
   },
+  {
+    name: "three-adapter-root",
+    entry: "packages/s100-viewer-adapter-three/src/index.ts",
+    forbidden: [
+      "packages/s100-viewer-adapter-three/src/adapter/ThreeViewerHost.ts",
+      "packages/s100-viewer-adapter-three/src/adapter/ThreeEngineScene.ts",
+      "packages/s100-viewer-adapter-three/src/layers/",
+    ],
+  },
+  {
+    name: "three-viewer-host",
+    entry: "packages/s100-viewer-adapter-three/src/adapter/ThreeViewerHost.ts",
+    forbidden: [
+      "packages/s100-viewer-adapter-three/src/adapter/ThreeEngineScene.ts",
+      "packages/s100-viewer-adapter-three/src/layers/",
+    ],
+  },
+  {
+    name: "three-scene-shell",
+    entry: "packages/s100-viewer-adapter-three/src/adapter/ThreeEngineScene.ts",
+    forbidden: [
+      "packages/s100-viewer-adapter-three/src/layers/mapLayer.ts",
+      "packages/s100-viewer-adapter-three/src/layers/routePlanLayer.ts",
+      "packages/s100-viewer-adapter-three/src/layers/s102TilesLayer.ts",
+      "packages/s100-viewer-adapter-three/src/layers/s111SurfaceCurrentLayer.ts",
+      "packages/s100-viewer-adapter-three/src/layers/vesselLayer.ts",
+    ],
+  },
 ];
 
 const violations = [];

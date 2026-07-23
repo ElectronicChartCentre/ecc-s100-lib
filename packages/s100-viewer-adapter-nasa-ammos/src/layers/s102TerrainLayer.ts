@@ -4,6 +4,7 @@ import {
   type ThreeDTilesSource,
 } from "@ecc/s100-viewer";
 import { resolveSafetyDepthMeters } from "@ecc/s100-viewer/internal/products/depthStyle";
+import { parseS102TerrainHeightSign } from "@ecc/s100-viewer/internal/products/s102TerrainShading";
 import type { TerrainView } from "../runtime/scene/NasaSceneRuntime.js";
 import {
   getNasaAmmosExtension,
@@ -77,25 +78,9 @@ const normalizeQueryString = (value: string): string =>
 
 const getS102HeightSign = (spec: S102BathymetryLayerSpec): 1 | -1 => {
   const heightCoordinate = getNasaAmmosExtension<{ sign?: unknown }>(spec, "heightCoordinate");
-  return parseHeightSign(
+  return parseS102TerrainHeightSign(
     heightCoordinate?.sign ??
       getNasaAmmosExtension<unknown>(spec, "heightSign") ??
       spec.source.metadata?.values?.heightSign,
   );
-};
-
-const parseHeightSign = (value: unknown): 1 | -1 => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value < 0 ? -1 : 1;
-  }
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "-1" || normalized === "-" || normalized === "negative" || normalized === "inverted") {
-      return -1;
-    }
-    if (normalized.startsWith("-")) {
-      return -1;
-    }
-  }
-  return 1;
 };

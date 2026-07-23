@@ -8,7 +8,7 @@ import type {
   SimulatedWaterLevelLayerSpec,
   VesselLayerSpec,
 } from "@ecc/s100-viewer";
-import type { Camera, Scene, WebGLRenderer } from "three";
+import type { S100RenderContext } from "../runtime/core/types.js";
 import type {
   CustomModelView,
   MapView,
@@ -24,12 +24,7 @@ export type NasaSceneGeoreference = {
   origin?: Vec3;
 };
 
-export type NasaRenderContext = {
-  canvas: HTMLCanvasElement;
-  camera: Camera;
-  renderer: WebGLRenderer;
-  scene: Scene;
-};
+export type NasaRenderContext = S100RenderContext;
 
 export type NasaLayerNative =
   | { kind: "terrain"; spec: S102BathymetryLayerSpec; view: TerrainView }

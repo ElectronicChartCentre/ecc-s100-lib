@@ -8,6 +8,10 @@ import {
   type Texture,
 } from "three";
 import type { NasaRenderContext } from "../adapter/layerNativeTypes.js";
+import {
+  createNasaZUpSkyDome,
+  disposeNasaSkyDome,
+} from "./skyDome.js";
 
 export const applyNasaBackground = (
   renderContext: NasaRenderContext,
@@ -20,16 +24,24 @@ export const applyNasaBackground = (
   }
 
   if (state.background === "transparent") {
+    disposeNasaSkyDome(renderContext.skyDome);
+    renderContext.skyDome = null;
     scene.background = null;
     scene.environment = null;
+    renderContext.backgroundMap = null;
+    renderContext.environmentMap = null;
     renderer.setClearColor(new Color(0x000000), 0);
     return;
   }
 
   if (state.background === "solid") {
+    disposeNasaSkyDome(renderContext.skyDome);
+    renderContext.skyDome = null;
     const color = new Color(0x102033);
     scene.background = color;
     scene.environment = null;
+    renderContext.backgroundMap = null;
+    renderContext.environmentMap = null;
     renderer.setClearColor(color, 1);
     return;
   }
@@ -79,8 +91,39 @@ export const applyNasaEnvironmentTexture = (
   environmentTexture: Texture,
   state: EnvironmentState,
 ): void => {
+  disposeNasaSkyDome(renderContext.skyDome);
+  renderContext.skyDome = null;
   renderContext.scene.background = backgroundTexture;
   renderContext.scene.environment = environmentTexture;
+  renderContext.backgroundMap = backgroundTexture;
+  renderContext.environmentMap = environmentTexture;
+  renderContext.scene.backgroundIntensity = normalizePositiveNumber(
+    state.backgroundIntensity,
+    renderContext.scene.backgroundIntensity,
+  );
+  renderContext.scene.environmentIntensity = normalizePositiveNumber(
+    state.lighting?.environmentIntensity,
+    renderContext.scene.environmentIntensity,
+  );
+  renderContext.renderer.setClearColor(new Color(0x102033), 1);
+};
+
+export const applyNasaEquirectangularEnvironmentTexture = (
+  renderContext: NasaRenderContext,
+  backgroundTexture: Texture,
+  environmentTexture: Texture,
+  state: EnvironmentState,
+): void => {
+  disposeNasaSkyDome(renderContext.skyDome);
+  const skyDome = createNasaZUpSkyDome(backgroundTexture, {
+    backgroundIntensity: state.backgroundIntensity,
+  });
+  renderContext.scene.add(skyDome);
+  renderContext.skyDome = skyDome;
+  renderContext.scene.background = null;
+  renderContext.scene.environment = environmentTexture;
+  renderContext.backgroundMap = backgroundTexture;
+  renderContext.environmentMap = environmentTexture;
   renderContext.scene.backgroundIntensity = normalizePositiveNumber(
     state.backgroundIntensity,
     renderContext.scene.backgroundIntensity,

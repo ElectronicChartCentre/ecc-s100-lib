@@ -1,7 +1,8 @@
 # S-100 Engine Adapter Switcher
 
 Private workspace demo for exercising the public `@ecc/s100-viewer` package
-against NASA-AMMOS and Cesium adapters.
+against NASA-AMMOS, Cesium, and the experimental plain Three.js reference
+adapter.
 
 For a zero-knowledge, step-by-step learning path through S-100 concepts, the
 public API, this demo's source structure, and first adapter-authoring steps,
@@ -49,9 +50,18 @@ During local Vite development, remote S-102 3D Tiles requests are routed through
 copy of this demo still needs S-102 endpoints that allow the deployed origin, or
 an equivalent application proxy.
 
+The `Three.js Reference` engine option uses
+`@ecc/s100-viewer-adapter-three`. That adapter is intentionally smaller than the
+NASA-AMMOS renderer and exists to demonstrate adapter-authoring against the
+canonical public API. It should be useful for maintainers, but it is not yet a
+release-target adapter.
+
 ## Commands
 
 ```sh
+npm run build:adapter-three
+npm run check:adapter-three
+npm run test:adapter-three
 npm run check:demo:engine-switcher
 npm run build:demo:engine-switcher
 npm run demo:engine-switcher

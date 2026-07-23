@@ -28,6 +28,9 @@
       "@ecc/s100-viewer-adapter-cesium": [
         "packages/s100-viewer-adapter-cesium/src/index.ts"
       ],
+      "@ecc/s100-viewer-adapter-three": [
+        "packages/s100-viewer-adapter-three/src/index.ts"
+      ],
       "@ecc/s100-viewer-adapter-cogs": [
         "packages/s100-viewer-adapter-cogs/src/index.ts"
       ]

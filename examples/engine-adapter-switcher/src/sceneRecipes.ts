@@ -194,7 +194,6 @@ export const sceneRecipes = {
     description: "Adds a demo vessel layer over a transparent S-101 ENC overlay.",
     requiredProducts: ["vessel", "S-101"],
     requiredDataSources: ["model", "wms"],
-    requiredVisualFeatures: ["vesselTransformGizmo"],
     async apply(scene, context) {
       const showOceanSurface = context.engineId !== "cesium";
       await addTransparentS101Overlay(scene, context);

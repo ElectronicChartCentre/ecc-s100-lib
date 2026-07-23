@@ -15,6 +15,12 @@ The root workspace may include demos, local experiments, and historical
 planning artifacts, but those are not release targets unless they are added to
 `tools/release-targets.mjs`.
 
+Experimental adapter packages may live under `packages/*` when they are useful
+for reference implementation work, but they still need an explicit status in
+their README and must not be treated as release targets by accident. The
+current example is `@ecc/s100-viewer-adapter-three`, a plain Three.js reference
+adapter used to exercise the public adapter contract and engine-switcher demo.
+
 ## Core Package Responsibilities
 
 `packages/s100-viewer` owns engine-neutral API and product semantics:
@@ -88,6 +94,11 @@ Adapter code may contain:
 Adapter code should not define product semantics that can be shared in the core
 package, such as positive depth normalization, S-111 speed-band selection, route
 style defaults, or ENC opacity rules.
+
+Experimental adapters follow the same boundary rules as release-target
+adapters. They may be incomplete, but they should not depend on app code,
+examples, local worktrees, or package internals that would make later promotion
+to a maintained adapter harder.
 
 ## Lazy Adapter Loading
 

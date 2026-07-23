@@ -36,6 +36,9 @@
     "demo:engine-switcher": "npm run dev -w @ecc/s100-engine-adapter-switcher",
     "build:demo:engine-switcher": "npm run build -w @ecc/s100-engine-adapter-switcher",
     "check:demo:engine-switcher": "npm run check -w @ecc/s100-engine-adapter-switcher",
+    "build:adapter-three": "npm run build -w @ecc/s100-viewer-adapter-three",
+    "check:adapter-three": "npm run check -w @ecc/s100-viewer-adapter-three",
+    "test:adapter-three": "npm run test -w @ecc/s100-viewer-adapter-three",
     "clean": "npm run clean --workspaces --if-present"
   },
   "devDependencies": {

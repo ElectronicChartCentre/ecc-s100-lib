@@ -14,6 +14,8 @@ const viewerProductSource = resolve(workspaceRoot, "packages/s100-viewer/src/ent
 const viewerInternalSource = resolve(workspaceRoot, "packages/s100-viewer/src/internal/$1");
 const nasaAmmosAdapterSource = resolve(workspaceRoot, "packages/s100-viewer-adapter-nasa-ammos/src/index.ts");
 const cesiumAdapterSource = resolve(workspaceRoot, "packages/s100-viewer-adapter-cesium/src/index.ts");
+const threeAdapterSource = resolve(workspaceRoot, "packages/s100-viewer-adapter-three/src/index.ts");
+const threeSource = resolve(workspaceRoot, "node_modules/three");
 
 const contentTypes: Record<string, string> = {
   ".css": "text/css",
@@ -102,7 +104,13 @@ export default defineConfig(({ mode }) => {
         { find: /^@ecc\/s100-viewer$/u, replacement: viewerSource },
         { find: /^@ecc\/s100-viewer-adapter-nasa-ammos$/u, replacement: nasaAmmosAdapterSource },
         { find: /^@ecc\/s100-viewer-adapter-cesium$/u, replacement: cesiumAdapterSource },
+        { find: /^@ecc\/s100-viewer-adapter-three$/u, replacement: threeAdapterSource },
+        // Source-aliased adapter workspaces must share one Three runtime.
+        { find: /^three$/u, replacement: threeSource },
+        { find: /^three\/addons\/(.+)$/u, replacement: `${threeSource}/examples/jsm/$1` },
+        { find: /^three\/examples\/jsm\/(.+)$/u, replacement: `${threeSource}/examples/jsm/$1` },
       ],
+      dedupe: ["three"],
     },
     server: {
       proxy: createS102TileProxy(s102Endpoint),

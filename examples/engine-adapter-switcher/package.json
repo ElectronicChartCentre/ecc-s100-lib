@@ -13,6 +13,7 @@
     "@ecc/s100-viewer": "0.1.0-alpha.9",
     "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.9",
     "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.9",
+    "@ecc/s100-viewer-adapter-three": "0.1.0-alpha.9",
     "cesium": "^1.142.0",
     "three": "^0.184.0"
   },
