@@ -1,6 +1,6 @@
 {
   "name": "@ecc/s100-viewer-adapter-three",
-  "version": "0.1.0-alpha.9",
+  "version": "0.1.0-alpha.10",
   "private": false,
   "type": "module",
   "description": "Reference Three.js adapter package for @ecc/s100-viewer.",
@@ -43,7 +43,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@ecc/s100-viewer": "0.1.0-alpha.9",
+    "@ecc/s100-viewer": "0.1.0-alpha.10",
     "3d-tiles-renderer": "^0.4.27"
   },
   "peerDependencies": {
