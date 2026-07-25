@@ -84,9 +84,11 @@ therefore start with generated, S-104-shaped JSON fixtures:
 - optional fill/no-data regions for sampler tests;
 - localhost service responses shaped like the future real endpoint.
 
-The generator should be repo-owned and deterministic. Generated fixtures should
-be small enough for tests and demos. If larger generated outputs are needed,
-they should be regenerated locally rather than committed.
+The generator should be repo-owned and deterministic. Generated JSON and other
+large fixture outputs should be stored in the static files repository, not in
+`ecc-s100-lib`. This keeps the library source repository focused on code,
+types, tests, and fixture generation logic while still making demo payloads
+available through the same static asset workflow used by the existing demos.
 
 ## First Fixture Scene
 

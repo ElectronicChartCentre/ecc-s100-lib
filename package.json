@@ -21,6 +21,8 @@
     "bundle-shape:check": "node tools/check-bundle-shape.mjs",
     "maintainability:check": "npm run file-size:check && npm run boundaries:check && npm run bundle-shape:check",
     "lint": "npm run boundaries:check",
+    "fixtures:s104:generate": "node tools/s104-fixtures/generate-fixtures.mjs",
+    "fixtures:s104:validate": "node tools/s104-fixtures/validate-fixtures.mjs",
     "demo:getting-started": "npm run dev -w @ecc/s100-getting-started",
     "build:demo:getting-started": "npm run build -w @ecc/s100-getting-started",
     "check:demo:getting-started": "npm run check -w @ecc/s100-getting-started",
