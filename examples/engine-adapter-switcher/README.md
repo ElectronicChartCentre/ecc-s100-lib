@@ -34,6 +34,33 @@ Required for service-backed recipes:
 - `VITE_DEMO_S102_DATASET_IDS`: comma-separated S-102 dataset ids.
 - `VITE_DEMO_S111_DATASET_IDS`: comma-separated S-111 dataset ids.
 
+Optional for the `Live AIS Norway` recipe:
+
+- `VITE_AIS_PROXY_URL`: frontend-safe URL for the local or deployed ECC AIS
+  proxy, for example `http://localhost:8787`.
+- `VITE_AIS_REFRESH_INTERVAL_MS`: polling interval. Values below 30000 are
+  clamped to 30000.
+- `VITE_AIS_MAX_VESSELS`: maximum number of vessels requested from the proxy.
+- `VITE_AIS_MAX_AGE_SECONDS`: optional freshness filter for AIS messages.
+- `VITE_DEMO_LIVE_AIS_S102_DATASET_IDS`: optional override for the Stavanger
+  S-102 terrain datasets. By default the recipe uses
+  `102NO006J0811_10_U`, `102NO006T0711_40_U`, `102NO006T0711_30_U`, and
+  `102NO006J0811_20_U`.
+- `VITE_DEMO_LIVE_AIS_S101_ENABLED`: optional S-101 WMS basemap for the live
+  AIS scene. It defaults to `false` so the demo remains terrain-first and a
+  bad WMS style cannot mask the S-102 terrain as an opaque black plane.
+
+For local live AIS testing, start the proxy from the super-repo root:
+
+```sh
+cd services/ecc-ais-proxy-instance
+npm run dev
+```
+
+The proxy reads backend-only BarentsWatch credentials from `.env.local` in its
+repo or a parent directory. Do not expose `BW_CLIENT_ID` or
+`BW_AIS_CLIENT_SECRET` through this Vite demo's `.env.local`.
+
 The demo keeps static local assets under `public/demo-assets`:
 
 - `vessel/panama-tanker-origin-at-transponder.glb`: higher-detail tanker model

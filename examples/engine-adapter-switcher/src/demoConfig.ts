@@ -21,6 +21,13 @@ export type DemoServiceConfig = DemoSceneSettings & {
   s101WmsLayers: readonly string[];
 };
 
+export type DemoLiveAisConfig = {
+  proxyUrl: string | null;
+  refreshIntervalMs: number;
+  maxVessels: number;
+  maxAgeSeconds?: number;
+};
+
 export type DemoServiceRequirement =
   | "primarApiKey"
   | "licenseeKey"
@@ -40,8 +47,7 @@ export const getDemoSceneSettings = (): DemoSceneSettings => ({
   mapWidthMeters: readNumberEnv("VITE_DEMO_MAP_WIDTH_METERS", 5000),
 });
 
-export const getDemoLookAtTarget = () => {
-  const settings = getDemoSceneSettings();
+export const getDemoLookAtTarget = (settings: DemoSceneSettings = getDemoSceneSettings()) => {
   return {
     kind: "projected",
     crs: settings.crs,
@@ -51,8 +57,9 @@ export const getDemoLookAtTarget = () => {
   } as const;
 };
 
-export const getDemoServiceConfig = (): DemoServiceConfig => {
-  const settings = getDemoSceneSettings();
+export const getDemoServiceConfig = (
+  settings: DemoSceneSettings = getDemoSceneSettings(),
+): DemoServiceConfig => {
   return {
     ...settings,
     primarApiKey: readFirstEnv(["VITE_DEMO_PRIMAR_API_KEY", "VITE_S111_PRIMAR_API_KEY"]),
@@ -80,8 +87,9 @@ export const getDemoServiceConfig = (): DemoServiceConfig => {
 
 export const requireDemoServiceConfig = (
   requirements: readonly DemoServiceRequirement[],
+  settings?: DemoSceneSettings,
 ): DemoServiceConfig => {
-  const config = getDemoServiceConfig();
+  const config = getDemoServiceConfig(settings);
   const missing = requirements.filter((requirement) => {
     const value = config[requirement];
     return Array.isArray(value) ? value.length === 0 : !value;
@@ -95,6 +103,27 @@ export const requireDemoServiceConfig = (
 
   return config;
 };
+
+export const getDemoLiveAisConfig = (): DemoLiveAisConfig => {
+  const maxAgeSeconds = readOptionalPositiveIntegerEnv("VITE_AIS_MAX_AGE_SECONDS");
+  return {
+    proxyUrl: readFirstEnv(["VITE_AIS_PROXY_URL", "VITE_DEMO_AIS_PROXY_URL"])?.replace(/\/+$/, "") ?? null,
+    refreshIntervalMs: Math.max(readPositiveIntegerEnv("VITE_AIS_REFRESH_INTERVAL_MS", 30_000), 30_000),
+    maxVessels: readPositiveIntegerEnv("VITE_AIS_MAX_VESSELS", 250),
+    ...(maxAgeSeconds !== undefined ? { maxAgeSeconds } : {}),
+  };
+};
+
+export const getDemoLiveAisS102DatasetIds = (): readonly string[] =>
+  readCsvEnv("VITE_DEMO_LIVE_AIS_S102_DATASET_IDS", [
+    "102NO006J0811_10_U",
+    "102NO006T0711_40_U",
+    "102NO006T0711_30_U",
+    "102NO006J0811_20_U",
+  ]);
+
+export const getDemoLiveAisS101Enabled = (): boolean =>
+  readBooleanEnv("VITE_DEMO_LIVE_AIS_S101_ENABLED", false);
 
 const readFirstEnv = (keys: readonly string[]): string | undefined => {
   for (const key of keys) {
@@ -128,4 +157,38 @@ const readNumberEnv = (key: string, fallback: number): number => {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const readPositiveIntegerEnv = (key: string, fallback: number): number => {
+  const value = readEnv(key);
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const readOptionalPositiveIntegerEnv = (key: string): number | undefined => {
+  const value = readEnv(key);
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const readBooleanEnv = (key: string, fallback: boolean): boolean => {
+  const value = readEnv(key)?.toLowerCase();
+  if (value === undefined) {
+    return fallback;
+  }
+  if (value === "true" || value === "1" || value === "yes") {
+    return true;
+  }
+  if (value === "false" || value === "0" || value === "no") {
+    return false;
+  }
+  return fallback;
 };

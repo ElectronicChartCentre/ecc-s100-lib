@@ -9,6 +9,7 @@ import { createParametricVesselObject } from "../parametric-vessel-model.js";
 import {
   SeaLevelIndicatorMode,
   type ModelAssetSpecification,
+  type VesselShadowSpecification,
   type VesselDimensions,
   type VesselView,
 } from "../runtime/scene/NasaSceneRuntime.js";
@@ -74,6 +75,27 @@ export const getVesselTransformGizmoVerticalPositionLimits = (
     return undefined;
   }
   return transformGizmo.verticalPositionLimits;
+};
+
+export const getVesselShadowSpecification = (
+  spec: VesselLayerSpec,
+): boolean | VesselShadowSpecification => {
+  const enabled = getVesselShadowEnabled(spec);
+  const shadow = spec.style?.shadow;
+  if (typeof shadow === "object" && shadow !== null) {
+    return {
+      enabled,
+      mode: shadow.mode === "shared-texture" ? "shared-texture" : "high-quality",
+      ...(shadow.opacity !== undefined ? { opacity: shadow.opacity } : {}),
+      ...(shadow.softness !== undefined ? { softness: shadow.softness } : {}),
+      ...(shadow.color !== undefined ? { color: shadow.color } : {}),
+      ...(shadow.radiusMeters !== undefined ? { radiusMeters: shadow.radiusMeters } : {}),
+    };
+  }
+  return {
+    enabled,
+    mode: "high-quality",
+  };
 };
 
 export const applyVesselPresentation = (

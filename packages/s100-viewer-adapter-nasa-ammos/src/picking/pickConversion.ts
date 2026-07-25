@@ -92,12 +92,32 @@ export const pickValuesToResultFields = (
   if (typeof values.layerId === "string") {
     result.layerId = values.layerId;
   }
-  if (typeof values.waypointId === "string") {
+  if (typeof values.featureId === "string") {
+    result.featureId = values.featureId;
+  } else if (typeof values.waypointId === "string") {
     result.featureId = values.waypointId;
   } else if (typeof values.legId === "string") {
     result.featureId = values.legId;
   }
   return result;
+};
+
+export const getS100PickValues = (
+  object: Object3D,
+  stopAt: Object3D | null,
+): Record<string, unknown> | undefined => {
+  let current: Object3D | null = object;
+  while (current) {
+    const metadata = current.userData.s100PickMetadata;
+    if (isPickMetadata(metadata)) {
+      return metadata;
+    }
+    if (current === stopAt) {
+      break;
+    }
+    current = current.parent;
+  }
+  return undefined;
 };
 
 export const getCanvasPointer = (
@@ -184,3 +204,7 @@ const findPickableDescendants = (root: Object3D): Object3D[] => {
 
 const isPickableObject = (object: Object3D): boolean =>
   object.userData.s100Pickable === true;
+
+function isPickMetadata(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

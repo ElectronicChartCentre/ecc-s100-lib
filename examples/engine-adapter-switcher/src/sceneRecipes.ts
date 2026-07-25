@@ -3,6 +3,7 @@ import {
   createQuatIdentity,
   LayerBuilder,
   type AdapterCapabilities,
+  type Coordinate,
   type S100Scene,
 } from "@ecc/s100-viewer";
 import {
@@ -10,12 +11,32 @@ import {
   S111Workflow,
   type S111ProjectedBounds,
 } from "@ecc/s100-viewer/products/s111";
-import type { VesselDimensions } from "@ecc/s100-viewer/products/vessel";
 import {
+  createLiveVesselFeedLayer,
+  createProjectedLiveAisPositionMapper,
+  type LiveVesselFeedController,
+  type LiveVesselFeedVesselState,
+  type VesselDimensions,
+} from "@ecc/s100-viewer/products/vessel";
+import {
+  getDemoLiveAisConfig,
+  getDemoLiveAisS101Enabled,
+  getDemoLiveAisS102DatasetIds,
   getDemoSceneSettings,
   getDemoLookAtTarget,
+  getDemoServiceConfig,
   requireDemoServiceConfig,
+  type DemoSceneSettings,
 } from "./demoConfig";
+import {
+  fetchLiveAisVessels,
+  inactiveLiveAisStatus,
+  loadingLiveAisStatus,
+  missingLiveAisConfigStatus,
+  norwayLiveAisSceneBbox,
+  norwayLiveAisSceneSettings,
+  type LiveAisDemoStatus,
+} from "./liveAisDemo";
 import {
   appendWmsTemplateParameters,
   buildS101WmsUrlTemplate,
@@ -23,11 +44,22 @@ import {
 } from "./serviceData";
 import { demoVesselModelUrl } from "./staticAssets";
 
-export type DemoRecipeId = "minimal" | "s101-enc" | "s102-terrain" | "s111-time" | "vessel";
+export type DemoRecipeId =
+  | "minimal"
+  | "s101-enc"
+  | "s102-terrain"
+  | "s111-time"
+  | "vessel"
+  | "live-ais";
 
 export type DemoSceneRecipeContext = {
   engineId: string;
+  container: HTMLElement;
+  sceneSettings: DemoSceneSettings;
   log(level: "info" | "warn" | "error", message: string): void;
+  registerCleanup(cleanup: () => void | Promise<void>): void;
+  onLiveAisStatus?(status: LiveAisDemoStatus): void;
+  onLiveAisSelection?(selection: LiveVesselFeedVesselState | null): void;
 };
 
 export type DemoSceneRecipe = {
@@ -37,6 +69,13 @@ export type DemoSceneRecipe = {
   requiredProducts?: readonly string[];
   requiredDataSources?: readonly string[];
   requiredVisualFeatures?: readonly (keyof NonNullable<AdapterCapabilities["visualFeatures"]>)[];
+  sceneSettings?: DemoSceneSettings;
+  initialCamera?: {
+    target: Coordinate;
+    rangeMeters: number;
+    headingDegrees: number;
+    pitchDegrees: number;
+  };
   apply(scene: S100Scene, context: DemoSceneRecipeContext): Promise<void>;
 };
 
@@ -73,7 +112,7 @@ export const sceneRecipes = {
     requiredProducts: ["S-101"],
     requiredDataSources: ["wms"],
     async apply(scene, context) {
-      await scene.layers.add(createS101BasemapLayer());
+      await scene.layers.add(createS101BasemapLayer(context.sceneSettings));
       context.log("info", "Added S-101 ENC WMS basemap for the projected-local scene.");
     },
   },
@@ -98,7 +137,7 @@ export const sceneRecipes = {
         "primarApiKey",
         "s102TilesEndpoint",
         "s102DatasetIds",
-      ]);
+      ], context.sceneSettings);
       await addTransparentS101Overlay(scene, context);
       const datasetLabel = config.s102DatasetIds.join(",");
       const terrain = await scene.layers.add(
@@ -137,7 +176,7 @@ export const sceneRecipes = {
         "licenseeKey",
         "s111Endpoint",
         "s111DatasetIds",
-      ]);
+      ], context.sceneSettings);
       const s111Endpoint = requireConfiguredValue(config.s111Endpoint, "s111Endpoint");
       const licenseeKey = requireConfiguredValue(config.licenseeKey, "licenseeKey");
       await addTransparentS101Overlay(scene, context);
@@ -196,6 +235,7 @@ export const sceneRecipes = {
     requiredDataSources: ["model", "wms"],
     async apply(scene, context) {
       const showOceanSurface = context.engineId !== "cesium";
+      const lookAtTarget = getDemoLookAtTarget(context.sceneSettings);
       await addTransparentS101Overlay(scene, context);
       const vessel = await scene.layers.add(
         LayerBuilder.createVessel({
@@ -203,9 +243,9 @@ export const sceneRecipes = {
           title: "Demo vessel",
           url: demoVesselModelUrl,
           format: "glb",
-          crs: getDemoLookAtTarget().crs,
+          crs: lookAtTarget.crs,
           pose: {
-            position: getDemoLookAtTarget(),
+            position: lookAtTarget,
             headingDegrees: 35,
           },
           dimensions: demoVesselDimensions,
@@ -235,6 +275,77 @@ export const sceneRecipes = {
       context.log("info", "Added vessel and configured transform/ocean-surface controllers.");
     },
   },
+  "live-ais": {
+    id: "live-ais",
+    label: "Live AIS Norway",
+    description: "Adds Stavanger S-102 terrain and renders BarentsWatch live AIS vessels through a proxy.",
+    requiredProducts: ["vessel", "S-102"],
+    requiredDataSources: ["3d-tiles"],
+    sceneSettings: norwayLiveAisSceneSettings,
+    initialCamera: {
+      target: getDemoLookAtTarget(norwayLiveAisSceneSettings),
+      rangeMeters: 12_000,
+      headingDegrees: 20,
+      pitchDegrees: 55,
+    },
+    async apply(scene, context) {
+      const config = getDemoLiveAisConfig();
+      context.onLiveAisStatus?.(config.proxyUrl
+        ? inactiveLiveAisStatus(true)
+        : missingLiveAisConfigStatus());
+
+      if (getDemoLiveAisS101Enabled()) {
+        await tryAddOptionalS101Basemap(scene, context);
+      } else {
+        context.log("info", "Live AIS S-101 basemap skipped by default to keep S-102 terrain visible.");
+      }
+      await tryAddLiveAisS102Terrain(scene, context);
+
+      if (!config.proxyUrl) {
+        context.log("warn", "Live AIS proxy is not configured. Set VITE_AIS_PROXY_URL to enable this scene.");
+        return;
+      }
+
+      const feed = await createLiveVesselFeedLayer({
+        scene,
+        id: "demo-live-ais",
+        stalePolicy: {
+          removeMissing: true,
+          ...(config.maxAgeSeconds !== undefined ? { maxAgeSeconds: config.maxAgeSeconds } : {}),
+        },
+        style: {
+          style: {
+            opacity: 0.92,
+            showSeaLevelIndicator: true,
+            showOceanSurface: false,
+            oceanSurface: false,
+            shadow: {
+              enabled: true,
+              mode: "shared-texture",
+              opacity: 0.34,
+            },
+          },
+          selectedStyle: {
+            opacity: 1,
+          },
+        },
+        positionMapper: createProjectedLiveAisPositionMapper({
+          crs: context.sceneSettings.crs,
+        }),
+      });
+      const selection = registerLiveAisSelection({
+        scene,
+        feed,
+        context,
+      });
+      registerLiveAisPolling({
+        feed,
+        config,
+        context,
+        onAfterUpdate: selection.refresh,
+      });
+    },
+  },
 } satisfies Record<DemoRecipeId, DemoSceneRecipe>;
 
 export const allSceneRecipes = Object.values(sceneRecipes);
@@ -245,7 +356,8 @@ export const getSceneRecipe = (id: string): DemoSceneRecipe => {
     id === "s101-enc" ||
     id === "s102-terrain" ||
     id === "s111-time" ||
-    id === "vessel"
+    id === "vessel" ||
+    id === "live-ais"
   ) {
     return sceneRecipes[id];
   }
@@ -253,12 +365,11 @@ export const getSceneRecipe = (id: string): DemoSceneRecipe => {
   return sceneRecipes.minimal;
 };
 
-const createS101BasemapLayer = () => {
-  const settings = getDemoSceneSettings();
+const createS101BasemapLayer = (settings: DemoSceneSettings = getDemoSceneSettings()) => {
   const config = requireDemoServiceConfig([
     "licenseeKey",
     "s101WmsBaseUrl",
-  ]);
+  ], settings);
   const urlTemplate = buildS101WmsUrlTemplate(config, {
     imageSizePixels: demoEncWmsImageSizePixels,
     styleId: config.s101WmsBasemapStyleId,
@@ -266,13 +377,13 @@ const createS101BasemapLayer = () => {
   });
   const projectedMap = LayerBuilder.ProjectedMap.fromCenterExtent({
     center: {
-      x: settings.origin.x,
-      y: settings.origin.y,
-      crs: settings.crs,
+      x: config.origin.x,
+      y: config.origin.y,
+      crs: config.crs,
     },
-    widthMeters: settings.mapWidthMeters,
-    heightMeters: settings.mapWidthMeters,
-    crs: settings.crs,
+    widthMeters: config.mapWidthMeters,
+    heightMeters: config.mapWidthMeters,
+    crs: config.crs,
     minLevel: demoEncMapMinLevel,
     maxLevel: demoEncMapMaxLevel,
     quality: demoEncMapQuality,
@@ -321,15 +432,15 @@ const addTransparentS101Overlay = async (
   scene: S100Scene,
   context: DemoSceneRecipeContext,
 ): Promise<void> => {
-  await scene.layers.add(createTransparentS101OverlayLayer());
+  await scene.layers.add(createTransparentS101OverlayLayer(context.sceneSettings));
   context.log("info", "Added transparent S-101 ENC overlay.");
 };
 
-const createTransparentS101OverlayLayer = () => {
+const createTransparentS101OverlayLayer = (settings?: DemoSceneSettings) => {
   const config = requireDemoServiceConfig([
     "licenseeKey",
     "s101WmsBaseUrl",
-  ]);
+  ], settings);
   const baseTemplate = buildS101WmsUrlTemplate(config, {
     imageSizePixels: demoEncWmsImageSizePixels,
     styleId: config.s101WmsStyleId,
@@ -370,6 +481,220 @@ const createTransparentS101OverlayLayer = () => {
 
   return mapPair.transparent;
 };
+
+const tryAddOptionalS101Basemap = async (
+  scene: S100Scene,
+  context: DemoSceneRecipeContext,
+): Promise<void> => {
+  const config = getDemoServiceConfig(context.sceneSettings);
+  if (!config.licenseeKey || !config.s101WmsBaseUrl) {
+    context.log("warn", "Optional S-101 basemap skipped for live AIS scene; WMS config is incomplete.");
+    return;
+  }
+
+  await scene.layers.add(createS101BasemapLayer(context.sceneSettings));
+  context.log("info", "Added optional S-101 basemap for live AIS scene.");
+};
+
+const tryAddLiveAisS102Terrain = async (
+  scene: S100Scene,
+  context: DemoSceneRecipeContext,
+): Promise<void> => {
+  const datasetIds = getDemoLiveAisS102DatasetIds();
+  const baseConfig = getDemoServiceConfig(context.sceneSettings);
+  if (!baseConfig.primarApiKey || !baseConfig.s102TilesEndpoint || datasetIds.length === 0) {
+    context.log("warn", "Live AIS S-102 terrain skipped; S-102 endpoint, API key, or dataset ids are incomplete.");
+    return;
+  }
+
+  const config = {
+    ...baseConfig,
+    s102DatasetIds: datasetIds,
+  };
+  const datasetLabel = datasetIds.join(",");
+  const terrain = await scene.layers.add(
+    LayerBuilder.createS102({
+      id: "demo-live-ais-s102-terrain",
+      title: "Stavanger S-102 bathymetry",
+      url: buildS102TilesUrl(config),
+      crs: config.crs,
+      query: { crs: config.crs },
+      rendering: {
+        detailFactor: 500,
+      },
+      style: {
+        safetyDepthMeters: 10,
+        shading: "hypsometric",
+      },
+      metadata: {
+        datasetId: datasetLabel,
+        description: "Stavanger S-102 terrain used by the Live AIS Norway demo scene.",
+      },
+    }),
+  );
+  await terrain.controllers.terrain.setContours({ visible: true, intervalMeters: 5 });
+  context.log("info", `Added Stavanger S-102 terrain datasets: ${datasetLabel}.`);
+};
+
+const registerLiveAisPolling = (options: {
+  feed: LiveVesselFeedController;
+  config: ReturnType<typeof getDemoLiveAisConfig>;
+  context: DemoSceneRecipeContext;
+  onAfterUpdate?: () => void;
+}): void => {
+  let disposed = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let abortController: AbortController | null = null;
+  let refreshSequence = 0;
+
+  const stopTimer = (): void => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  const schedule = (): void => {
+    stopTimer();
+    if (disposed) {
+      return;
+    }
+    timer = setTimeout(() => {
+      void refresh();
+    }, options.config.refreshIntervalMs);
+  };
+
+  const refresh = async (): Promise<void> => {
+    abortController?.abort();
+    const currentAbortController = new AbortController();
+    abortController = currentAbortController;
+    const refreshId = ++refreshSequence;
+    options.context.onLiveAisStatus?.(loadingLiveAisStatus());
+
+    try {
+      const result = await fetchLiveAisVessels({
+        config: options.config,
+        bbox: norwayLiveAisSceneBbox,
+        signal: currentAbortController.signal,
+      });
+      if (disposed || refreshId !== refreshSequence || currentAbortController.signal.aborted) {
+        return;
+      }
+
+      await options.feed.updateVessels(result.vessels);
+      options.onAfterUpdate?.();
+      options.context.onLiveAisStatus?.({
+        state: result.sceneIntersectsCoverage ? "ready" : "outside-coverage",
+        configured: true,
+        message: result.sceneIntersectsCoverage
+          ? "Live AIS vessels loaded."
+          : "Scene is outside BarentsWatch open-AIS coverage.",
+        vesselCount: result.vessels.length,
+        latestFetchTime: result.generatedAt,
+        upstreamFetchedAt: result.upstreamFetchedAt,
+        servedFromWarmCache: result.servedFromWarmCache,
+        sceneIntersectsCoverage: result.sceneIntersectsCoverage,
+        warnings: result.warnings,
+      });
+      options.context.log("info", `Loaded ${result.vessels.length} live AIS vessel(s).`);
+    } catch (error) {
+      if (isAbortError(error) || disposed) {
+        return;
+      }
+      await options.feed.clear();
+      options.context.onLiveAisStatus?.({
+        state: "error",
+        configured: true,
+        message: errorMessage(error),
+      });
+      options.context.log("error", `Live AIS refresh failed: ${errorMessage(error)}`);
+    } finally {
+      if (abortController === currentAbortController) {
+        abortController = null;
+      }
+      schedule();
+    }
+  };
+
+  options.context.registerCleanup(async () => {
+    disposed = true;
+    stopTimer();
+    abortController?.abort();
+    await options.feed.dispose();
+  });
+
+  void refresh();
+};
+
+const registerLiveAisSelection = (options: {
+  scene: S100Scene;
+  feed: LiveVesselFeedController;
+  context: DemoSceneRecipeContext;
+}): { refresh(): void } => {
+  let disposed = false;
+  let selectedMmsi: number | null = null;
+  let selectionSequence = 0;
+
+  const emitSelection = (): void => {
+    const selected = selectedMmsi !== null
+      ? options.feed.getVessel(selectedMmsi) ?? null
+      : null;
+    options.context.onLiveAisSelection?.(selected);
+  };
+
+  const selectMmsi = async (mmsi: number | null): Promise<void> => {
+    const selectionId = ++selectionSequence;
+    selectedMmsi = mmsi;
+    await options.feed.selectVessel(mmsi);
+    if (disposed || selectionId !== selectionSequence) {
+      return;
+    }
+    emitSelection();
+  };
+
+  const handleClick = (event: MouseEvent): void => {
+    void (async () => {
+      const pick = await options.scene.picking.pick({
+        screenX: event.clientX,
+        screenY: event.clientY,
+        includeNative: false,
+      });
+      if (disposed) {
+        return;
+      }
+      await selectMmsi(liveAisMmsiFromLayerId(pick?.layerId ?? pick?.featureId));
+    })();
+  };
+
+  options.context.container.addEventListener("click", handleClick);
+  options.context.onLiveAisSelection?.(null);
+  options.context.registerCleanup(async () => {
+    disposed = true;
+    selectionSequence += 1;
+    options.context.container.removeEventListener("click", handleClick);
+    await options.feed.selectVessel(null);
+    options.context.onLiveAisSelection?.(null);
+  });
+
+  return {
+    refresh: emitSelection,
+  };
+};
+
+const liveAisMmsiFromLayerId = (layerId: string | undefined): number | null => {
+  const match = /^demo-live-ais-(\d+)$/.exec(layerId ?? "");
+  if (!match) {
+    return null;
+  }
+  const mmsi = Number(match[1]);
+  return Number.isSafeInteger(mmsi) ? mmsi : null;
+};
+
+const isAbortError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === "AbortError";
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 export const assessRecipeSupport = (
   recipe: DemoSceneRecipe,

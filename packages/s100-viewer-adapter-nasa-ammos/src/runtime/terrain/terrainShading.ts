@@ -8,6 +8,8 @@ import {
   patchS100TerrainShaderSource,
   S100_TERRAIN_SHADER_CACHE_KEY,
   S100_TERRAIN_SHADER_DEFAULTS,
+  updateS100TerrainVesselShadowUniforms,
+  type S100TerrainVesselShadowStamp,
   type S100TerrainShaderUniforms,
 } from "@ecc/s100-viewer/internal/products/s102TerrainShading";
 
@@ -65,6 +67,10 @@ export class TerrainMaterialController {
       0,
       normalizeS100TerrainFiniteNumber(value, 0),
     );
+  }
+
+  setVesselShadows(stamps: readonly S100TerrainVesselShadowStamp[]): void {
+    updateS100TerrainVesselShadowUniforms(this.uniforms, stamps);
   }
 
   private applyToMaterial(material: Material): void {

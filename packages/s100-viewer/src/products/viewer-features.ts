@@ -78,13 +78,23 @@ export type VesselOceanSurfaceStyle =
       reflectivity?: number;
     };
 
+export type VesselShadowMode = "high-quality" | "shared-texture";
+
 export type VesselShadowStyle =
   | boolean
   | {
       enabled?: boolean;
+      /**
+       * `high-quality` keeps the existing per-vessel shadow-casting light.
+       * `shared-texture` uses a lightweight shared fleet shadow path suitable
+       * for many parametric vessels. Adapters should prefer receiver shading
+       * over world-space shadow overlay geometry when terrain receivers exist.
+       */
+      mode?: VesselShadowMode;
       opacity?: number;
       softness?: number;
       color?: ColorValue;
+      radiusMeters?: number;
     };
 
 export type VesselStyle = OpacityVisibilityStyle & {

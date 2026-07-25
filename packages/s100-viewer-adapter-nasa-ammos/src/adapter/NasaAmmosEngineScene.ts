@@ -54,6 +54,7 @@ import {
   getPickableRootForObject,
   getPickableSceneRoots,
   getSeaLevelRayPoint,
+  getS100PickValues,
   hasUnpickableAncestor,
   legacyPickToPickResult,
   pickValuesToResultFields,
@@ -80,6 +81,32 @@ import {
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 
 const SIMULATED_WATER_LEVEL_PRODUCT = "simulated-water-level";
+
+const createVesselPickValues = (spec: VesselLayerSpec): Record<string, unknown> => {
+  const values: Record<string, unknown> = {
+    layerId: spec.id,
+    product: spec.product,
+    featureId: spec.id,
+  };
+  copyRecordValues(values, spec.metadata?.values);
+  copyRecordValues(values, spec.source.metadata?.values);
+  if (spec.source.kind === "parametric-vessel") {
+    copyRecordValues(values, spec.source.spec.metadata);
+  }
+  if (spec.dimensions !== undefined) {
+    values.dimensions = { ...spec.dimensions };
+  }
+  return values;
+};
+
+const copyRecordValues = (
+  target: Record<string, unknown>,
+  source: Record<string, unknown> | undefined,
+): void => {
+  if (source !== undefined) {
+    Object.assign(target, source);
+  }
+};
 
 type SubscriptionLike = {
   unsubscribe(): void;
@@ -293,8 +320,7 @@ export class NasaAmmosEngineScene implements EngineScene {
 
     if (hit) {
       const pickableRoot = getPickableRootForObject(hit.object);
-      const { getRoutePickValues } = await loadNasaRoutePlanLayerModule();
-      const routePickValues = getRoutePickValues(hit.object, pickableRoot);
+      const pickValues = getS100PickValues(hit.object, pickableRoot);
       return {
         screen: { x: request.screenX, y: request.screenY },
         world: {
@@ -306,7 +332,7 @@ export class NasaAmmosEngineScene implements EngineScene {
         },
         source: "geometry",
         depthMeters: depthFromElevation(hit.point.z, this.scene.seaLevel),
-        ...pickValuesToResultFields(routePickValues),
+        ...pickValuesToResultFields(pickValues),
         native: request.includeNative ? hit : undefined,
       };
     }
@@ -631,6 +657,7 @@ export class NasaAmmosEngineScene implements EngineScene {
       applyVesselPresentation,
       createVesselModelSpecification,
       getVesselDimensions,
+      getVesselShadowSpecification,
       getVesselTransformGizmoVerticalPositionLimits,
     } = await loadNasaVesselLayerModule();
     const model = createVesselModelSpecification(spec);
@@ -638,12 +665,15 @@ export class NasaAmmosEngineScene implements EngineScene {
     const view = this.scene.VesselFeature.add({
       model,
       dimensions: getVesselDimensions(spec),
+      shadow: getVesselShadowSpecification(spec),
       ...(verticalPositionLimits !== undefined ? { verticalPositionLimits } : {}),
     });
     const position = this.coordinateToEngineVec3(spec.pose.position);
     view.setPosition([position.x, position.y, position.z]);
     view.setHeading(spec.pose.headingDegrees ?? 0);
     view.setVisibility(spec.visible ?? true);
+    view.modelView.group.userData.s100Pickable = true;
+    view.modelView.group.userData.s100PickMetadata = createVesselPickValues(spec);
     applyVesselPresentation(view, spec);
 
     return { kind: "vessel", spec, view };

@@ -14,6 +14,7 @@ import {
   type ParametricVesselFeatureSessionOptions,
   type VesselVerticalConstraint,
 } from "./vessel-session.js";
+import { estimateParametricDraughtFromBeamMeters } from "./parametric-vessel/physical-defaults.js";
 
 export type LiveAisVesselSource = "barentswatch-live-ais" | string;
 
@@ -129,6 +130,8 @@ export function mapLiveAisVesselToParametricVessel(
       shipType: vessel.shipType,
       reportClass: vessel.reportClass,
       stream: vessel.stream,
+      draughtSource: vessel.draughtMeters !== undefined ? "ais" : "estimated",
+      draughtEstimated: vessel.draughtMeters === undefined,
     },
   };
 }
@@ -309,18 +312,22 @@ class LiveVesselFeedSession implements LiveVesselFeedController {
 
 function dimensionsForLiveAisVessel(vessel: LiveAisVessel): VesselDimensions {
   const source = vessel.dimensionsMeters;
-  const length = positive(source?.length) ?? sumPositive(source?.bow, source?.stern) ?? DEFAULT_LENGTH_METERS;
-  const width = positive(source?.width) ?? sumPositive(source?.port, source?.starboard) ?? DEFAULT_BEAM_METERS;
-  const bow = positive(source?.bow) ?? length / 2;
-  const stern = positive(source?.stern) ?? length - bow;
-  const port = positive(source?.port) ?? width / 2;
-  const starboard = positive(source?.starboard) ?? width - port;
+  const sourceBow = nonNegative(source?.bow);
+  const sourceStern = nonNegative(source?.stern);
+  const sourcePort = nonNegative(source?.port);
+  const sourceStarboard = nonNegative(source?.starboard);
+  const length = positive(source?.length) ?? sumNonNegative(sourceBow, sourceStern) ?? DEFAULT_LENGTH_METERS;
+  const width = positive(source?.width) ?? sumNonNegative(sourcePort, sourceStarboard) ?? DEFAULT_BEAM_METERS;
+  const bow = sourceBow ?? length / 2;
+  const stern = sourceStern ?? length - bow;
+  const port = sourcePort ?? width / 2;
+  const starboard = sourceStarboard ?? width - port;
   return {
-    draught: positive(vessel.draughtMeters) ?? DEFAULT_DRAUGHT_METERS,
-    bow: Math.max(bow, 0.1),
-    stern: Math.max(stern, 0.1),
-    port: Math.max(port, 0.1),
-    starboard: Math.max(starboard, 0.1),
+    draught: positive(vessel.draughtMeters) ?? estimateDraughtMeters(width),
+    bow,
+    stern,
+    port,
+    starboard,
   };
 }
 
@@ -364,8 +371,15 @@ function positive(value: number | undefined): number | undefined {
   return value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
-function sumPositive(left: number | undefined, right: number | undefined): number | undefined {
-  const a = positive(left);
-  const b = positive(right);
-  return a !== undefined && b !== undefined ? a + b : undefined;
+function nonNegative(value: number | undefined): number | undefined {
+  return value !== undefined && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function sumNonNegative(left: number | undefined, right: number | undefined): number | undefined {
+  const sum = left !== undefined && right !== undefined ? left + right : undefined;
+  return sum !== undefined && sum > 0 ? sum : undefined;
+}
+
+function estimateDraughtMeters(width: number): number {
+  return estimateParametricDraughtFromBeamMeters(width, DEFAULT_DRAUGHT_METERS);
 }

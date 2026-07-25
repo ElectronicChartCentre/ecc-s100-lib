@@ -181,6 +181,52 @@ describe("parametric vessel layout", () => {
     expect(short.physicalDimensions.freeboardMeters).toBe(4);
   });
 
+  it("defaults hull height from beam while keeping the hull taller than draught", () => {
+    const noExplicitHeight = buildParametricVesselLayout({
+      dimensions: {
+        draught: 5,
+        bow: 20,
+        stern: 12,
+        port: 6,
+        starboard: 6,
+      },
+    });
+    const narrowDeep = buildParametricVesselLayout({
+      dimensions: {
+        draught: 5,
+        bow: 10,
+        stern: 5,
+        port: 1,
+        starboard: 1,
+      },
+    });
+
+    expect(noExplicitHeight.physicalDimensions.hullHeightMeters).toBeCloseTo(6.75);
+    expect(narrowDeep.physicalDimensions.hullHeightMeters).toBeCloseTo(5.5);
+  });
+
+  it("caps default bridge and mast height against hull height for small vessels", () => {
+    const layout = buildParametricVesselLayout({
+      dimensions: {
+        draught: (3 * 0.55) / 1.35,
+        bow: 8,
+        stern: 2,
+        port: 2,
+        starboard: 1,
+      },
+    });
+
+    expect(layout.physicalDimensions.hullHeightMeters).toBeCloseTo(1.65);
+    expect(layout.physicalDimensions.bridgeHeightMeters).toBeLessThanOrEqual(
+      layout.physicalDimensions.hullHeightMeters,
+    );
+    expect(layout.physicalDimensions.mastHeightMeters).toBeLessThanOrEqual(
+      layout.physicalDimensions.hullHeightMeters * 2,
+    );
+    expect(layout.physicalDimensions.bridgeHeightMeters).toBeCloseTo(1.65);
+    expect(layout.physicalDimensions.mastHeightMeters).toBeCloseTo(3.3);
+  });
+
   it("places generated mast and transponder at the AIS top-view reference point", () => {
     const layout = buildParametricVesselLayout({
       dimensions: {
@@ -503,7 +549,7 @@ describe("parametric vessel layout", () => {
     });
     expect(midship?.scale[0]).toBeCloseTo(1);
     expect(midship?.scale[1]).toBeCloseTo(5);
-    expect(midship?.scale[2]).toBeCloseTo(11 / 12);
+    expect(midship?.scale[2]).toBeCloseTo((18 * 0.55) / 6);
     expect(funnel).toMatchObject({
       role: "funnel",
       assetId: "funnel",

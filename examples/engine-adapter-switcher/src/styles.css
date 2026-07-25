@@ -124,7 +124,7 @@ input {
 
 .side-panel {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
   min-height: 0;
   border-left: 1px solid #27313b;
   background: #151a20;
@@ -237,6 +237,47 @@ pre {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.live-ais-status,
+.live-ais-details {
+  display: grid;
+  gap: 7px;
+  color: #b9c7d3;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.live-ais-status__message,
+.live-ais-details__message {
+  color: #dbe4ec;
+}
+
+.live-ais-status__row,
+.live-ais-details__row {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.live-ais-status__label,
+.live-ais-details__label {
+  color: #81909f;
+}
+
+.live-ais-status__value,
+.live-ais-details__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.live-ais-status[data-state="missing-config"] .live-ais-status__message,
+.live-ais-status[data-state="outside-coverage"] .live-ais-status__message {
+  color: #f0d48a;
+}
+
+.live-ais-status[data-state="error"] .live-ais-status__message {
+  color: #ff9fab;
 }
 
 .control-button:disabled,

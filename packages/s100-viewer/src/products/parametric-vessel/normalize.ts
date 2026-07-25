@@ -1,5 +1,10 @@
 import type { VesselDimensions } from "../viewer-features.js";
 import { clamp, requireNonNegative, requirePositive } from "./validation.js";
+import {
+  defaultParametricBridgeHeightMeters,
+  defaultParametricHullHeightMeters,
+  defaultParametricMastHeightMeters,
+} from "./physical-defaults.js";
 import type {
   NormalizedParametricVesselAssembly,
   ParametricVesselAssemblyOptions,
@@ -57,7 +62,7 @@ export function normalizePhysicalDimensions(
   const draughtMeters = dimensions.draught;
   const hullHeightMeters = normalizeOptionalPositive(
     input.hullHeightMeters,
-    draughtMeters + Math.max(draughtMeters * 0.35, 1.5),
+    defaultParametricHullHeightMeters({ draughtMeters, beamMeters }),
     "dimensions.hullHeightMeters",
   );
   if (hullHeightMeters < draughtMeters) {
@@ -69,16 +74,28 @@ export function normalizePhysicalDimensions(
     Math.max(hullHeightMeters * 0.035, 0.25),
     "dimensions.deckThicknessMeters",
   );
-  const bridgeHeightMeters = normalizeOptionalPositive(
+  const requestedBridgeHeightMeters = normalizeOptionalRequestedHeight(
     input.bridgeHeightMeters,
-    Math.max(beamMeters * 0.35, 4),
     "dimensions.bridgeHeightMeters",
   );
-  const mastHeightMeters = normalizeOptionalPositive(
+  const bridgeHeightMeters = defaultParametricBridgeHeightMeters({
+    beamMeters,
+    hullHeightMeters,
+    ...(requestedBridgeHeightMeters !== undefined
+      ? { requestedHeightMeters: requestedBridgeHeightMeters }
+      : {}),
+  });
+  const requestedMastHeightMeters = normalizeOptionalRequestedHeight(
     input.mastHeightMeters,
-    Math.max(bridgeHeightMeters * 1.4, 6),
     "dimensions.mastHeightMeters",
   );
+  const mastHeightMeters = defaultParametricMastHeightMeters({
+    bridgeHeightMeters,
+    hullHeightMeters,
+    ...(requestedMastHeightMeters !== undefined
+      ? { requestedHeightMeters: requestedMastHeightMeters }
+      : {}),
+  });
 
   return {
     lengthMeters,
@@ -90,6 +107,13 @@ export function normalizePhysicalDimensions(
     bridgeHeightMeters,
     mastHeightMeters,
   };
+}
+
+function normalizeOptionalRequestedHeight(
+  value: number | undefined,
+  label: string,
+): number | undefined {
+  return value === undefined ? undefined : requirePositive(value, label);
 }
 
 export function normalizeReferencePoint(

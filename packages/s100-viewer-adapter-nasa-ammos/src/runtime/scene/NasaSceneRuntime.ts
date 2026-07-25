@@ -46,6 +46,7 @@ import type {
   S100RenderContext,
 } from "../core/types.js";
 import { S100NasaLogLevel } from "../core/types.js";
+import type { S100TerrainVesselShadowStamp } from "@ecc/s100-viewer/internal/products/s102TerrainShading";
 import {
   TerrainDisplayPropertyAdapter,
   TerrainMaterialController,
@@ -229,6 +230,7 @@ export type VesselSpecification = {
   model: ModelAssetSpecification;
   dimensions: VesselDimensions;
   verticalPositionLimits?: VesselVerticalPositionLimits;
+  shadow?: boolean | VesselShadowSpecification;
 };
 
 export type CustomModelScale = number | Vec3Tuple;
@@ -319,6 +321,16 @@ export type VerticalShadowOptions = {
   height?: number;
   far?: number;
   mapSize?: number;
+};
+
+export type VesselShadowMode = "high-quality" | "shared-texture";
+
+export type VesselShadowSpecification = VerticalShadowOptions & {
+  mode?: VesselShadowMode;
+  opacity?: number;
+  softness?: number;
+  color?: unknown;
+  radiusMeters?: number;
 };
 
 export type ModelLoadStatus = "idle" | "loading" | "loaded" | "error";
@@ -438,6 +450,9 @@ const DEFAULT_VERTICAL_SHADOW_FAR = 5000;
 const DEFAULT_VERTICAL_SHADOW_MAP_SIZE = 1024;
 const DEFAULT_VERTICAL_SHADOW_RADIUS_PADDING_FACTOR = 2.5;
 const DEFAULT_VERTICAL_SHADOW_BOUNDS_PADDING_FACTOR = 1.5;
+const DEFAULT_SHARED_VESSEL_SHADOW_OPACITY = 0.34;
+const DEFAULT_SHARED_VESSEL_SHADOW_SOFTNESS = 0.42;
+const SHARED_VESSEL_SHADOW_FOOTPRINT_PADDING_FACTOR = 1.04;
 const PICKABLE_OBJECT_USER_DATA_KEY = "s100Pickable";
 const UNPICKABLE_OBJECT_USER_DATA_KEY = "s100Unpickable";
 const PICKING_RAY_ABOVE_SEA_HEIGHT = 100;
@@ -463,6 +478,51 @@ const VESSEL_GLTF_TO_Z_UP_ORIENTATION = new Quaternion().setFromAxisAngle(
 );
 const Z_UP_VECTOR = new Vector3(0, 0, 1);
 
+class VesselTerrainShadowRegistry {
+  private readonly materialControllers = new Set<TerrainMaterialController>();
+  private readonly stamps = new Map<object, S100TerrainVesselShadowStamp>();
+
+  registerMaterialController(controller: TerrainMaterialController): Subscription {
+    this.materialControllers.add(controller);
+    controller.setVesselShadows(this.getStamps());
+    return {
+      unsubscribe: () => {
+        this.materialControllers.delete(controller);
+      },
+    };
+  }
+
+  setStamp(key: object, stamp: S100TerrainVesselShadowStamp): void {
+    this.stamps.set(key, stamp);
+    this.sync();
+  }
+
+  removeStamp(key: object): void {
+    if (this.stamps.delete(key)) {
+      this.sync();
+    }
+  }
+
+  clear(): void {
+    if (this.stamps.size === 0) {
+      return;
+    }
+    this.stamps.clear();
+    this.sync();
+  }
+
+  private sync(): void {
+    const stamps = this.getStamps();
+    for (const controller of this.materialControllers) {
+      controller.setVesselShadows(stamps);
+    }
+  }
+
+  private getStamps(): S100TerrainVesselShadowStamp[] {
+    return [...this.stamps.values()];
+  }
+}
+
 export class NasaSceneRuntime {
   readonly runtime = {};
   readonly cameraChanged = new EventEmitter<CameraUpdate>();
@@ -479,13 +539,14 @@ export class NasaSceneRuntime {
   readonly Lighting = new LightingFeature();
   readonly Debug = new DebugFeature();
   readonly cameraNavigation: CameraNavigation;
+  private readonly vesselTerrainShadows = new VesselTerrainShadowRegistry();
 
   constructor(
     private readonly coreScene: CoreS100Scene,
     private readonly config: ViewerConfig = {},
   ) {
     this.Picking = new PickingFeature(coreScene, this.PickingRay);
-    this.Terrain = new TerrainFeature(coreScene);
+    this.Terrain = new TerrainFeature(coreScene, this.vesselTerrainShadows);
     this.S111 = new S111Feature(coreScene);
     this.Map = new MapFeature(coreScene);
     this.HoverPrism = new HoverPrismFeature(coreScene);
@@ -520,6 +581,7 @@ export class NasaSceneRuntime {
       coreScene,
       config,
       setNavigationEnabled,
+      this.vesselTerrainShadows,
     );
   }
 
@@ -535,6 +597,7 @@ export class NasaSceneRuntime {
     this.cameraNavigation.destroy();
     this.Picking.destroy();
     this.cameraChanged.clear();
+    this.vesselTerrainShadows.clear();
     this.coreScene.destroy();
   }
 
@@ -1050,12 +1113,20 @@ class S100CameraControls {
 export class TerrainFeature {
   private readonly views = new Set<TerrainView>();
 
-  constructor(private readonly coreScene: CoreS100Scene) {}
+  constructor(
+    private readonly coreScene: CoreS100Scene,
+    private readonly vesselTerrainShadows: VesselTerrainShadowRegistry,
+  ) {}
 
   add(dataset: TerrainDataset): TerrainView {
-    const view = new TerrainView(dataset, this.coreScene, () => {
-      this.views.delete(view);
-    });
+    const view = new TerrainView(
+      dataset,
+      this.coreScene,
+      this.vesselTerrainShadows,
+      () => {
+        this.views.delete(view);
+      },
+    );
     this.views.add(view);
     return view;
   }
@@ -1079,6 +1150,7 @@ export class TerrainView {
   private frameSubscription: FrameSubscription | null = null;
   private seaLevelSubscription: Subscription | null = null;
   private cameraInteractionSubscription: Subscription | null = null;
+  private terrainShadowSubscription: Subscription | null = null;
   private tiles: TilesRenderer | null = null;
   private retryController: TerrainTileRetryController | null = null;
   private readonly handleLoadModel = (event: { scene: Object3D }): void => {
@@ -1093,11 +1165,15 @@ export class TerrainView {
   constructor(
     readonly dataset: TerrainDataset,
     coreScene: CoreS100Scene,
+    vesselTerrainShadows: VesselTerrainShadowRegistry,
     private readonly onDestroy: () => void,
   ) {
     this.renderContext = coreScene.renderContext;
     this.tilesetURL = normalizeTerrainTilesetURL(dataset.baseURL);
     this.terrain = new TerrainDisplayPropertyAdapter(this.materialController);
+    this.terrainShadowSubscription = vesselTerrainShadows.registerMaterialController(
+      this.materialController,
+    );
     this.terrain.seaLevel = coreScene.seaLevel;
     this.seaLevelSubscription = coreScene.seaLevelChanged.subscribe(
       (seaLevel) => {
@@ -1127,6 +1203,8 @@ export class TerrainView {
     this.seaLevelSubscription = null;
     this.cameraInteractionSubscription?.unsubscribe();
     this.cameraInteractionSubscription = null;
+    this.terrainShadowSubscription?.unsubscribe();
+    this.terrainShadowSubscription = null;
     this.retryController?.dispose();
     this.retryController = null;
     if (this.tiles) {
@@ -2435,6 +2513,8 @@ export class VesselFeature {
     private readonly coreScene: CoreS100Scene,
     private readonly config: ViewerConfig = {},
     private readonly setNavigationEnabled: (enabled: boolean) => void = () => {},
+    private readonly vesselTerrainShadows: VesselTerrainShadowRegistry =
+      new VesselTerrainShadowRegistry(),
   ) {}
 
   add(specification: VesselSpecification): VesselView {
@@ -2443,6 +2523,7 @@ export class VesselFeature {
       this.coreScene,
       this.config,
       this.setNavigationEnabled,
+      this.vesselTerrainShadows,
       () => {
         this.views.delete(view);
       },
@@ -2486,6 +2567,7 @@ export class VesselView {
   private readonly indicator: Mesh<RingGeometry, MeshBasicMaterial> | null;
   private readonly seaSurface: Mesh<CircleGeometry, MeshPhysicalMaterial> | null;
   private readonly verticalShadow: VerticalShadowProjector | null;
+  private readonly sharedShadow: SharedVesselTerrainShadow | null;
   private position: Vec3Tuple = [0, 0, 0];
   private verticalPositionLimits: VesselVerticalPositionLimits | null = null;
   private seaLevelIndicatorMode = SeaLevelIndicatorMode.Off;
@@ -2498,6 +2580,7 @@ export class VesselView {
     coreScene: CoreS100Scene,
     config: ViewerConfig,
     setNavigationEnabled: (enabled: boolean) => void,
+    vesselTerrainShadows: VesselTerrainShadowRegistry,
     private readonly onDestroy: () => void,
   ) {
     this.coreScene = coreScene;
@@ -2588,11 +2671,22 @@ export class VesselView {
         updateSeaLevelSurfaceAnimation(seaSurface);
       });
     }
-    this.verticalShadow = coreScene.renderContext
+    const shadow = normalizeVesselShadowSpecification(specification.shadow);
+    this.verticalShadowVisible = shadow.enabled;
+    this.verticalShadow = coreScene.renderContext && shadow.enabled && shadow.mode === "high-quality"
       ? new VerticalShadowProjector(
           coreScene,
           this.modelView.group,
           specification.dimensions,
+          shadow,
+        )
+      : null;
+    this.sharedShadow = coreScene.renderContext && shadow.enabled && shadow.mode === "shared-texture"
+      ? new SharedVesselTerrainShadow(
+          vesselTerrainShadows,
+          this.modelView.group,
+          specification.dimensions,
+          shadow,
         )
       : null;
     this.seaLevelSubscription = coreScene.seaLevelChanged.subscribe(() => {
@@ -2678,6 +2772,7 @@ export class VesselView {
     this.seaSurface?.material.bumpMap?.dispose();
     this.seaSurface?.material.dispose();
     this.seaSurface?.parent?.remove(this.seaSurface);
+    this.sharedShadow?.dispose();
     this.modelView.destroy();
     this.positionChanged.clear();
     this.onDestroy();
@@ -2722,6 +2817,7 @@ export class VesselView {
       }
     }
     this.verticalShadow?.update();
+    this.sharedShadow?.update();
   }
 
   private updateSeaLevelIndicatorVisibility(): void {
@@ -2738,7 +2834,9 @@ export class VesselView {
   }
 
   private updateVerticalShadowVisibility(): void {
-    this.verticalShadow?.setEnabled(this.visible && this.verticalShadowVisible);
+    const enabled = this.visible && this.verticalShadowVisible;
+    this.verticalShadow?.setEnabled(enabled);
+    this.sharedShadow?.setEnabled(enabled);
   }
 
   private getRenderPosition(): Vec3Tuple {
@@ -2895,6 +2993,88 @@ class VerticalShadowProjector {
     this.light.parent?.remove(this.light);
     this.target.parent?.remove(this.target);
     this.light.dispose();
+  }
+}
+
+class SharedVesselTerrainShadow {
+  private readonly key = {};
+  private readonly worldPosition = new Vector3();
+  private enabled = true;
+
+  constructor(
+    private readonly vesselTerrainShadows: VesselTerrainShadowRegistry,
+    private readonly object: Object3D,
+    private readonly dimensions: VesselDimensions,
+    private readonly options: VesselShadowSpecification = {},
+  ) {
+    this.update();
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.vesselTerrainShadows.removeStamp(this.key);
+      return;
+    }
+    this.update();
+  }
+
+  update(): void {
+    if (!this.enabled) {
+      this.vesselTerrainShadows.removeStamp(this.key);
+      return;
+    }
+
+    this.object.updateMatrixWorld(true);
+    this.object.getWorldPosition(this.worldPosition);
+    const headingRadians = MathUtils.degToRad(
+      -getHeadingFromQuaternion(this.object.quaternion),
+    );
+    const footprint = this.getFootprintDimensions();
+    this.vesselTerrainShadows.setStamp(this.key, {
+      x: this.worldPosition.x,
+      y: this.worldPosition.y,
+      bowMeters: footprint.bow,
+      sternMeters: footprint.stern,
+      portMeters: footprint.port,
+      starboardMeters: footprint.starboard,
+      headingRadians,
+      opacity: normalizeUnitInterval(
+        this.options.opacity,
+        DEFAULT_SHARED_VESSEL_SHADOW_OPACITY,
+      ),
+      softness: normalizeUnitInterval(
+        this.options.softness,
+        DEFAULT_SHARED_VESSEL_SHADOW_SOFTNESS,
+      ),
+    });
+  }
+
+  dispose(): void {
+    this.vesselTerrainShadows.removeStamp(this.key);
+  }
+
+  private getFootprintDimensions(): VesselDimensions {
+    const uniformRadius = normalizePositiveNumber(
+      this.options.radiusMeters ?? this.options.radius,
+      0,
+    );
+    if (uniformRadius > 0) {
+      return {
+        ...this.dimensions,
+        bow: uniformRadius,
+        stern: uniformRadius,
+        port: uniformRadius,
+        starboard: uniformRadius,
+      };
+    }
+    return {
+      ...this.dimensions,
+      bow: this.dimensions.bow * SHARED_VESSEL_SHADOW_FOOTPRINT_PADDING_FACTOR,
+      stern: this.dimensions.stern * SHARED_VESSEL_SHADOW_FOOTPRINT_PADDING_FACTOR,
+      port: this.dimensions.port * SHARED_VESSEL_SHADOW_FOOTPRINT_PADDING_FACTOR,
+      starboard: this.dimensions.starboard * SHARED_VESSEL_SHADOW_FOOTPRINT_PADDING_FACTOR,
+    };
   }
 }
 
@@ -4258,6 +4438,38 @@ function normalizeVerticalShadowOptions(
   return {
     enabled: false,
   };
+}
+
+function normalizeVesselShadowSpecification(
+  value: VesselSpecification["shadow"],
+): VesselShadowSpecification & { enabled: boolean; mode: VesselShadowMode } {
+  if (value === undefined || value === true) {
+    return {
+      enabled: true,
+      mode: "high-quality",
+    };
+  }
+  if (value === false) {
+    return {
+      enabled: false,
+      mode: "high-quality",
+    };
+  }
+  const mode = value.mode === "shared-texture"
+    ? "shared-texture"
+    : "high-quality";
+  return {
+    ...value,
+    enabled: value.enabled !== false,
+    mode,
+  };
+}
+
+function normalizeUnitInterval(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return MathUtils.clamp(fallback, 0, 1);
+  }
+  return MathUtils.clamp(value, 0, 1);
 }
 
 function normalizeTransformControlOptions(

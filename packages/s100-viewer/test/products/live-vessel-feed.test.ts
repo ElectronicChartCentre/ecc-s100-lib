@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createLiveVesselFeedLayer,
   mapLiveAisVesselToParametricVessel,
+  projectLiveAisVesselToProjectedCoordinate,
   type Coordinate,
   type LiveAisVessel,
   type S100Layer,
@@ -42,8 +43,85 @@ describe("live vessel feed", () => {
       metadata: {
         mmsi: 257076860,
         source: "barentswatch-live-ais",
+        draughtSource: "ais",
+        draughtEstimated: false,
       },
     });
+  });
+
+  it("preserves zero-valued AIS dimension offsets", () => {
+    const spec = mapLiveAisVesselToParametricVessel(
+      liveVessel({
+        dimensionsMeters: {
+          bow: 31,
+          stern: 31,
+          port: 0,
+          starboard: 14,
+          length: 62,
+          width: 14,
+        },
+      }),
+    );
+
+    expect(spec.dimensions).toMatchObject({
+      bow: 31,
+      stern: 31,
+      port: 0,
+      starboard: 14,
+    });
+  });
+
+  it("uses a size-scaled draught fallback when AIS draught is missing", () => {
+    const smallCraft = mapLiveAisVesselToParametricVessel(
+      liveVessel({
+        dimensionsMeters: {
+          bow: 8,
+          stern: 2,
+          port: 2,
+          starboard: 1,
+          length: 10,
+          width: 3,
+        },
+      }),
+    );
+    const coaster = mapLiveAisVesselToParametricVessel(
+      liveVessel({
+        dimensionsMeters: {
+          bow: 20,
+          stern: 12,
+          port: 6,
+          starboard: 6,
+          length: 32,
+          width: 12,
+        },
+      }),
+    );
+
+    expect(smallCraft.dimensions.draught).toBeCloseTo((3 * 0.55) / 1.35);
+    expect(coaster.dimensions.draught).toBeCloseTo((12 * 0.55) / 1.35);
+    expect(smallCraft.metadata).toMatchObject({
+      draughtSource: "estimated",
+      draughtEstimated: true,
+    });
+  });
+
+  it("projects AIS geodetic positions into a projected scene CRS", () => {
+    const projected = projectLiveAisVesselToProjectedCoordinate(
+      liveVessel({
+        longitude: 5.7,
+        latitude: 58.9,
+        positionCrs: "EPSG:4258",
+      }),
+      { crs: "EPSG:32632" },
+    );
+
+    expect(projected).toMatchObject({
+      kind: "projected",
+      crs: "EPSG:32632",
+      z: 0,
+    });
+    expect(projected.x).toBeCloseTo(309906.967, 3);
+    expect(projected.y).toBeCloseTo(6533606.491, 3);
   });
 
   it("creates, updates, and removes MMSI-keyed vessel sessions", async () => {
@@ -239,6 +317,7 @@ function liveVessel(
     longitude?: number;
     latitude?: number;
     trueHeading?: number;
+    positionCrs?: string;
     messageTime?: string;
     dimensionsMeters?: LiveAisVessel["dimensionsMeters"];
     draughtMeters?: number;
@@ -251,7 +330,7 @@ function liveVessel(
     name: "ODD LUNDBERG",
     position: {
       kind: "geodetic",
-      crs: "EPSG:4326",
+      crs: options.positionCrs ?? "EPSG:4326",
       longitude: options.longitude ?? 9.588648,
       latitude: options.latitude ?? 63.727733,
       heightMeters: 0,

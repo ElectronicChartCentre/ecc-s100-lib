@@ -105,4 +105,66 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos vessel layer", () => {
     await scene.layers.clear();
     await viewer.destroy();
   });
+
+  it("maps shared-texture vessel shadows for fleet-style parametric vessels", async () => {
+    const viewer = await createS100Viewer({
+      adapter: createNasaAmmosAdapter(),
+    });
+    const scene = await viewer.createScene();
+
+    const vessel = await scene.layers.add<VesselLayerSpec>(
+      LayerBuilder.createParametricVessel({
+        id: "live-ais-257076860",
+        title: "Live AIS vessel",
+        pose: {
+          position: {
+            kind: "projected",
+            x: 100,
+            y: 200,
+            z: 0,
+            crs: "EPSG:32633",
+          },
+        },
+        parametric: {
+          dimensions: {
+            draught: 3,
+            bow: 42,
+            stern: 18,
+            port: 6,
+            starboard: 6,
+          },
+        },
+        style: {
+          shadow: {
+            enabled: true,
+            mode: "shared-texture",
+            opacity: 0.34,
+          },
+        },
+      }),
+    );
+
+    const native = vessel.getNativeHandle<{
+      kind: string;
+      view: {
+        specification: {
+          shadow?: {
+            enabled?: boolean;
+            mode?: string;
+            opacity?: number;
+          };
+        };
+      };
+    }>();
+
+    expect(native?.kind).toBe("vessel");
+    expect(native?.view.specification.shadow).toMatchObject({
+      enabled: true,
+      mode: "shared-texture",
+      opacity: 0.34,
+    });
+
+    await scene.layers.clear();
+    await viewer.destroy();
+  });
 });

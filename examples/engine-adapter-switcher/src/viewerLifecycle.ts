@@ -9,6 +9,7 @@ import {
   type S100Unsubscribe,
   type S100Viewer,
 } from "@ecc/s100-viewer";
+import type { LiveVesselFeedVesselState } from "@ecc/s100-viewer/products/vessel";
 import type { DemoEngineDefinition } from "./engineRegistry";
 import {
   getDemoLookAtTarget,
@@ -17,8 +18,10 @@ import {
 import {
   assessRecipeSupport,
   type DemoRecipeSupport,
+  type DemoSceneRecipeContext,
   type DemoSceneRecipe,
 } from "./sceneRecipes";
+import type { LiveAisDemoStatus } from "./liveAisDemo";
 import { loadDemoEnvironment } from "./staticAssets";
 
 export type DemoLogLevel = "info" | "warn" | "error";
@@ -39,6 +42,8 @@ export type CreateViewerSessionOptions = {
   recipe: DemoSceneRecipe;
   log: DemoLogSink;
   onCameraPose(pose: EngineCameraPose): void;
+  onLiveAisStatus?(status: LiveAisDemoStatus): void;
+  onLiveAisSelection?(selection: LiveVesselFeedVesselState | null): void;
 };
 
 export const createViewerSession = async (
@@ -48,7 +53,8 @@ export const createViewerSession = async (
   options.log("info", `Loading ${options.engine.label} adapter.`);
   const adapter = await options.engine.load(logger);
   const recipeSupport = assessRecipeSupport(options.recipe, adapter.capabilities);
-  const sceneSettings = getDemoSceneSettings();
+  const sceneSettings = options.recipe.sceneSettings ?? getDemoSceneSettings();
+  const cleanupCallbacks: Array<() => void | Promise<void>> = [];
 
   if (!recipeSupport.supported) {
     throw new Error(`Recipe is not supported by ${adapter.displayName}: ${recipeSupport.reasons.join("; ")}`);
@@ -98,18 +104,32 @@ export const createViewerSession = async (
     options.log("warn", `Environment setup skipped: ${errorMessage(error)}`);
   }
 
-  await options.recipe.apply(scene, {
+  const recipeContext: DemoSceneRecipeContext = {
     engineId: options.engine.id,
+    container: options.container,
+    sceneSettings,
     log: options.log,
-  });
+    registerCleanup(cleanup) {
+      cleanupCallbacks.push(cleanup);
+    },
+  };
+  if (options.onLiveAisStatus !== undefined) {
+    recipeContext.onLiveAisStatus = options.onLiveAisStatus;
+  }
+  if (options.onLiveAisSelection !== undefined) {
+    recipeContext.onLiveAisSelection = options.onLiveAisSelection;
+  }
+
+  await options.recipe.apply(scene, recipeContext);
 
   try {
-    scene.camera.lookAt({
-      target: getDemoLookAtTarget(),
+    const initialCamera = options.recipe.initialCamera ?? {
+      target: getDemoLookAtTarget(sceneSettings),
       rangeMeters: 900,
       headingDegrees: 25,
       pitchDegrees: 62,
-    });
+    };
+    scene.camera.lookAt(initialCamera);
     options.onCameraPose(scene.camera.getPose());
   } catch (error) {
     options.log("warn", `Camera look-at skipped: ${errorMessage(error)}`);
@@ -123,6 +143,9 @@ export const createViewerSession = async (
     async destroy() {
       for (const unsubscribe of unsubscribers) {
         unsubscribe();
+      }
+      for (const cleanup of cleanupCallbacks.splice(0).reverse()) {
+        await cleanup();
       }
       await viewer.destroy();
     },
