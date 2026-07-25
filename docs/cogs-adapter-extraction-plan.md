@@ -1,8 +1,8 @@
 # Cogs Adapter Extraction Plan
 
-The Cogs adapter is complete enough for the Phase 7 interoperability baseline,
-but Phase 8 package planning excludes it from the future default release package
-set.
+The Cogs adapter is complete enough for the earlier interoperability baseline,
+but maintainability package planning excludes it from the future default release
+package set.
 
 ## Decision
 

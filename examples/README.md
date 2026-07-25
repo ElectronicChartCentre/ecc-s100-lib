@@ -16,7 +16,10 @@ Additional focused examples:
 - [S-102 and S-101 scene](./s102-s101-scene/main.ts)
 - [S-111 time scene](./s111-time-scene/main.ts)
 - [S-100 Explorer integration pattern](./s100-explorer-integration/main.ts)
-- [RTZ route demo app](./rtz-route)
+- [RTZ route demo app](./rtz-route), with the
+  [RTZ route workflow guide](../docs/workflows/rtz-route.md)
+- [Parametric vessel demo app](./parametric-vessel), with the
+  [parametric vessel workflow guide](../docs/workflows/parametric-vessel.md)
 - [Engine adapter switcher demo app](./engine-adapter-switcher)
 
 The engine adapter switcher is a private workspace app that exercises the
@@ -57,12 +60,23 @@ npm run demo:rtz-route
 npm run build:demo:rtz-route
 ```
 
+The parametric vessel demo is a focused vessel-shape tuning app:
+
+```sh
+npm run demo:parametric-vessel
+npm run build:demo:parametric-vessel
+```
+
 Until the packages are published to npm, local workspaces and release tarballs
-are the expected dependency sources. Once published, the install shape is:
+are the expected dependency sources. Once the release-target packages are
+published, the install shape is:
 
 ```sh
 npm install @ecc/s100-viewer @ecc/s100-viewer-adapter-nasa-ammos
 npm install @ecc/s100-viewer-adapter-cesium cesium
+
+# Optional when the Three.js reference adapter becomes a release target.
+npm install @ecc/s100-viewer-adapter-three three
 ```
 
 The remaining non-app example files are TypeScript snippets that document public

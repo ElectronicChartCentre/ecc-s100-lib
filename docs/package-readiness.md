@@ -42,9 +42,9 @@ immutable GitHub release tarballs for the maintained package set:
 
 ```json
 {
-  "@ecc/s100-viewer": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.9/ecc-s100-viewer-0.1.0-alpha.9.tgz",
-  "@ecc/s100-viewer-adapter-nasa-ammos": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.9/ecc-s100-viewer-adapter-nasa-ammos-0.1.0-alpha.9.tgz",
-  "@ecc/s100-viewer-adapter-cesium": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.9/ecc-s100-viewer-adapter-cesium-0.1.0-alpha.9.tgz"
+  "@ecc/s100-viewer": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.10/ecc-s100-viewer-0.1.0-alpha.10.tgz",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.10/ecc-s100-viewer-adapter-nasa-ammos-0.1.0-alpha.10.tgz",
+  "@ecc/s100-viewer-adapter-cesium": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.10/ecc-s100-viewer-adapter-cesium-0.1.0-alpha.10.tgz"
 }
 ```
 
@@ -76,9 +76,9 @@ After public npm publication, S-100 Explorer should consume registry versions:
 
 ```json
 {
-  "@ecc/s100-viewer": "0.1.0-alpha.9",
-  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.9",
-  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.9"
+  "@ecc/s100-viewer": "0.1.0-alpha.10",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.10",
+  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.10"
 }
 ```
 
@@ -134,6 +134,12 @@ S-101, S-102, and S-111 builders also set `productSpecificationVersion` to
 editions should be passed explicitly only when the service metadata exposes them
 and the implementation has validated the edition. Simulated water-level layers
 and S-57 ENC layers do not claim an IHO S-100 product specification version.
+
+Real S-104 water-level support is intentionally separate from
+`simulated-water-level`. The current S-104 foundation is documented in
+[`docs/architecture/s104-water-level.md`](./architecture/s104-water-level.md);
+until that product entrypoint exists, simulated water-level layers must continue
+to be described as non-IHO helper data.
 
 The core package lists library-level support in `S100SupportedProductVersions`.
 Each adapter must list renderable product versions on

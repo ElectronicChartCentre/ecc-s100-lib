@@ -1,7 +1,7 @@
 # Developer Ergonomics Review
 
-Phase 8 goal: make the package convenient to use before deciding on public npm
-publication.
+Maintainability branch goal: make the package convenient to use before deciding
+on public npm publication.
 
 ## Current Strengths
 

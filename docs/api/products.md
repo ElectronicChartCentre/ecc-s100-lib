@@ -10,6 +10,11 @@ package targets already-derived services:
 - REST or static JSON for simulated water-level layers and S-111
 - GLB/GLTF model sources for vessels
 
+Real S-104 water-level support is planned as a product data/sampler API, not as
+an alias for the existing `simulated-water-level` helper. See
+[S-104 water level architecture](../architecture/s104-water-level.md) for the
+current implementation decision record.
+
 ## Layer Builder
 
 ```ts
@@ -156,6 +161,10 @@ Public product entrypoints:
 - `@ecc/s100-viewer/products/route`
 - `@ecc/s100-viewer/products/vessel`
 - `@ecc/s100-viewer/products/simulated-water-level`
+
+The planned real S-104 entrypoint is `@ecc/s100-viewer/products/s104`. It should
+be added only when the sampler/workflow implementation starts; until then,
+`simulated-water-level` remains a non-IHO operational helper product.
 
 ## Feature Sessions
 

@@ -2,6 +2,9 @@
 
 Focused runnable example for RTZ route rendering through `@ecc/s100-viewer`.
 
+For the application-facing API guide, see
+[`docs/workflows/rtz-route.md`](../../docs/workflows/rtz-route.md).
+
 ```sh
 npm run demo:rtz-route
 npm run build:demo:rtz-route

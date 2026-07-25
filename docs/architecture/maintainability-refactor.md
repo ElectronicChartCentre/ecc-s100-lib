@@ -540,6 +540,18 @@ Recommended work:
   heading, and any route features consumed by the app.
 - Update the super-repo submodule pointer after each successful lib batch.
 
+### Phase 10A: S-104 Water Level Foundation
+
+Real S-104 support should start from the tracked decision record in
+[S-104 water level architecture](./s104-water-level.md). The feature should be
+implemented as a product data/sampler workflow in `@ecc/s100-viewer`, with
+generated S-104-shaped fixtures and a localhost fixture service used until real
+S-104 HDF5 samples and backend service planning are available.
+
+This phase should not reuse `simulated-water-level` as fake S-104. The existing
+simulated-water-level product remains a non-IHO helper for global scene sea
+level.
+
 ### Phase 11: CI And Release Hygiene
 
 This phase should make the new guardrails durable in GitHub checks.

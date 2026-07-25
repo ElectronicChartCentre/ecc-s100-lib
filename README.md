@@ -23,9 +23,9 @@ S-100 Explorer owns any application-specific migration bridge in the webapp.
 The public package contract is the main `@ecc/s100-viewer` entry point plus
 adapter packages.
 
-The CogsEngine adapter remains in this workspace for now, but Phase 8 planning
-treats it as a separate local interoperability repo. It is not part of the
-future default release package set.
+The CogsEngine adapter remains in this workspace for now, but maintainability
+package planning treats it as a separate local interoperability repo. It is not
+part of the future default release package set.
 
 ## Quick Start Shape
 
@@ -56,8 +56,13 @@ import {
 } from "@ecc/s100-viewer";
 import { createNasaAmmosAdapter } from "@ecc/s100-viewer-adapter-nasa-ammos";
 
+const container = document.getElementById("viewer");
+if (container === null) {
+  throw new Error("Missing #viewer container.");
+}
+
 const viewer = await createS100Viewer({
-  container: document.getElementById("viewer"),
+  container,
   adapter: createNasaAmmosAdapter(),
 });
 
@@ -126,12 +131,20 @@ npm run pack:release-target:dry-run
 
 ## Documentation
 
+- [Start here](./docs/start-here.md)
+- [S-100 primer for library users](./docs/concepts/s100-primer.md)
 - [Getting started app and story](./examples/getting-started)
 - [Reference app](./examples/reference-app)
 - [Step-by-step engine switcher learning guide](./docs/learn/engine-switcher-practical-guide.md)
+- [API entrypoints](./docs/api/entrypoints.md)
+- Workflow guides:
+  [Live AIS vessel feed](./docs/workflows/live-vessel-feed.md),
+  [parametric vessel](./docs/workflows/parametric-vessel.md),
+  [RTZ route](./docs/workflows/rtz-route.md)
 - [Package readiness](./docs/package-readiness.md)
 - [Developer ergonomics review](./docs/developer-ergonomics-review.md)
 - [Maintainability refactor](./docs/architecture/maintainability-refactor.md)
+- [S-104 water level architecture](./docs/architecture/s104-water-level.md)
 - [Cogs adapter extraction plan](./docs/cogs-adapter-extraction-plan.md)
 - [API docs](./docs/api/README.md)
 - [Examples](./examples/README.md)

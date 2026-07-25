@@ -13,18 +13,30 @@ npm install @ecc/s100-viewer @ecc/s100-viewer-adapter-nasa-ammos
 
 Use it with at least one adapter package.
 
-## Minimal Shape
+## Recommended App Shape
+
+Most application screens should use the root package for viewer and scene setup,
+then use product-focused public entrypoints for feature sessions:
 
 ```ts
 import {
   createS100Viewer,
-  LayerBuilder,
   SceneBuilder,
 } from "@ecc/s100-viewer";
+import { S102TerrainSession } from "@ecc/s100-viewer/products/s102";
+import {
+  S111SurfaceCurrentSession,
+  createPrimarS111Service,
+} from "@ecc/s100-viewer/products/s111";
 import { createNasaAmmosAdapter } from "@ecc/s100-viewer-adapter-nasa-ammos";
 
+const container = document.getElementById("viewer");
+if (container === null) {
+  throw new Error("Missing #viewer container.");
+}
+
 const viewer = await createS100Viewer({
-  container: document.getElementById("viewer"),
+  container,
   adapter: createNasaAmmosAdapter(),
 });
 
@@ -39,17 +51,55 @@ const scene = await viewer.createScene({
   }),
 });
 
-await scene.layers.add(LayerBuilder.createS102({
-  url: "https://example.test/s102/tileset.json",
+const terrain = S102TerrainSession.create({
+  scene,
   crs: "EPSG:32619",
-}));
+  source: {
+    urlForDatasetIds(datasetIds, context) {
+      const ids = datasetIds.join(",");
+      return `https://example.test/s102/${ids}/tileset.json?crs=${context.crs}`;
+    },
+  },
+});
+
+await terrain.setDatasetIds(["NO_SAMPLE_S102"]);
+
+const licenseeKey = "replace-with-app-service-licensee-key";
+const currents = await S111SurfaceCurrentSession.load({
+  scene,
+  datasets: [{
+    id: "NO_SAMPLE_S111",
+    bounds: {
+      projected: {
+        west: 330000,
+        south: 5185000,
+        east: 332000,
+        north: 5188000,
+      },
+    },
+  }],
+  crs: "EPSG:32619",
+  service: createPrimarS111Service({
+    endpoint: "https://example.test/s111",
+    licenseeKey,
+  }),
+});
 ```
 
-Canonical layers expose product-specific controller handles through
-`layer.controllers`, so applications can use the same clean layer API for both
-setup and later interaction:
+Feature sessions own common application mechanics such as layer replacement,
+cleanup, status, provider defaults, time setup, visibility, and interaction
+constraints. They still use the canonical `scene.layers` kernel underneath.
+Production applications commonly route service calls through a backend proxy so
+provider credentials do not have to live in browser-delivered code.
+
+## Lower-Level Layer Shape
+
+Use `LayerBuilder` directly when a feature session does not fit your workflow,
+when writing a new feature session, or when you need exact layer-spec control:
 
 ```ts
+import { LayerBuilder } from "@ecc/s100-viewer";
+
 const terrain = await scene.layers.add(LayerBuilder.createS102({
   id: "bathymetry",
   url: "https://example.test/s102/tileset.json",
@@ -66,6 +116,26 @@ const currents = await scene.layers.add(LayerBuilder.createStaticS111({
 await currents.controllers.surfaceCurrent.setCustomScale(2.5);
 currents.controllers.surfaceCurrent.setCurrentTime(Date.now());
 ```
+
+Canonical layers expose product-specific controller handles through
+`layer.controllers`, so applications can use the same clean layer API for both
+setup and later interaction.
+
+## Public Product Entrypoints
+
+Use public subpaths for product-specific application code:
+
+```ts
+import { EncWmsSession } from "@ecc/s100-viewer/products/enc";
+import { RouteFeatureSession } from "@ecc/s100-viewer/products/route";
+import { S102TerrainSession } from "@ecc/s100-viewer/products/s102";
+import { S111SurfaceCurrentSession } from "@ecc/s100-viewer/products/s111";
+import { VesselFeatureSession } from "@ecc/s100-viewer/products/vessel";
+```
+
+The broad `@ecc/s100-viewer/products` entrypoint is useful for modules that
+intentionally compose multiple product families. Application code should not
+import `@ecc/s100-viewer/internal/*`.
 
 Viewer-level camera controls are optional. When omitted, the viewer applies
 `CameraControlPresets.S100_DEFAULT` to every scene so applications do not need
@@ -103,8 +173,7 @@ The library-level product/version matrix is exported as
 - `SceneGeoreference`: projected-local now, ellipsoid/ECEF later.
 - `SceneBuilder`: convenience helpers for common scene setup.
 - `LayerBuilder`: convenience helpers for common S-100 product layers.
-- `S100EngineAdapter`: contract third-party engines implement to work with this
-  API.
+- Product sessions: higher-level app-facing workflows for product families.
 
 ## Native Engine Handles
 

@@ -2,12 +2,12 @@
   {
     "path": "packages/s100-viewer-adapter-cesium/src/adapter/CesiumEngineScene.ts",
     "phase": "P5",
-    "reason": "Existing Cesium adapter implementation moved behind a small public root; split feature modules through Phase 5."
+    "reason": "Existing Cesium adapter implementation moved behind a small public root; split feature modules in the adapter-module follow-up."
   },
   {
     "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/scene/NasaSceneRuntime.ts",
     "phase": "P4",
-    "reason": "Existing NASA runtime scene remains oversized after removal from compat path; feature extraction continues in Phase 4 follow-up."
+    "reason": "Existing NASA runtime scene remains oversized after removal from compat path; feature extraction continues in the adapter-module follow-up."
   },
   {
     "path": "packages/s100-viewer-adapter-nasa-ammos/src/runtime/map/FlatMapOverlay.ts",

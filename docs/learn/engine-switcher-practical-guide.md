@@ -15,15 +15,16 @@ engines.
 - `prerequisites`: Node.js/npm, browser access, TypeScript familiarity, and
   local access to this workspace. Service-backed recipes also need local PRIMAR
   endpoint, licensee, API key, and dataset configuration.
-- `component_versions`: `@ecc/s100-viewer@0.1.0-alpha.9`,
-  `@ecc/s100-viewer-adapter-nasa-ammos@0.1.0-alpha.9`,
-  `@ecc/s100-viewer-adapter-cesium@0.1.0-alpha.9`,
+- `component_versions`: `@ecc/s100-viewer@0.1.0-alpha.10`,
+  `@ecc/s100-viewer-adapter-nasa-ammos@0.1.0-alpha.10`,
+  `@ecc/s100-viewer-adapter-cesium@0.1.0-alpha.10`,
+  `@ecc/s100-viewer-adapter-three@0.1.0-alpha.10`,
   `@ecc/s100-engine-adapter-switcher@0.0.0`.
 - `commands`: `npm install`, `npm run check:demo:engine-switcher`,
   `npm run build:demo:engine-switcher`, `npm run demo:engine-switcher`.
 - `expected_result`: A local Vite app at `http://localhost:<port>` where the
-  same scene recipes can be loaded through NASA-AMMOS/Three.js and Cesium
-  adapters.
+  same scene recipes can be loaded through NASA-AMMOS, Cesium, and the
+  experimental plain Three.js reference adapter.
 - `failure_modes`: Missing `.env.local` values, service credentials, dataset
   ids, browser-origin restrictions, unsupported adapter capabilities, or
   renderer-specific asset setup.
@@ -31,9 +32,10 @@ engines.
   is not a release target. NASA-AMMOS is projected-local only. Cesium supports
   more globe-native concepts, but full curved-earth S-102/ENC replacement
   workflows are later-phase work.
-- `next_steps`: After this guide, read `docs/api/README.md`, modify or add a
-  switcher recipe, then prototype a minimal adapter with `createInMemoryAdapter`
-  as the reference shape.
+- `next_steps`: After this guide, read `docs/start-here.md` and
+  `docs/concepts/s100-primer.md`, then `docs/api/entrypoints.md`; modify or add
+  a switcher recipe, then prototype a minimal adapter with `createInMemoryAdapter` or
+  `@ecc/s100-viewer-adapter-three` as the reference shape.
 - `validation_evidence`: This guide is based on the current source files under
   `packages/s100-viewer`, `packages/s100-viewer-adapter-nasa-ammos`,
   `packages/s100-viewer-adapter-cesium`, and
@@ -59,6 +61,8 @@ Adapter packages own rendering:
 
 - `@ecc/s100-viewer-adapter-nasa-ammos`: NASA-AMMOS/Three.js adapter
 - `@ecc/s100-viewer-adapter-cesium`: Cesium adapter
+- `@ecc/s100-viewer-adapter-three`: experimental plain Three.js reference
+  adapter used for maintainability and adapter-authoring work
 
 Application code should mostly talk to `@ecc/s100-viewer`. The app should
 import adapter packages only at a small engine-selection boundary.
@@ -69,15 +73,19 @@ flowchart LR
   Core["@ecc/s100-viewer<br/>viewer, scene, products, controllers"]
   Nasa["@ecc/s100-viewer-adapter-nasa-ammos<br/>Three.js runtime"]
   Cesium["@ecc/s100-viewer-adapter-cesium<br/>Cesium runtime"]
+  Three["@ecc/s100-viewer-adapter-three<br/>reference runtime"]
   Services["S-100 service-ready data<br/>WMS, WMTS, 3D Tiles, JSON, GLB"]
 
   App --> Core
   App -->|"selects one adapter"| Nasa
   App -->|"or selects one adapter"| Cesium
+  App -->|"or selects one adapter"| Three
   Core -->|"engine contract"| Nasa
   Core -->|"engine contract"| Cesium
+  Core -->|"engine contract"| Three
   Nasa --> Services
   Cesium --> Services
+  Three --> Services
 ```
 
 The engine switcher example is the best first app because it keeps those
@@ -100,6 +108,9 @@ The current demo uses these product concepts:
   S-57 is not itself an S-100 product specification.
 - `vessel`: An operational viewer feature, not an IHO S-100 product. It lets
   the app place and manipulate a vessel model in the same scene.
+- `Live AIS`: An operational vessel-feed workflow. The switcher uses a proxy to
+  fetch AIS-like vessel reports, then renders each report as a managed
+  parametric vessel.
 - `map-overlay` and `simulated-water-level`: Operational helper layers used by
   applications around S-100 data.
 
@@ -152,6 +163,7 @@ VITE_DEMO_ORIGIN_X=0
 VITE_DEMO_ORIGIN_Y=0
 VITE_DEMO_ORIGIN_Z=0
 VITE_DEMO_MAP_WIDTH_METERS=5000
+VITE_AIS_PROXY_URL=http://localhost:8787
 ```
 
 If these values are empty, use the app as a code-reading exercise first. The
@@ -166,7 +178,8 @@ Open these files in order:
 2. `examples/engine-adapter-switcher/src/engineRegistry.ts`
 3. `examples/engine-adapter-switcher/src/viewerLifecycle.ts`
 4. `examples/engine-adapter-switcher/src/sceneRecipes.ts`
-5. `examples/engine-adapter-switcher/src/sceneControls.ts`
+5. `examples/engine-adapter-switcher/src/liveAisDemo.ts`
+6. `examples/engine-adapter-switcher/src/sceneControls.ts`
 
 They map to the application architecture:
 
@@ -176,6 +189,8 @@ They map to the application architecture:
   `S100Scene`
 - `sceneRecipes.ts`: adds S-101, S-102, S-111, and vessel layers through the
   product API
+- `liveAisDemo.ts`: keeps live AIS proxy, projection, and status behavior out
+  of generic viewer lifecycle code
 - `sceneControls.ts`: changes already-added layers through canonical
   controllers
 
@@ -185,6 +200,7 @@ flowchart TD
   Registry["engineRegistry.ts<br/>load selected S100EngineAdapter"]
   Lifecycle["viewerLifecycle.ts<br/>createS100Viewer + createScene"]
   Recipes["sceneRecipes.ts<br/>LayerBuilder + scene.layers"]
+  LiveAis["liveAisDemo.ts<br/>AIS proxy + projection helpers"]
   Controls["sceneControls.ts<br/>layer.controllers + scene.time"]
   Core["@ecc/s100-viewer"]
   Adapter["Selected adapter"]
@@ -194,6 +210,7 @@ flowchart TD
   Lifecycle --> Core
   Lifecycle --> Adapter
   Lifecycle --> Recipes
+  Recipes --> LiveAis
   Main --> Controls
   Recipes --> Core
   Controls --> Core
@@ -296,7 +313,7 @@ async destroy() {
 The switcher uses an app-local engine registry.
 
 ```ts
-export type DemoEngineId = "nasa-ammos" | "cesium";
+export type DemoEngineId = "nasa-ammos" | "cesium" | "three";
 
 export type DemoEngineDefinition = {
   id: DemoEngineId;
@@ -333,6 +350,17 @@ return createCesiumAdapter({
     timeline: false,
   },
   fetchHandler: window.fetch.bind(window),
+});
+```
+
+The plain Three.js reference adapter is also loaded dynamically:
+
+```ts
+const { createThreeAdapter } = await import("@ecc/s100-viewer-adapter-three");
+
+return createThreeAdapter({
+  fetchHandler: window.fetch.bind(window),
+  backgroundColor: 0x17202a,
 });
 ```
 
@@ -376,6 +404,13 @@ export type DemoSceneRecipe = {
   requiredProducts?: readonly string[];
   requiredDataSources?: readonly string[];
   requiredVisualFeatures?: readonly (keyof NonNullable<AdapterCapabilities["visualFeatures"]>)[];
+  sceneSettings?: DemoSceneSettings;
+  initialCamera?: {
+    target: Coordinate;
+    rangeMeters: number;
+    headingDegrees: number;
+    pitchDegrees: number;
+  };
   apply(scene: S100Scene, context: DemoSceneRecipeContext): Promise<void>;
 };
 ```
@@ -675,13 +710,70 @@ Key vessel concepts:
 Practice task:
 
 1. Change the vessel heading from `35` to `90`.
-2. Run the switcher and compare NASA-AMMOS and Cesium.
+2. Run the switcher and compare all available engines.
 3. Check the capability panel if a visual feature is unsupported.
 
 What you learned: operational viewer features use the same API shape as S-100
 product layers.
 
-## 13. The Layer API Mastery Map
+## 13. Add Live AIS Vessels
+
+The `Live AIS Norway` recipe demonstrates an application-owned service boundary
+feeding a library-owned vessel feed controller:
+
+```ts
+const feed = await createLiveVesselFeedLayer({
+  scene,
+  id: "demo-live-ais",
+  stalePolicy: {
+    removeMissing: true,
+    maxAgeSeconds: config.maxAgeSeconds,
+  },
+  style: {
+    style: {
+      opacity: 0.92,
+      showSeaLevelIndicator: true,
+      showOceanSurface: false,
+    },
+    selectedStyle: {
+      opacity: 1,
+    },
+  },
+  positionMapper: (vessel) =>
+    projectLiveAisVesselToScene(vessel, context.sceneSettings),
+});
+```
+
+The recipe then polls the proxy and updates the feed:
+
+```ts
+await feed.updateVessels(response.vessels);
+await feed.selectVessel(selectedMmsi);
+```
+
+Key Live AIS concepts:
+
+- Provider credentials stay in the backend proxy, not in Vite `.env.local`.
+- The frontend receives normalized `LiveAisVessel` records.
+- `positionMapper` converts incoming geodetic positions into the current
+  projected-local scene CRS.
+- The feed creates, updates, selects, removes, and disposes vessel sessions.
+- The engine switcher keeps AIS status and selected-vessel UI in app code.
+
+For the standalone workflow guide, read
+`docs/workflows/live-vessel-feed.md`.
+
+Practice task:
+
+1. Start the AIS proxy from the super-repo root if credentials are configured.
+2. Set `VITE_AIS_PROXY_URL=http://localhost:8787`.
+3. Run the switcher and select `Live AIS Norway`.
+4. Switch engines and compare capability differences.
+
+What you learned: live operational feeds should be normalized at the app/service
+boundary, then handed to a product-specific library controller.
+
+## 14. The Layer API Mastery Map
 
 Every layer starts as a spec:
 
@@ -753,7 +845,7 @@ Mastery checkpoint:
 - Controllers are convenience APIs over canonical layer patches.
 - Native handles are escape hatches, not the normal path.
 
-## 14. Scene API Mastery Map
+## 15. Scene API Mastery Map
 
 An `S100Scene` exposes the main runtime subsystems:
 
@@ -843,7 +935,7 @@ console.log(handles.adapterId, handles.engineName);
 Use `getEngineHandles()` only for advanced integration. Treat returned objects
 as borrowed references that become invalid after `scene.destroy()`.
 
-## 15. Viewer API Mastery Map
+## 16. Viewer API Mastery Map
 
 The viewer owns the adapter host and scene lifecycle:
 
@@ -875,7 +967,7 @@ Use one viewer per active native viewer host. The switcher destroys and
 recreates the viewer when the selected engine changes because the underlying
 renderer is different.
 
-## 16. Product Builder Cheat Sheet
+## 17. Product Builder Cheat Sheet
 
 Import from the core package:
 
@@ -1020,7 +1112,7 @@ const encPair = LayerBuilder.createEncWmsPair({
 await scene.layers.addMany([encPair.opaque, encPair.transparent].filter(Boolean));
 ```
 
-## 17. Public API Inventory
+## 18. Public API Inventory
 
 The package root `@ecc/s100-viewer` re-exports the public developer surface.
 Use this inventory as a mastery checklist and then inspect
@@ -1032,7 +1124,10 @@ when they make imports clearer:
 ```ts
 import { S111SurfaceCurrentSession } from "@ecc/s100-viewer/products/s111";
 import { RouteFeatureSession } from "@ecc/s100-viewer/products/route";
-import { VesselFeatureSession } from "@ecc/s100-viewer/products/vessel";
+import {
+  VesselFeatureSession,
+  createLiveVesselFeedLayer,
+} from "@ecc/s100-viewer/products/vessel";
 ```
 
 Keep adapter imports at the adapter package root, and use dynamic imports when
@@ -1047,7 +1142,8 @@ an engine is optional at runtime.
 | Camera | `CameraControlPresets`, `CameraController`, `CameraLookAt`, `EngineCameraPose`, `CameraControlConfig` | Set camera controls, move the camera, and listen for pose changes. |
 | Layers | `LayerCollection`, `S100Layer`, `LayerSpec`, `LayerPatch`, `S100ProductType` | Add, update, remove, and inspect live product layers. |
 | Controllers | `TerrainLayerController`, `MapLayerController`, `SurfaceCurrentLayerController`, `VesselLayerController` | Make product-specific runtime changes without native engine code. |
-| Products | `LayerBuilder`, `defineS100LayerSpec`, `S100SupportedProductVersions`, product spec types | Build S-101, S-57, S-102, S-111, simulated water-level, vessel, and map overlay specs. |
+| Products | `LayerBuilder`, `defineS100LayerSpec`, `S100SupportedProductVersions`, product spec types | Build S-101, S-57, S-102, S-111, simulated water-level, vessel, route, and map overlay specs. |
+| Feature sessions | `EncWmsSession`, `S102TerrainSession`, `S111SurfaceCurrentSession`, `RouteFeatureSession`, `VesselFeatureSession`, `createLiveVesselFeedLayer` | Use app-facing workflows with lifecycle and replacement behavior already handled. |
 | Time | `TimeController`, `TimeInterval`, `TimePlaybackOptions`, `TimePlaybackState` | Drive time-aware products such as S-111. |
 | Picking | `PickingController`, `DepthRayController`, `PickRequest`, `PickResult`, `LivePickingOptions` | Query scene content under screen coordinates and configure live picking visuals. |
 | Events | `EventBus`, `S100EventBus`, `S100Unsubscribe` | Subscribe to scene/layer/time/camera/error changes. |
@@ -1064,7 +1160,7 @@ Master the API by category:
 6. Inspect adapter capabilities and native handles.
 7. Implement or modify an adapter method.
 
-## 18. Architecture: Core, Adapter, Engine
+## 19. Architecture: Core, Adapter, Engine
 
 The core package wraps adapter implementations with stable application-facing
 objects:
@@ -1141,7 +1237,7 @@ The separation is deliberate:
 - Adapters own native rendering details.
 - Engines own pixels, primitives, entities, textures, and renderer resources.
 
-## 19. Data Flow From Recipe To Renderer
+## 20. Data Flow From Recipe To Renderer
 
 When the S-102 recipe adds terrain, the data flow looks like this:
 
@@ -1167,7 +1263,7 @@ flowchart TD
 The app never has to construct a Three.js mesh or Cesium entity for S-102.
 That is the adapter's job.
 
-## 20. Add Your Own Recipe
+## 21. Add Your Own Recipe
 
 Create a small recipe before writing a new adapter. It is the fastest way to
 learn the API.
@@ -1219,7 +1315,7 @@ Use this to test whether your mental model is right:
 - Did you avoid engine-native imports in the recipe?
 - Can controls update the layer through controllers?
 
-## 21. Build A Minimal Engine Adapter
+## 22. Build A Minimal Engine Adapter
 
 Adapter authoring starts with `S100EngineAdapter`:
 
@@ -1325,9 +1421,10 @@ placeholders for your renderer. The important contract is real:
 
 For a fully working minimal reference, read
 `packages/s100-viewer/src/adapters/InMemoryAdapter.ts`. It stores layers in a
-map, supports camera/time/picking hooks, and avoids renderer complexity.
+map, supports camera/time/picking hooks, and avoids renderer complexity. For a
+browser renderer reference, read `packages/s100-viewer-adapter-three`.
 
-## 22. Adapter Implementation Checklist
+## 23. Adapter Implementation Checklist
 
 Before an adapter is useful in the engine switcher, answer these questions:
 
@@ -1373,7 +1470,7 @@ Then add features in this order:
 9. Environment/lighting
 10. Native handles and diagnostics
 
-## 23. Plug A New Adapter Into The Switcher
+## 24. Plug A New Adapter Into The Switcher
 
 After you have a `createMyEngineAdapter()` function:
 
@@ -1386,7 +1483,7 @@ After you have a `createMyEngineAdapter()` function:
 Example:
 
 ```ts
-export type DemoEngineId = "nasa-ammos" | "cesium" | "my-engine";
+export type DemoEngineId = "nasa-ammos" | "cesium" | "three" | "my-engine";
 
 export const engineDefinitions = {
   // existing entries...
@@ -1416,7 +1513,7 @@ The Minimal Scene is the right first test because it exercises:
 - layer event logging
 - destroy/recreate flow
 
-## 24. Debugging Practical Failures
+## 25. Debugging Practical Failures
 
 Missing service configuration:
 
@@ -1441,6 +1538,16 @@ The Vite development server routes remote S-102 3D Tiles requests through
 `/demo-proxy/s102-tiles` when needed. A deployed/static copy still needs the
 service to allow that origin or an equivalent application proxy.
 
+Live AIS proxy problem:
+
+```text
+Configure VITE_AIS_PROXY_URL to load live AIS.
+```
+
+Fix: start the AIS proxy service, set `VITE_AIS_PROXY_URL` to a frontend-safe
+proxy URL such as `http://localhost:8787`, and keep backend BarentsWatch
+credentials out of the Vite demo `.env.local`.
+
 Layer added but not visible:
 
 - Check CRS and origin.
@@ -1456,7 +1563,7 @@ Engine switch hangs or leaves stale canvas:
 - Confirm adapter `dispose()` removes layer/native scene resources.
 - Confirm adapter `destroy()` releases the native viewer.
 
-## 25. What Mastery Looks Like
+## 26. What Mastery Looks Like
 
 You understand the library when you can:
 
@@ -1464,6 +1571,8 @@ You understand the library when you can:
   adapter internals.
 - Run the engine switcher and diagnose missing service configuration.
 - Add an S-101, S-102, S-111, or vessel layer with `LayerBuilder`.
+- Use feature sessions for app-facing S-102, S-111, ENC, route, vessel, and
+  live AIS workflows.
 - Use `SceneBuilder.projectedLocal(...)` with an explicit CRS and origin.
 - Read adapter capabilities and predict whether a recipe should load.
 - Update a layer through `layer.update(...)` or `layer.controllers`.
@@ -1475,20 +1584,25 @@ You understand the library when you can:
 - Sketch a minimal `S100EngineAdapter` and identify where layer translation
   belongs.
 
-## 26. Reference Reading Order
+## 27. Reference Reading Order
 
 After completing the tutorial path, read the reference docs in this order:
 
-1. `packages/s100-viewer/README.md`
-2. `docs/api/core.md`
-3. `docs/api/products.md`
-4. `docs/api/canonical-app-integration.md`
-5. `packages/s100-viewer/src/adapters/types.ts`
-6. `packages/s100-viewer/src/adapters/InMemoryAdapter.ts`
-7. `packages/s100-viewer-adapter-nasa-ammos/README.md`
-8. `packages/s100-viewer-adapter-cesium/README.md`
-9. `packages/s100-viewer-adapter-nasa-ammos/src/index.ts`
-10. `packages/s100-viewer-adapter-cesium/src/index.ts`
+1. `docs/start-here.md`
+2. `docs/concepts/s100-primer.md`
+3. `docs/api/entrypoints.md`
+4. `packages/s100-viewer/README.md`
+5. `docs/api/core.md`
+6. `docs/api/products.md`
+7. `docs/api/canonical-app-integration.md`
+8. `docs/workflows/live-vessel-feed.md`
+9. `docs/workflows/parametric-vessel.md`
+10. `docs/workflows/rtz-route.md`
+11. `packages/s100-viewer/src/adapters/types.ts`
+12. `packages/s100-viewer/src/adapters/InMemoryAdapter.ts`
+13. `packages/s100-viewer-adapter-three/README.md`
+14. `packages/s100-viewer-adapter-nasa-ammos/README.md`
+15. `packages/s100-viewer-adapter-cesium/README.md`
 
 Use the source when reference docs feel incomplete. The public contract is
 visible in exported types from `packages/s100-viewer/src/index.ts`.
