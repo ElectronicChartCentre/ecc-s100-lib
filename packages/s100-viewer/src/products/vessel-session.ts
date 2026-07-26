@@ -301,7 +301,7 @@ function clampVerticalPosition(
   }
 
   const referenceOffset = verticalConstraint.reference === "sea-level"
-    ? scene.getSeaLevel()
+    ? waterLevelAtCoordinate(scene, position)
     : 0;
   const min = addReferenceOffset(verticalConstraint.minMeters, referenceOffset);
   const maxValue = verticalConstraint.maxMeters === "draught"
@@ -360,6 +360,13 @@ function addReferenceOffset(
   referenceOffset: number,
 ): number | undefined {
   return value !== undefined ? value + referenceOffset : undefined;
+}
+
+function waterLevelAtCoordinate(scene: S100Scene, coordinate: Coordinate): number {
+  const sample = scene.waterLevel.sample({ coordinate });
+  return sample.status === "value" && Number.isFinite(sample.heightMeters)
+    ? sample.heightMeters
+    : scene.getSeaLevel();
 }
 
 function clampOptional(

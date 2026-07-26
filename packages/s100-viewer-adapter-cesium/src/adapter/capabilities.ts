@@ -13,6 +13,8 @@ export const cesiumAdapterCapabilities: AdapterCapabilities = {
   timeDynamicLayers: true,
   nativeHandles: true,
   precisionStrategy: "engine-native",
+  waterLevelField: "sampled",
+  waterLevelTerrainShading: "global",
   globe: {
     ellipsoidEcef: true,
     globeNative3dTiles: true,

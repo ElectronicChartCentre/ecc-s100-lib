@@ -3,6 +3,7 @@ import {
   type BaseLayerSpec,
   type EngineLayerHandle,
   type LayerPatch,
+  type WaterLevelFieldSource,
 } from "@ecc/s100-viewer";
 import * as THREE from "three";
 import type { FetchLike } from "../options.js";
@@ -27,7 +28,7 @@ export class LayerRegistry {
     private readonly reference: ThreeProjectedLocalReference,
     private readonly fetchHandler: FetchLike | undefined,
     private readonly getSeaLevel: () => number,
-    private readonly setSeaLevel: (value: number) => void,
+    private readonly setSeaLevel: (value: number, source?: WaterLevelFieldSource) => void,
     private readonly setCameraInteractionSuppressed: (suppressed: boolean) => void,
   ) {}
 

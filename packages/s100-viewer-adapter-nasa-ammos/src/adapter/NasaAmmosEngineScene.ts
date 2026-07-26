@@ -23,6 +23,7 @@ import {
   type S111SurfaceCurrentLayerSpec,
   type SimulatedWaterLevelLayerSpec,
   type VesselLayerSpec,
+  type WaterLevelFieldSource,
 } from "@ecc/s100-viewer";
 import { depthFromElevation } from "@ecc/s100-viewer/internal/products/depthStyle";
 import type { Vec3 } from "../runtime/index.js";
@@ -119,6 +120,7 @@ export class NasaAmmosEngineScene implements EngineScene {
   private livePickingSubscription: SubscriptionLike | null = null;
   private cameraChangeListener: EngineCameraChangeListener | null = null;
   private cameraChangeSubscription: SubscriptionLike | null = null;
+  private seaLevelSource: WaterLevelFieldSource = "static";
   private environmentLoadSerial = 0;
   private environmentTextures: Texture[] = [];
   private disposed = false;
@@ -224,18 +226,23 @@ export class NasaAmmosEngineScene implements EngineScene {
       if (native.kind === "simulated-water-level") {
         const seaLevel = resolveWaterLevel(native.data, this.currentTime);
         if (seaLevel !== null) {
-          this.setSeaLevel(seaLevel);
+          this.setSeaLevel(seaLevel, "simulated-water-level");
         }
       }
     }
   }
 
-  setSeaLevel(value: number): void {
+  setSeaLevel(value: number, source: WaterLevelFieldSource = "static"): void {
     this.scene.seaLevel = value;
+    this.seaLevelSource = source;
   }
 
   getSeaLevel(): number {
     return this.scene.seaLevel;
+  }
+
+  getSeaLevelSource(): WaterLevelFieldSource {
+    return this.seaLevelSource;
   }
 
   setEnvironment(state: EnvironmentState): void {
@@ -636,7 +643,7 @@ export class NasaAmmosEngineScene implements EngineScene {
     const data = await loadJsonSource(spec.source, this.options.fetchHandler);
     const seaLevel = resolveWaterLevel(data, this.currentTime);
     if (seaLevel !== null) {
-      this.setSeaLevel(seaLevel);
+      this.setSeaLevel(seaLevel, "simulated-water-level");
     }
 
     return { kind: "simulated-water-level", spec, data };

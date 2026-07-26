@@ -5,6 +5,8 @@ export type {
   AdapterPrecisionStrategy,
   AdapterVisualCapabilities,
   AdapterVisualFeatureCapability,
+  AdapterWaterLevelFieldCapability,
+  AdapterWaterLevelTerrainShadingCapability,
   EngineCameraChangeListener,
   EngineHandleBundle,
   EngineLayerHandle,

@@ -20,7 +20,7 @@ import type {
 import type { BaseLayerSpec, LayerPatch } from "../layers/types.js";
 import type { LivePickingOptions, PickRequest, PickResult } from "../picking/types.js";
 import { S100SupportedProductVersions } from "../products/index.js";
-import type { EnvironmentState, SceneOptions } from "../scene/types.js";
+import type { EnvironmentState, SceneOptions, WaterLevelFieldSource } from "../scene/types.js";
 
 export type InMemoryAdapterOptions = {
   id?: string;
@@ -41,6 +41,7 @@ export type InMemoryAdapterOptions = {
   onLayerPatchListener?: (listener: EngineLayerPatchListener | null) => void;
   onCameraChangeListener?: (listener: EngineCameraChangeListener | null) => void;
   getSeaLevel?: () => number;
+  getSeaLevelSource?: () => WaterLevelFieldSource;
   failAddLayerIds?: readonly string[];
 };
 
@@ -63,6 +64,8 @@ export const createInMemoryAdapter = (options: InMemoryAdapterOptions = {}): S10
     timeDynamicLayers: true,
     nativeHandles: true,
     precisionStrategy: "engine-native",
+    waterLevelField: "sampled",
+    waterLevelTerrainShading: "none",
     globe: {
       ellipsoidEcef: true,
       globeNative3dTiles: false,
@@ -107,6 +110,7 @@ export const createInMemoryAdapter = (options: InMemoryAdapterOptions = {}): S10
             options.onLayerPatchListener,
             options.onCameraChangeListener,
             options.getSeaLevel,
+            options.getSeaLevelSource,
             options.failAddLayerIds,
           );
         },
@@ -123,6 +127,7 @@ class InMemoryEngineScene implements EngineScene {
   private camera = defaultCameraPose();
   private time = new Date(0);
   private seaLevel = 0;
+  private seaLevelSource: WaterLevelFieldSource = "static";
   private cameraControls: CameraControlConfig | undefined;
   private environment: EnvironmentState = {};
   private readonly layers = new Map<EngineLayerHandle, BaseLayerSpec>();
@@ -154,6 +159,7 @@ class InMemoryEngineScene implements EngineScene {
       | ((listener: EngineCameraChangeListener | null) => void)
       | undefined,
     private readonly getSeaLevelOverride: (() => number) | undefined,
+    private readonly getSeaLevelSourceOverride: (() => WaterLevelFieldSource) | undefined,
     private readonly failAddLayerIds: readonly string[] | undefined,
   ) {}
 
@@ -200,12 +206,17 @@ class InMemoryEngineScene implements EngineScene {
     this.time = new Date(time);
   }
 
-  setSeaLevel(value: number): void {
+  setSeaLevel(value: number, source: WaterLevelFieldSource = "static"): void {
     this.seaLevel = value;
+    this.seaLevelSource = source;
   }
 
   getSeaLevel(): number {
-    return this.getSeaLevelOverride?.() ?? Number.NaN;
+    return this.getSeaLevelOverride?.() ?? this.seaLevel;
+  }
+
+  getSeaLevelSource(): WaterLevelFieldSource {
+    return this.getSeaLevelSourceOverride?.() ?? this.seaLevelSource;
   }
 
   setEnvironment(state: EnvironmentState): void {

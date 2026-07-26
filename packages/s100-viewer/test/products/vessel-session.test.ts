@@ -130,6 +130,39 @@ describe("VesselFeatureSession", () => {
     expect(layer.controllers.vessel.setPosition).toHaveBeenCalledWith(projected(1, 2, 15));
   });
 
+  it("uses sampled water level for sea-level-relative vessel constraints", async () => {
+    const layer = createVesselLayer();
+    const scene = createScene(layer, 10, 12);
+
+    await VesselFeatureSession.add({
+      scene,
+      id: "sampled-water-level-vessel",
+      url: "/vessel.glb",
+      pose: {
+        position: projected(1, 2, 99),
+      },
+      dimensions,
+      constraints: {
+        vertical: {
+          minMeters: -75,
+          maxMeters: "draught",
+          reference: "sea-level",
+        },
+      },
+    });
+
+    expect(scene.waterLevel.sample).toHaveBeenCalledWith({
+      coordinate: projected(1, 2, 99),
+    });
+    expect(scene.layers.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pose: {
+          position: projected(1, 2, 17),
+        },
+      }),
+    );
+  });
+
   it("refreshes draught-based transform limits when dimensions change", async () => {
     const layer = createVesselLayer();
     const session = await VesselFeatureSession.add({
@@ -234,10 +267,22 @@ type TestVesselLayer = S100Layer<VesselLayerSpec> & {
   __headingUnsubscribe: ReturnType<typeof vi.fn>;
 };
 
-function createScene(layer: TestVesselLayer, seaLevel: number): S100Scene {
+function createScene(layer: TestVesselLayer, seaLevel: number, sampledSeaLevel = seaLevel): S100Scene {
   return {
     layers: {
       add: vi.fn().mockResolvedValue(layer),
+    },
+    waterLevel: {
+      sample: vi.fn(({ coordinate }: { coordinate: Coordinate }) => ({
+        status: "value" as const,
+        source: "static" as const,
+        heightMeters: sampledSeaLevel,
+        coordinate,
+        requestedCoordinate: coordinate,
+        sourceTime: new Date(0),
+        requestedTime: new Date(0),
+        samplingMode: "scene-global-sea-level" as const,
+      })),
     },
     getSeaLevel: vi.fn().mockReturnValue(seaLevel),
   } as unknown as S100Scene;

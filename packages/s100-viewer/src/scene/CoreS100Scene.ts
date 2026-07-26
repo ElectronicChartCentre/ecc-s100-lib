@@ -6,9 +6,9 @@ import type {
   EngineScene,
 } from "../adapters/types.js";
 import { CoreCameraController } from "../camera/CoreCameraController.js";
-import type { SceneGeoreference } from "../coordinates/types.js";
+import type { Coordinate, ProjectedCoordinate, SceneGeoreference } from "../coordinates/types.js";
 import { S100Error } from "../errors/S100Error.js";
-import { EventBus } from "../events/S100EventBus.js";
+import { EventBus, type S100Unsubscribe } from "../events/S100EventBus.js";
 import { CoreLayerCollection } from "../layers/CoreLayerCollection.js";
 import { CoreDepthRayController } from "../picking/CoreDepthRayController.js";
 import { CorePickingController } from "../picking/CorePickingController.js";
@@ -44,8 +44,11 @@ export class CoreS100Scene implements S100Scene {
   readonly environment: EnvironmentController;
   readonly waterLevel: CoreWaterLevelFieldController;
   private seaLevel = 0;
+  private fallbackSeaLevel = 0;
+  private activeSeaLevelSource: WaterLevelFieldSource = "static";
   private seaLevelSource: Exclude<WaterLevelFieldSource, "s104"> = "static";
   private destroyed = false;
+  private readonly subscriptions: S100Unsubscribe[] = [];
 
   constructor(private readonly options: CoreS100SceneOptions) {
     this.id = options.id ?? `scene-${nextSceneId++}`;
@@ -64,7 +67,18 @@ export class CoreS100Scene implements S100Scene {
       getSeaLevel: () => this.seaLevel,
       getSeaLevelSource: () => this.seaLevelSource,
       getSceneTime: () => this.time.getCurrent(),
+      onSamplerChanged: () => {
+        this.refreshRepresentativeSeaLevel({ notifyWaterLevel: false });
+      },
     });
+    this.subscriptions.push(
+      this.events.on("camera.changed", () => {
+        this.refreshRepresentativeSeaLevel();
+      }),
+      this.events.on("time.changed", () => {
+        this.refreshRepresentativeSeaLevel();
+      }),
+    );
   }
 
   get adapterCapabilities(): AdapterCapabilities {
@@ -95,26 +109,86 @@ export class CoreS100Scene implements S100Scene {
   }
 
   setSeaLevel(value: number): void {
-    this.seaLevel = value;
+    const previousSource = this.seaLevelSource;
+    this.fallbackSeaLevel = finiteSeaLevel(value);
     this.seaLevelSource = "static";
-    this.options.engineScene.setSeaLevel(value);
-    this.events.emit("seaLevel.changed", value);
-    this.waterLevel.notifyChanged();
+    this.refreshRepresentativeSeaLevel({
+      forceWaterLevelNotification: previousSource !== this.seaLevelSource,
+    });
   }
 
   private setSeaLevelFromEngine(value: number): void {
+    const previousSource = this.seaLevelSource;
+    this.fallbackSeaLevel = finiteSeaLevel(value);
+    this.seaLevelSource = "simulated-water-level";
+    this.refreshRepresentativeSeaLevel({
+      forceWaterLevelNotification: previousSource !== this.seaLevelSource,
+      applyToEngine: this.waterLevel.getSampler() !== null,
+    });
+  }
+
+  private refreshRepresentativeSeaLevel(
+    options: {
+      notifyWaterLevel?: boolean;
+      forceWaterLevelNotification?: boolean;
+      applyToEngine?: boolean;
+    } = {},
+  ): void {
+    const representative = this.representativeWaterLevel();
+    this.setActiveSeaLevel(
+      representative?.heightMeters ?? this.fallbackSeaLevel,
+      representative !== null ? "s104" : this.seaLevelSource,
+      options,
+    );
+  }
+
+  private representativeWaterLevel(): { heightMeters: number } | null {
+    if (this.waterLevel.getSampler() === null) {
+      return null;
+    }
+
+    const sample = this.waterLevel.sample({
+      coordinate: representativeCoordinate(this.options.georeference, this.camera.getPose().position),
+      time: this.time.getCurrent(),
+    });
+    if (sample.status !== "value" || !Number.isFinite(sample.heightMeters)) {
+      return null;
+    }
+    return { heightMeters: sample.heightMeters };
+  }
+
+  private setActiveSeaLevel(
+    value: number,
+    source: WaterLevelFieldSource,
+    options: {
+      notifyWaterLevel?: boolean;
+      forceWaterLevelNotification?: boolean;
+      applyToEngine?: boolean;
+    } = {},
+  ): void {
+    const normalized = finiteSeaLevel(value);
     const previousSeaLevel = this.seaLevel;
-    const sourceChanged = this.seaLevelSource !== "simulated-water-level";
-    if (Object.is(previousSeaLevel, value) && !sourceChanged) {
+    const previousSource = this.activeSeaLevelSource;
+    const sourceChanged = previousSource !== source;
+    if (
+      Object.is(previousSeaLevel, normalized) &&
+      !sourceChanged &&
+      options.forceWaterLevelNotification !== true
+    ) {
       return;
     }
 
-    this.seaLevel = value;
-    this.seaLevelSource = "simulated-water-level";
-    if (!Object.is(previousSeaLevel, value)) {
-      this.events.emit("seaLevel.changed", value);
+    this.seaLevel = normalized;
+    this.activeSeaLevelSource = source;
+    if (options.applyToEngine !== false) {
+      this.options.engineScene.setSeaLevel(normalized, source);
     }
-    this.waterLevel.notifyChanged();
+    if (!Object.is(previousSeaLevel, normalized)) {
+      this.events.emit("seaLevel.changed", normalized);
+    }
+    if (options.notifyWaterLevel !== false || options.forceWaterLevelNotification === true) {
+      this.waterLevel.notifyChanged();
+    }
   }
 
   getSeaLevel(): number {
@@ -140,6 +214,9 @@ export class CoreS100Scene implements S100Scene {
     }
 
     await this.layers.clear();
+    for (const unsubscribe of this.subscriptions.splice(0)) {
+      unsubscribe();
+    }
     this.time.destroy();
     this.camera.destroy();
     await this.options.engineScene.dispose();
@@ -147,3 +224,34 @@ export class CoreS100Scene implements S100Scene {
     this.destroyed = true;
   }
 }
+
+const representativeCoordinate = (
+  georeference: SceneGeoreference,
+  cameraPosition: { x: number; y: number; z: number },
+): Coordinate => {
+  if (georeference.mode === "projected-local") {
+    const origin = georeference.origin;
+    if (origin.kind === "projected") {
+      const coordinate: ProjectedCoordinate = {
+        kind: "projected",
+        crs: georeference.crs,
+        x: origin.x + cameraPosition.x,
+        y: origin.y + cameraPosition.y,
+        z: (origin.z ?? 0) + cameraPosition.z,
+      };
+      return coordinate;
+    }
+    return origin;
+  }
+
+  return georeference.origin ?? {
+    kind: "geodetic",
+    lon: 0,
+    lat: 0,
+    height: 0,
+    datum: "WGS84",
+  };
+};
+
+const finiteSeaLevel = (value: number): number =>
+  Number.isFinite(value) ? value : 0;

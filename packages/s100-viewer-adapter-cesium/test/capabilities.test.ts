@@ -15,6 +15,8 @@ describe("@ecc/s100-viewer-adapter-cesium capabilities", () => {
     expect(cesiumAdapterCapabilities.sceneGeoreferences).toContain("ellipsoid-ecef");
     expect(cesiumAdapterCapabilities.layerProducts).toContain("S-102");
     expect(cesiumAdapterCapabilities.supportedProductVersions?.length).toBeGreaterThan(0);
+    expect(cesiumAdapterCapabilities.waterLevelField).toBe("sampled");
+    expect(cesiumAdapterCapabilities.waterLevelTerrainShading).toBe("global");
     expect(cesiumAdapterCapabilities.visualFeatures).toMatchObject({
       depthRay: true,
       hoverPrism: true,

@@ -36,6 +36,8 @@ describe("@ecc/s100-viewer-adapter-nasa-ammos capabilities", () => {
     expect(nasaAmmosAdapterCapabilities.layerProducts).toContain("route-plan");
     expect(nasaAmmosAdapterCapabilities.dataSources).toContain("parametric-vessel");
     expect(nasaAmmosAdapterCapabilities.dataSources).toContain("route-plan");
+    expect(nasaAmmosAdapterCapabilities.waterLevelField).toBe("sampled");
+    expect(nasaAmmosAdapterCapabilities.waterLevelTerrainShading).toBe("global");
     expect(nasaAmmosAdapterCapabilities.supportedProductVersions).toEqual(
       S100SupportedProductVersions,
     );

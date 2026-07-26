@@ -32,6 +32,8 @@ export const nasaAmmosAdapterCapabilities: AdapterCapabilities = {
   timeDynamicLayers: true,
   nativeHandles: true,
   precisionStrategy: "origin-rebased",
+  waterLevelField: "sampled",
+  waterLevelTerrainShading: "global",
   globe: {
     ellipsoidEcef: false,
     globeNative3dTiles: false,

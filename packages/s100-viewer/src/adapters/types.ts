@@ -3,7 +3,7 @@ import type { SceneGeoreferenceMode } from "../coordinates/types.js";
 import type { BaseLayerSpec, LayerPatch } from "../layers/types.js";
 import type { LivePickingOptions, PickRequest, PickResult } from "../picking/types.js";
 import type { S100ProductVersionSupport } from "../products/index.js";
-import type { EnvironmentState, SceneOptions } from "../scene/types.js";
+import type { EnvironmentState, SceneOptions, WaterLevelFieldSource } from "../scene/types.js";
 
 export type LoggerLike = {
   debug?: (...args: unknown[]) => void;
@@ -36,6 +36,10 @@ export type AdapterVisualCapabilities = {
   dynamicLighting?: AdapterVisualFeatureCapability;
 };
 
+export type AdapterWaterLevelFieldCapability = "none" | "sampled";
+
+export type AdapterWaterLevelTerrainShadingCapability = "none" | "global" | "per-position";
+
 export type AdapterCapabilities = {
   sceneGeoreferences: readonly SceneGeoreferenceMode[];
   layerProducts: readonly string[];
@@ -46,6 +50,8 @@ export type AdapterCapabilities = {
   timeDynamicLayers: boolean;
   nativeHandles: boolean;
   precisionStrategy?: AdapterPrecisionStrategy;
+  waterLevelField?: AdapterWaterLevelFieldCapability;
+  waterLevelTerrainShading?: AdapterWaterLevelTerrainShadingCapability;
   globe?: {
     ellipsoidEcef: boolean;
     globeNative3dTiles?: boolean;
@@ -110,8 +116,9 @@ export interface EngineScene {
   setCameraChangeListener?(listener: EngineCameraChangeListener | null): void;
   setCameraControls?(config: CameraControlConfig): void;
   setTime(time: Date): void;
-  setSeaLevel(value: number): void;
+  setSeaLevel(value: number, source?: WaterLevelFieldSource): void;
   getSeaLevel?(): number;
+  getSeaLevelSource?(): WaterLevelFieldSource;
   setEnvironment?(state: EnvironmentState): void;
   setLayerPatchListener?(listener: EngineLayerPatchListener | null): void;
   addLayer(spec: BaseLayerSpec): Promise<EngineLayerHandle>;

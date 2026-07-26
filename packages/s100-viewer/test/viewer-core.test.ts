@@ -432,8 +432,9 @@ describe("createS100Viewer", () => {
     expect(scene.waterLevel.getState()).toMatchObject({
       sampler,
       source: "s104",
-      seaLevelMeters: 0,
+      seaLevelMeters: 2.4,
     });
+    expect(scene.getSeaLevel()).toBe(2.4);
     expect(sampleFromSampler).toHaveBeenCalledWith({
       coordinate,
       time: new Date("2026-07-26T00:00:00Z"),
@@ -463,6 +464,7 @@ describe("createS100Viewer", () => {
     const viewer = await createS100Viewer({
       adapter: createInMemoryAdapter({
         getSeaLevel: () => engineSeaLevel,
+        getSeaLevelSource: () => "simulated-water-level",
       }),
     });
     const scene = await viewer.createScene({ id: "simulated-water-level-field-scene" });

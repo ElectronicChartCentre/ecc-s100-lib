@@ -172,6 +172,32 @@ First-pass rendering behavior may use a representative sampled value near the
 vessel or camera for ocean-surface height. Per-position S-104 terrain/ocean
 shading should be a later shader/texture phase after the sampler is stable.
 
+## Current Adapter State
+
+NASA-AMMOS, Three.js, and Cesium now advertise sampled water-level support:
+
+```ts
+{
+  waterLevelField: "sampled",
+  waterLevelTerrainShading: "global",
+}
+```
+
+The core scene owns the S-104 sampler and forwards a representative sampled
+height to adapters through the existing sea-level path. That keeps terrain and
+ocean rendering working without engine-specific S-104 parsing, while making the
+current limitation explicit: S-102 terrain shading is still global, not
+per-position.
+
+Vessel feature sessions use `scene.waterLevel.sample({ coordinate })` at the
+vessel position for sea-level-relative vertical limits. This is the first
+point-specific consumer of the S-104 field and keeps draught behavior aligned
+with spatially varying water level where a sampler is available.
+
+Future per-position rendering should generate a compact texture or equivalent
+adapter-native field from the prepared S-104 grid and sample it in terrain and
+ocean shaders.
+
 ## Implementation Handoff
 
 The next implementation phases should proceed in this order:

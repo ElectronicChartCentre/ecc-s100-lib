@@ -13,6 +13,7 @@ export type CoreWaterLevelFieldControllerOptions = {
   getSeaLevel: () => number;
   getSeaLevelSource: () => Exclude<WaterLevelFieldSource, "s104">;
   getSceneTime: () => Date;
+  onSamplerChanged?: () => void;
 };
 
 export class CoreWaterLevelFieldController implements WaterLevelFieldController {
@@ -29,6 +30,7 @@ export class CoreWaterLevelFieldController implements WaterLevelFieldController 
     }
 
     this.sampler = sampler;
+    this.options.onSamplerChanged?.();
     this.emitChanged();
   }
 

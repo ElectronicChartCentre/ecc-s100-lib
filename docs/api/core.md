@@ -66,6 +66,19 @@ When an S-104 workflow is prepared, attach its sampler with
 controller returns the current global sea level with source `static` or
 `simulated-water-level`.
 
+Adapters that consume the field advertise that through capabilities:
+
+- `waterLevelField: "sampled"` means the adapter can accept a representative
+  water-level value derived from the scene sampler.
+- `waterLevelTerrainShading: "global"` means S-102 terrain shading still uses a
+  uniform sea-level value, not a per-position S-104 texture or shader lookup.
+
+NASA-AMMOS, Three.js, and Cesium currently use the same first-pass behavior:
+when an S-104 sampler is attached, the core scene samples near the active camera
+and forwards that representative value to the adapter. Product/session helpers
+that need a point-specific answer, such as vessel draught constraints, should
+call `scene.waterLevel.sample({ coordinate })` directly.
+
 ## Layers
 
 `scene.layers.add(spec)` accepts a product or operational layer spec and returns

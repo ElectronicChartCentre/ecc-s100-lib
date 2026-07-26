@@ -31,7 +31,12 @@ export class CoreTimeController implements TimeController {
     this.current = new Date(value);
     this.engineScene.setTime(this.current);
     const seaLevel = this.engineScene.getSeaLevel?.();
-    if (typeof seaLevel === "number" && Number.isFinite(seaLevel)) {
+    const seaLevelSource = this.engineScene.getSeaLevelSource?.();
+    if (
+      typeof seaLevel === "number" &&
+      Number.isFinite(seaLevel) &&
+      (seaLevelSource === "simulated-water-level" || seaLevelSource === undefined)
+    ) {
       this.onEngineSeaLevelChanged(seaLevel);
     }
     this.events.emit("time.changed", this.getCurrent());

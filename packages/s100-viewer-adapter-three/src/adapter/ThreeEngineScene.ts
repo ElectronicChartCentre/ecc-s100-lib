@@ -16,6 +16,7 @@ import type {
   PickResult,
   BaseLayerSpec,
   SceneOptions,
+  WaterLevelFieldSource,
 } from "@ecc/s100-viewer";
 import * as THREE from "three";
 import type { ThreeAdapterOptions } from "../options.js";
@@ -54,6 +55,7 @@ export class ThreeEngineScene implements EngineScene {
   };
   private currentTime = new Date(0);
   private seaLevel = 0;
+  private seaLevelSource: WaterLevelFieldSource = "static";
   private cameraChangeListener: EngineCameraChangeListener | null = null;
   private livePickingOptions: LivePickingOptions = { enabled: false };
   private livePickingEmit: ((result: PickResult | null) => void) | null = null;
@@ -91,7 +93,7 @@ export class ThreeEngineScene implements EngineScene {
       this.reference,
       adapterOptions.fetchHandler,
       () => this.seaLevel,
-      (value) => this.setSeaLevel(value),
+      (value, source) => this.setSeaLevel(value, source),
       (suppressed) => this.cameraController.setInteractionSuppressed(suppressed),
     );
     this.picking = new ThreePicking(
@@ -150,12 +152,17 @@ export class ThreeEngineScene implements EngineScene {
     this.layers.update(this.currentTime);
   }
 
-  setSeaLevel(value: number): void {
+  setSeaLevel(value: number, source: WaterLevelFieldSource = "static"): void {
     this.seaLevel = Number.isFinite(value) ? value : 0;
+    this.seaLevelSource = source;
   }
 
   getSeaLevel(): number {
     return this.seaLevel;
+  }
+
+  getSeaLevelSource(): WaterLevelFieldSource {
+    return this.seaLevelSource;
   }
 
   setEnvironment(state: EnvironmentState): void {

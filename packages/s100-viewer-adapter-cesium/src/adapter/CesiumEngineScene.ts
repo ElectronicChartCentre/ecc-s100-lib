@@ -31,6 +31,7 @@ import {
   type SpatialExtent,
   type StaticJsonSource,
   type VesselLayerSpec,
+  type WaterLevelFieldSource,
   type WmsSource,
   type WmtsSource,
   isEncLayerSpec,
@@ -282,6 +283,7 @@ export class CesiumEngineScene implements EngineScene {
   private readonly layers = new Map<EngineLayerHandle, CesiumLayerNative>();
   private currentTime = new Date(0);
   private currentSeaLevel = 0;
+  private currentSeaLevelSource: WaterLevelFieldSource = "static";
   private hoverPrismDrawables: CesiumSceneDrawable[] = [];
   private readonly projectedWmsCutoutCandidates: SpatialExtent[] = [];
   private cameraPanAbort: (() => void) | null = null;
@@ -460,7 +462,7 @@ export class CesiumEngineScene implements EngineScene {
       if (native.kind === "simulated-water-level") {
         const seaLevel = resolveWaterLevel(native.data, this.currentTime);
         if (seaLevel !== null) {
-          this.setSeaLevel(seaLevel);
+          this.setSeaLevel(seaLevel, "simulated-water-level");
         }
       }
       if (native.kind === "s111") {
@@ -470,8 +472,9 @@ export class CesiumEngineScene implements EngineScene {
     this.updateVesselPresentationDrawables();
   }
 
-  setSeaLevel(value: number): void {
+  setSeaLevel(value: number, source: WaterLevelFieldSource = "static"): void {
     this.currentSeaLevel = value;
+    this.currentSeaLevelSource = source;
     for (const native of this.layers.values()) {
       if (native.kind !== "3d-tiles") {
         continue;
@@ -495,6 +498,10 @@ export class CesiumEngineScene implements EngineScene {
 
   getSeaLevel(): number {
     return this.currentSeaLevel;
+  }
+
+  getSeaLevelSource(): WaterLevelFieldSource {
+    return this.currentSeaLevelSource;
   }
 
   setLayerPatchListener(listener: EngineLayerPatchListener | null): void {
@@ -1095,7 +1102,7 @@ export class CesiumEngineScene implements EngineScene {
     const data = await loadJsonSource(spec.source, this.options.fetchHandler);
     const seaLevel = resolveWaterLevel(data, this.currentTime);
     if (seaLevel !== null) {
-      this.setSeaLevel(seaLevel);
+      this.setSeaLevel(seaLevel, "simulated-water-level");
     }
     return { kind: "simulated-water-level", spec, data };
   }

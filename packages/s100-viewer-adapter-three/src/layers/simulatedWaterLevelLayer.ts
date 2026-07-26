@@ -1,13 +1,14 @@
 import type {
   BaseLayerSpec,
   SimulatedWaterLevelLayerSpec,
+  WaterLevelFieldSource,
 } from "@ecc/s100-viewer";
 import type { ThreeLayerNative } from "./types.js";
 
 export const createSimulatedWaterLevelLayer = (
   spec: BaseLayerSpec,
   getSeaLevel: () => number,
-  setSeaLevel: (value: number) => void,
+  setSeaLevel: (value: number, source?: WaterLevelFieldSource) => void,
 ): ThreeLayerNative<SimulatedWaterLevelLayerSpec> => {
   const layerSpec = spec as SimulatedWaterLevelLayerSpec;
   return {
@@ -16,7 +17,7 @@ export const createSimulatedWaterLevelLayer = (
     update: (time) => {
       const seaLevel = resolveWaterLevel(layerSpec, time);
       if (seaLevel !== null && seaLevel !== getSeaLevel()) {
-        setSeaLevel(seaLevel);
+        setSeaLevel(seaLevel, "simulated-water-level");
       }
     },
     dispose: () => {},
