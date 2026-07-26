@@ -3,7 +3,12 @@ import type { SceneGeoreferenceMode } from "../coordinates/types.js";
 import type { BaseLayerSpec, LayerPatch } from "../layers/types.js";
 import type { LivePickingOptions, PickRequest, PickResult } from "../picking/types.js";
 import type { S100ProductVersionSupport } from "../products/index.js";
-import type { EnvironmentState, SceneOptions, WaterLevelFieldSource } from "../scene/types.js";
+import type {
+  EnvironmentState,
+  SceneOptions,
+  WaterLevelFieldSource,
+  WaterLevelFieldState,
+} from "../scene/types.js";
 
 export type LoggerLike = {
   debug?: (...args: unknown[]) => void;
@@ -119,6 +124,7 @@ export interface EngineScene {
   setSeaLevel(value: number, source?: WaterLevelFieldSource): void;
   getSeaLevel?(): number;
   getSeaLevelSource?(): WaterLevelFieldSource;
+  setWaterLevelField?(state: WaterLevelFieldState): void;
   setEnvironment?(state: EnvironmentState): void;
   setLayerPatchListener?(listener: EngineLayerPatchListener | null): void;
   addLayer(spec: BaseLayerSpec): Promise<EngineLayerHandle>;

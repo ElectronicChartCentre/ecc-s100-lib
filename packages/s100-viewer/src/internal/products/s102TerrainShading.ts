@@ -14,6 +14,17 @@ export type S100TerrainShaderUniforms = {
   vesselShadowData: S100TerrainShaderUniform<Float32Array>;
   vesselShadowOrientation: S100TerrainShaderUniform<Float32Array>;
   vesselShadowShape: S100TerrainShaderUniform<Float32Array>;
+  waterLevelGridEnabled: S100TerrainShaderUniform;
+  waterLevelGridTexture: S100TerrainShaderUniform<unknown>;
+  waterLevelGridWidth: S100TerrainShaderUniform;
+  waterLevelGridHeight: S100TerrainShaderUniform;
+  waterLevelGridNoDataValue: S100TerrainShaderUniform;
+  waterLevelGridOriginX: S100TerrainShaderUniform;
+  waterLevelGridOriginY: S100TerrainShaderUniform;
+  waterLevelGridLongitudinalX: S100TerrainShaderUniform;
+  waterLevelGridLongitudinalY: S100TerrainShaderUniform;
+  waterLevelGridLatitudinalX: S100TerrainShaderUniform;
+  waterLevelGridLatitudinalY: S100TerrainShaderUniform;
 };
 
 export type S100TerrainShaderVerticalAxis = "x" | "y" | "z";
@@ -39,8 +50,21 @@ export type S100TerrainVesselShadowStamp = {
   softness?: number;
 };
 
+export type S100TerrainWaterLevelGridUniformState = {
+  texture: unknown;
+  width: number;
+  height: number;
+  noDataValue: number;
+  originX: number;
+  originY: number;
+  longitudinalX: number;
+  longitudinalY: number;
+  latitudinalX: number;
+  latitudinalY: number;
+};
+
 export const S100_TERRAIN_MAX_VESSEL_SHADOWS = 64;
-export const S100_TERRAIN_SHADER_CACHE_KEY = "s100-terrain-v6";
+export const S100_TERRAIN_SHADER_CACHE_KEY = "s100-terrain-v7";
 
 export const S100_TERRAIN_SHADER_DEFAULTS = {
   seaLevel: 0,
@@ -66,6 +90,17 @@ export const createS100TerrainShaderUniforms = (): S100TerrainShaderUniforms => 
   vesselShadowData: { value: new Float32Array(S100_TERRAIN_MAX_VESSEL_SHADOWS * 4) },
   vesselShadowOrientation: { value: new Float32Array(S100_TERRAIN_MAX_VESSEL_SHADOWS * 4) },
   vesselShadowShape: { value: new Float32Array(S100_TERRAIN_MAX_VESSEL_SHADOWS * 4) },
+  waterLevelGridEnabled: { value: 0 },
+  waterLevelGridTexture: { value: null },
+  waterLevelGridWidth: { value: 1 },
+  waterLevelGridHeight: { value: 1 },
+  waterLevelGridNoDataValue: { value: -1_000_000 },
+  waterLevelGridOriginX: { value: 0 },
+  waterLevelGridOriginY: { value: 0 },
+  waterLevelGridLongitudinalX: { value: 1 },
+  waterLevelGridLongitudinalY: { value: 0 },
+  waterLevelGridLatitudinalX: { value: 0 },
+  waterLevelGridLatitudinalY: { value: 1 },
 });
 
 export const assignS100TerrainShaderUniforms = (
@@ -83,6 +118,54 @@ export const assignS100TerrainShaderUniforms = (
   target.s100TerrainVesselShadowData = uniforms.vesselShadowData;
   target.s100TerrainVesselShadowOrientation = uniforms.vesselShadowOrientation;
   target.s100TerrainVesselShadowShape = uniforms.vesselShadowShape;
+  target.s100TerrainWaterLevelGridEnabled = uniforms.waterLevelGridEnabled;
+  target.s100TerrainWaterLevelGridTexture = uniforms.waterLevelGridTexture;
+  target.s100TerrainWaterLevelGridWidth = uniforms.waterLevelGridWidth;
+  target.s100TerrainWaterLevelGridHeight = uniforms.waterLevelGridHeight;
+  target.s100TerrainWaterLevelGridNoDataValue = uniforms.waterLevelGridNoDataValue;
+  target.s100TerrainWaterLevelGridOriginX = uniforms.waterLevelGridOriginX;
+  target.s100TerrainWaterLevelGridOriginY = uniforms.waterLevelGridOriginY;
+  target.s100TerrainWaterLevelGridLongitudinalX = uniforms.waterLevelGridLongitudinalX;
+  target.s100TerrainWaterLevelGridLongitudinalY = uniforms.waterLevelGridLongitudinalY;
+  target.s100TerrainWaterLevelGridLatitudinalX = uniforms.waterLevelGridLatitudinalX;
+  target.s100TerrainWaterLevelGridLatitudinalY = uniforms.waterLevelGridLatitudinalY;
+};
+
+export const updateS100TerrainWaterLevelGridUniforms = (
+  uniforms: S100TerrainShaderUniforms,
+  grid: S100TerrainWaterLevelGridUniformState | null,
+): void => {
+  if (!grid || grid.width <= 0 || grid.height <= 0) {
+    uniforms.waterLevelGridEnabled.value = 0;
+    return;
+  }
+
+  uniforms.waterLevelGridEnabled.value = 1;
+  uniforms.waterLevelGridTexture.value = grid.texture;
+  uniforms.waterLevelGridWidth.value = Math.max(1, Math.floor(grid.width));
+  uniforms.waterLevelGridHeight.value = Math.max(1, Math.floor(grid.height));
+  uniforms.waterLevelGridNoDataValue.value = normalizeS100TerrainFiniteNumber(
+    grid.noDataValue,
+    -1_000_000,
+  );
+  uniforms.waterLevelGridOriginX.value = normalizeS100TerrainFiniteNumber(grid.originX, 0);
+  uniforms.waterLevelGridOriginY.value = normalizeS100TerrainFiniteNumber(grid.originY, 0);
+  uniforms.waterLevelGridLongitudinalX.value = normalizeS100TerrainFiniteNumber(
+    grid.longitudinalX,
+    1,
+  );
+  uniforms.waterLevelGridLongitudinalY.value = normalizeS100TerrainFiniteNumber(
+    grid.longitudinalY,
+    0,
+  );
+  uniforms.waterLevelGridLatitudinalX.value = normalizeS100TerrainFiniteNumber(
+    grid.latitudinalX,
+    0,
+  );
+  uniforms.waterLevelGridLatitudinalY.value = normalizeS100TerrainFiniteNumber(
+    grid.latitudinalY,
+    1,
+  );
 };
 
 export const updateS100TerrainVesselShadowUniforms = (
@@ -213,6 +296,17 @@ uniform float s100TerrainVesselShadowIntensity;
 uniform vec4 s100TerrainVesselShadowData[${S100_TERRAIN_MAX_VESSEL_SHADOWS}];
 uniform vec4 s100TerrainVesselShadowOrientation[${S100_TERRAIN_MAX_VESSEL_SHADOWS}];
 uniform vec4 s100TerrainVesselShadowShape[${S100_TERRAIN_MAX_VESSEL_SHADOWS}];
+uniform float s100TerrainWaterLevelGridEnabled;
+uniform sampler2D s100TerrainWaterLevelGridTexture;
+uniform float s100TerrainWaterLevelGridWidth;
+uniform float s100TerrainWaterLevelGridHeight;
+uniform float s100TerrainWaterLevelGridNoDataValue;
+uniform float s100TerrainWaterLevelGridOriginX;
+uniform float s100TerrainWaterLevelGridOriginY;
+uniform float s100TerrainWaterLevelGridLongitudinalX;
+uniform float s100TerrainWaterLevelGridLongitudinalY;
+uniform float s100TerrainWaterLevelGridLatitudinalX;
+uniform float s100TerrainWaterLevelGridLatitudinalY;
 const float S100_TERRAIN_CONTOUR_FULL_DISTANCE = 750.0;
 const float S100_TERRAIN_CONTOUR_FADE_DISTANCE = 3250.0;
 
@@ -298,13 +392,66 @@ float s100TerrainVesselShadow(vec2 worldPosition) {
     shadow = max(shadow, stamp * orientation.z * s100TerrainVesselShadowIntensity);
   }
   return clamp(shadow, 0.0, 0.8);
+}
+
+float s100TerrainLocalWaterLevel(vec2 worldPosition, float fallbackSeaLevel) {
+  if (s100TerrainWaterLevelGridEnabled < 0.5) {
+    return fallbackSeaLevel;
+  }
+
+  vec2 longitudinal = vec2(
+    s100TerrainWaterLevelGridLongitudinalX,
+    s100TerrainWaterLevelGridLongitudinalY
+  );
+  vec2 latitudinal = vec2(
+    s100TerrainWaterLevelGridLatitudinalX,
+    s100TerrainWaterLevelGridLatitudinalY
+  );
+  float determinant =
+    longitudinal.x * latitudinal.y - longitudinal.y * latitudinal.x;
+  if (abs(determinant) <= 0.000001) {
+    return 0.0;
+  }
+
+  vec2 delta = worldPosition - vec2(
+    s100TerrainWaterLevelGridOriginX,
+    s100TerrainWaterLevelGridOriginY
+  );
+  vec2 fractionalIndex = vec2(
+    (delta.x * latitudinal.y - delta.y * latitudinal.x) / determinant,
+    (longitudinal.x * delta.y - longitudinal.y * delta.x) / determinant
+  );
+  vec2 nearest = floor(fractionalIndex + 0.5);
+  if (
+    nearest.x < 0.0 ||
+    nearest.y < 0.0 ||
+    nearest.x > s100TerrainWaterLevelGridWidth - 1.0 ||
+    nearest.y > s100TerrainWaterLevelGridHeight - 1.0
+  ) {
+    return 0.0;
+  }
+
+  vec2 uv = (nearest + vec2(0.5)) /
+    vec2(s100TerrainWaterLevelGridWidth, s100TerrainWaterLevelGridHeight);
+  float value = texture2D(s100TerrainWaterLevelGridTexture, uv).r;
+  if (
+    abs(value - s100TerrainWaterLevelGridNoDataValue) < 0.5 ||
+    value != value
+  ) {
+    return 0.0;
+  }
+  return value;
 }`,
     )
     .replace(
       "#include <color_fragment>",
       `#include <color_fragment>
 float s100TerrainElevation = vS100TerrainWorldPosition.${verticalAxis} * s100TerrainHeightSign;
-float s100TerrainDepth = s100TerrainSeaLevel - s100TerrainElevation;
+float s100TerrainSeaLevelAtPosition = s100TerrainLocalWaterLevel(
+  vS100TerrainWorldPosition.xy,
+  s100TerrainSeaLevel
+);
+float s100TerrainDepth = s100TerrainSeaLevelAtPosition - s100TerrainElevation;
 vec3 s100TerrainColor = s100TerrainElevationColor(s100TerrainElevation);
 
 float s100TerrainContour = s100TerrainContourLine(

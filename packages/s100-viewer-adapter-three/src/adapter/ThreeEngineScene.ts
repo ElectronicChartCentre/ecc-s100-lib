@@ -1,6 +1,7 @@
 import type {
   CameraControlConfig,
   CameraLookAt,
+  Coordinate,
   EngineCameraChangeListener,
   EngineCameraPose,
   EngineHandleBundle,
@@ -16,6 +17,7 @@ import type {
   PickResult,
   BaseLayerSpec,
   SceneOptions,
+  WaterLevelFieldState,
   WaterLevelFieldSource,
 } from "@ecc/s100-viewer";
 import * as THREE from "three";
@@ -56,6 +58,7 @@ export class ThreeEngineScene implements EngineScene {
   private currentTime = new Date(0);
   private seaLevel = 0;
   private seaLevelSource: WaterLevelFieldSource = "static";
+  private waterLevelFieldState: WaterLevelFieldState | null = null;
   private cameraChangeListener: EngineCameraChangeListener | null = null;
   private livePickingOptions: LivePickingOptions = { enabled: false };
   private livePickingEmit: ((result: PickResult | null) => void) | null = null;
@@ -93,6 +96,7 @@ export class ThreeEngineScene implements EngineScene {
       this.reference,
       adapterOptions.fetchHandler,
       () => this.seaLevel,
+      (coordinate) => this.getWaterLevelAt(coordinate),
       (value, source) => this.setSeaLevel(value, source),
       (suppressed) => this.cameraController.setInteractionSuppressed(suppressed),
     );
@@ -163,6 +167,26 @@ export class ThreeEngineScene implements EngineScene {
 
   getSeaLevelSource(): WaterLevelFieldSource {
     return this.seaLevelSource;
+  }
+
+  setWaterLevelField(state: WaterLevelFieldState): void {
+    this.waterLevelFieldState = state;
+    this.layers.setWaterLevelField(state);
+  }
+
+  private getWaterLevelAt(coordinate: Coordinate): number {
+    const state = this.waterLevelFieldState;
+    if (!state?.sampler) {
+      return this.seaLevel;
+    }
+
+    const sample = state.sampler.sample({
+      coordinate,
+      time: this.currentTime,
+    });
+    return sample.status === "value" && Number.isFinite(sample.heightMeters)
+      ? sample.heightMeters
+      : 0;
   }
 
   setEnvironment(state: EnvironmentState): void {

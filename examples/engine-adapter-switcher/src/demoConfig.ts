@@ -164,7 +164,7 @@ export const getDemoLiveAisS101Enabled = (): boolean =>
 
 export const getDemoS104FixtureConfig = (): DemoS104FixtureConfig => ({
   serviceUrl: readFirstEnv(["VITE_S104_FIXTURE_SERVICE_URL", "VITE_DEMO_S104_FIXTURE_SERVICE_URL"])
-    ?? "http://localhost:8794",
+    ?? "http://127.0.0.1:8794",
   datasetId: readFirstEnv(["VITE_S104_DATASET_ID", "VITE_DEMO_S104_DATASET_ID"])
     ?? defaultS104FixtureDatasetId,
   maxDataPoints: readPositiveIntegerEnv("VITE_S104_MAX_DATA_POINTS", 100_000),

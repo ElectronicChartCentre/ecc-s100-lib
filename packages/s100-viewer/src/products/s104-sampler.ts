@@ -42,20 +42,30 @@ export type SampleS104WaterLevelOptions = {
 };
 
 const S104_NEAREST_NEIGHBOR: S104SamplingMode = "s104-nearest-neighbor";
+const samplerDatasets = new WeakMap<S104WaterLevelSampler, readonly S104DecodedDataset[]>();
 
 export const createS104WaterLevelSampler = (
   options: CreateS104WaterLevelSamplerOptions,
-): S104WaterLevelSampler => ({
-  sample: (sampleOptions) =>
-    sampleS104WaterLevel({
-      datasets: options.datasets,
-      coordinate: sampleOptions.coordinate,
-      time: sampleOptions.time,
-      ...(options.coordinateProjector !== undefined
-        ? { coordinateProjector: options.coordinateProjector }
-        : {}),
-    }),
-});
+): S104WaterLevelSampler => {
+  const datasets = normalizeDatasets(options.datasets);
+  const sampler: S104WaterLevelSampler = {
+    sample: (sampleOptions) =>
+      sampleS104WaterLevel({
+        datasets,
+        coordinate: sampleOptions.coordinate,
+        time: sampleOptions.time,
+        ...(options.coordinateProjector !== undefined
+          ? { coordinateProjector: options.coordinateProjector }
+          : {}),
+      }),
+  };
+  samplerDatasets.set(sampler, datasets);
+  return sampler;
+};
+
+export const getS104WaterLevelSamplerDatasets = (
+  sampler: S104WaterLevelSampler,
+): readonly S104DecodedDataset[] => samplerDatasets.get(sampler) ?? [];
 
 export const sampleS104WaterLevel = (
   options: SampleS104WaterLevelOptions,

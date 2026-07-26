@@ -4,6 +4,7 @@ import type {
   BaseLayerSpec,
   S102BathymetryLayerSpec,
   ThreeDTilesSource,
+  WaterLevelFieldState,
 } from "@ecc/s100-viewer";
 import { TilesRenderer } from "3d-tiles-renderer";
 import { ImplicitTilingPlugin } from "3d-tiles-renderer/core/plugins";
@@ -15,6 +16,7 @@ import {
   ThreeS102TerrainMaterialController,
   applyThreeS102TerrainStyle,
 } from "./s102TerrainMaterial.js";
+import { createThreeWaterLevelTerrainGrid } from "./s104WaterLevelTerrainGrid.js";
 import type { ThreeLayerNative } from "./types.js";
 import { setObjectOpacity } from "./types.js";
 
@@ -50,8 +52,23 @@ export const createS102TilesLayer = (
   const s102Spec = spec as S102BathymetryLayerSpec;
   const tiles = new TilesRenderer(normalizeTilesetUrl(s102Spec.source.url));
   const terrainMaterialController = new ThreeS102TerrainMaterialController();
+  let waterLevelGridKey: string | null = null;
   applyThreeS102TerrainStyle(terrainMaterialController, s102Spec);
   terrainMaterialController.setSeaLevel(getSeaLevel());
+  const setWaterLevelField = (state: WaterLevelFieldState | null, time: Date): void => {
+    const grid = createThreeWaterLevelTerrainGrid(state, time, reference);
+    if (!grid) {
+      waterLevelGridKey = null;
+      terrainMaterialController.setWaterLevelGrid(null);
+      return;
+    }
+    if (grid.key === waterLevelGridKey) {
+      grid.texture.dispose();
+      return;
+    }
+    waterLevelGridKey = grid.key;
+    terrainMaterialController.setWaterLevelGrid(grid.uniforms);
+  };
   tiles.setCamera(camera);
   tiles.setResolutionFromRenderer(camera, renderer);
   tiles.group.name = `three-s102-${spec.id}`;
@@ -78,6 +95,7 @@ export const createS102TilesLayer = (
       tiles.setResolutionFromRenderer(camera, renderer);
       tiles.update();
     },
+    setWaterLevelField,
     setVisible: (visible) => {
       tiles.group.visible = visible;
     },
@@ -93,6 +111,7 @@ export const createS102TilesLayer = (
       tiles.removeEventListener("load-model", handleLoadModel);
       scene.remove(tiles.group);
       tiles.dispose();
+      terrainMaterialController.dispose();
     },
   };
 };

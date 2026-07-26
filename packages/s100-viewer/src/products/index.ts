@@ -20,6 +20,7 @@ export * from "./route-session.js";
 export * from "./s102-session.js";
 export * from "./s104.js";
 export * from "./s104-dataset.js";
+export * from "./s104-field.js";
 export * from "./s104-metadata.js";
 export * from "./s104-sampler.js";
 export * from "./s104-service.js";

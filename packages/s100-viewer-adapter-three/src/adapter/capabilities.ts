@@ -32,7 +32,7 @@ export const threeAdapterCapabilities: AdapterCapabilities = {
   nativeHandles: true,
   precisionStrategy: "origin-rebased",
   waterLevelField: "sampled",
-  waterLevelTerrainShading: "global",
+  waterLevelTerrainShading: "per-position",
   globe: {
     ellipsoidEcef: false,
     globeNative3dTiles: false,

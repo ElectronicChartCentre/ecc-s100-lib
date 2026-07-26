@@ -1,6 +1,7 @@
 import type {
   BaseLayerSpec,
   ColorValue,
+  Coordinate,
   VesselLayerSpec,
   VesselDimensions,
   VesselOceanSurfaceStyle,
@@ -15,6 +16,10 @@ import {
   updateS100OceanSurfaceTime,
   type S100OceanSurfaceUniforms,
 } from "@ecc/s100-viewer/internal/products/oceanSurfaceShader";
+import {
+  renderedEngineZFromVesselPose,
+  vesselPoseZFromRenderedEngineZ,
+} from "@ecc/s100-viewer/internal/products/vesselPose";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
@@ -46,12 +51,14 @@ const GLTF_Y_UP_TO_Z_UP_ORIENTATION = new THREE.Quaternion().setFromAxisAngle(
   new THREE.Vector3(1, 0, 0),
   Math.PI / 2,
 );
+type WaterLevelAtCoordinate = (coordinate: Coordinate) => number;
 
 export const createVesselLayer = async (
   spec: BaseLayerSpec,
   scene: THREE.Scene,
   reference: ThreeProjectedLocalReference,
   getSeaLevel: () => number = () => 0,
+  getWaterLevelAt: WaterLevelAtCoordinate = () => getSeaLevel(),
   camera?: THREE.Camera,
   domElement?: HTMLElement,
   setCameraInteractionSuppressed: (suppressed: boolean) => void = () => undefined,
@@ -66,11 +73,12 @@ export const createVesselLayer = async (
     scene,
     reference,
     getSeaLevel,
+    getWaterLevelAt,
   );
   let transformControls: VesselTransformControlsView | null = null;
   setLayerUserData(model, vesselSpec, "vector", vesselSpec.id);
   group.add(model);
-  applyVesselPose(group, vesselSpec, reference);
+  applyVesselPose(group, vesselSpec, reference, getWaterLevelAt);
   setObjectOpacity(group, spec.opacity ?? vesselSpec.style?.opacity ?? 1);
   oceanSurface.setLayerOpacity(spec.opacity ?? vesselSpec.style?.opacity ?? 1);
   oceanSurface.updateSpec(vesselSpec);
@@ -84,6 +92,7 @@ export const createVesselLayer = async (
       domElement,
       reference,
       getSeaLevel,
+      getWaterLevelAt,
       () => oceanSurface.update(),
       setCameraInteractionSuppressed,
     )
@@ -105,6 +114,7 @@ export const createVesselLayer = async (
     },
     getPickableObjects: () => [group],
     update: () => {
+      applyVesselPose(group, vesselSpec, reference, getWaterLevelAt);
       oceanSurface.update();
     },
     patch: (patch) => {
@@ -114,7 +124,7 @@ export const createVesselLayer = async (
       if (opacity !== undefined) {
         oceanSurface.setLayerOpacity(opacity);
       }
-      applyVesselPose(group, vesselSpec, reference);
+      applyVesselPose(group, vesselSpec, reference, getWaterLevelAt);
       oceanSurface.updateSpec(vesselSpec);
       transformControls?.updateSpec(vesselSpec);
     },
@@ -223,8 +233,14 @@ const applyVesselPose = (
   group: THREE.Group,
   spec: VesselLayerSpec,
   reference: ThreeProjectedLocalReference,
+  getWaterLevelAt: WaterLevelAtCoordinate,
 ): void => {
-  group.position.copy(coordinateToWorld(spec.pose.position, reference));
+  const position = coordinateToWorld(spec.pose.position, reference);
+  position.z = renderedEngineZFromVesselPose(
+    position.z,
+    getWaterLevelAt(spec.pose.position),
+  );
+  group.position.copy(position);
   const heading = spec.pose.headingDegrees ?? 0;
   const pitch = spec.pose.pitchDegrees ?? 0;
   const roll = spec.pose.rollDegrees ?? 0;
@@ -250,6 +266,7 @@ class VesselTransformControlsView {
     private readonly domElement: HTMLElement,
     private readonly reference: ThreeProjectedLocalReference,
     private readonly getSeaLevel: () => number,
+    private readonly getWaterLevelAt: WaterLevelAtCoordinate,
     private readonly onChanged: () => void,
     private readonly setCameraInteractionSuppressed: (suppressed: boolean) => void,
   ) {}
@@ -401,12 +418,19 @@ class VesselTransformControlsView {
       this.group.position,
       this.spec,
       this.reference,
-      this.getSeaLevel(),
+      this.getWaterLevelAt,
     );
     if (!nextPosition.equals(this.group.position)) {
       this.group.position.copy(nextPosition);
     }
-    this.spec.pose.position = worldToProjectedCoordinate(nextPosition, this.reference);
+    const renderedPosition = worldToProjectedCoordinate(nextPosition, this.reference);
+    this.spec.pose.position = {
+      ...renderedPosition,
+      z: vesselPoseZFromRenderedEngineZ(
+        renderedPosition.z ?? 0,
+        this.getWaterLevelAt(renderedPosition),
+      ),
+    };
     this.spec.pose.headingDegrees = normalizeHeadingDegrees(
       -THREE.MathUtils.radToDeg(this.group.rotation.z),
     );
@@ -598,13 +622,16 @@ const constrainVesselWorldPosition = (
   worldPosition: THREE.Vector3,
   spec: VesselLayerSpec,
   reference: ThreeProjectedLocalReference,
-  seaLevel: number,
+  getWaterLevelAt: WaterLevelAtCoordinate,
 ): THREE.Vector3 => {
   const limits = getTransformGizmoObject(spec.style?.transformGizmo)
     ?.verticalPositionLimits;
   const projected = worldToProjectedCoordinate(worldPosition, reference);
   const currentZ = projected.z ?? 0;
-  const nextZ = constrainVerticalMeters(currentZ, limits, seaLevel);
+  const waterLevel = getWaterLevelAt(projected);
+  const poseZ = vesselPoseZFromRenderedEngineZ(currentZ, waterLevel);
+  const nextPoseZ = constrainVerticalMeters(poseZ, limits, waterLevel);
+  const nextZ = renderedEngineZFromVesselPose(nextPoseZ, waterLevel);
   return nextZ === projected.z
     ? worldPosition.clone()
     : coordinateToWorld({ ...projected, z: nextZ }, reference);
@@ -639,6 +666,7 @@ class VesselOceanSurfaceView {
     private readonly scene: THREE.Scene,
     private readonly reference: ThreeProjectedLocalReference,
     private readonly getSeaLevel: () => number,
+    private readonly getWaterLevelAt: WaterLevelAtCoordinate,
   ) {}
 
   updateSpec(spec: VesselLayerSpec): void {
@@ -678,7 +706,10 @@ class VesselOceanSurfaceView {
     mesh.position.set(
       vesselPosition.x + centerOffset.x,
       vesselPosition.y + centerOffset.y,
-      normalizeFiniteNumber(this.getSeaLevel(), 0) + DEFAULT_OCEAN_SURFACE_Z_OFFSET_METERS,
+      normalizeFiniteNumber(
+        this.getWaterLevelAt(this.spec.pose.position),
+        this.getSeaLevel(),
+      ) + DEFAULT_OCEAN_SURFACE_Z_OFFSET_METERS,
     );
     mesh.quaternion.identity();
     mesh.visible = style.enabled && (this.spec.visible ?? true);

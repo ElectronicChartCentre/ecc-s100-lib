@@ -69,6 +69,7 @@ export class CoreS100Scene implements S100Scene {
       getSceneTime: () => this.time.getCurrent(),
       onSamplerChanged: () => {
         this.refreshRepresentativeSeaLevel({ notifyWaterLevel: false });
+        this.syncWaterLevelFieldToEngine();
       },
     });
     this.subscriptions.push(
@@ -77,6 +78,7 @@ export class CoreS100Scene implements S100Scene {
       }),
       this.events.on("time.changed", () => {
         this.refreshRepresentativeSeaLevel();
+        this.syncWaterLevelFieldToEngine();
       }),
     );
   }
@@ -183,6 +185,7 @@ export class CoreS100Scene implements S100Scene {
     if (options.applyToEngine !== false) {
       this.options.engineScene.setSeaLevel(normalized, source);
     }
+    this.syncWaterLevelFieldToEngine();
     if (!Object.is(previousSeaLevel, normalized)) {
       this.events.emit("seaLevel.changed", normalized);
     }
@@ -193,6 +196,10 @@ export class CoreS100Scene implements S100Scene {
 
   getSeaLevel(): number {
     return this.seaLevel;
+  }
+
+  private syncWaterLevelFieldToEngine(): void {
+    this.options.engineScene.setWaterLevelField?.(this.waterLevel.getState());
   }
 
   showHoverPrism(

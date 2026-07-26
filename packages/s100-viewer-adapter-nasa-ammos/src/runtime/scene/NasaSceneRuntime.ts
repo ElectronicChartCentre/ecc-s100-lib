@@ -46,7 +46,10 @@ import type {
   S100RenderContext,
 } from "../core/types.js";
 import { S100NasaLogLevel } from "../core/types.js";
-import type { S100TerrainVesselShadowStamp } from "@ecc/s100-viewer/internal/products/s102TerrainShading";
+import type {
+  S100TerrainVesselShadowStamp,
+  S100TerrainWaterLevelGridUniformState,
+} from "@ecc/s100-viewer/internal/products/s102TerrainShading";
 import {
   TerrainDisplayPropertyAdapter,
   TerrainMaterialController,
@@ -1196,6 +1199,13 @@ export class TerrainView {
     }
   }
 
+  setWaterLevelGrid(grid: S100TerrainWaterLevelGridUniformState | null): void {
+    this.materialController.setWaterLevelGrid(grid);
+    if (this.tiles) {
+      this.materialController.applyToObject(this.tiles.group);
+    }
+  }
+
   destroy(): void {
     this.frameSubscription?.unsubscribe();
     this.frameSubscription = null;
@@ -1214,6 +1224,7 @@ export class TerrainView {
       this.tiles.dispose();
       this.tiles = null;
     }
+    this.materialController.dispose();
     this.onDestroy();
   }
 

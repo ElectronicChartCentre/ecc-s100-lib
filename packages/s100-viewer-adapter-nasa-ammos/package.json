@@ -1,6 +1,6 @@
 {
   "name": "@ecc/s100-viewer-adapter-nasa-ammos",
-  "version": "0.1.0-alpha.11",
+  "version": "0.1.0-alpha.12",
   "private": false,
   "type": "module",
   "description": "NASA-AMMOS/Three.js adapter package for @ecc/s100-viewer.",
@@ -42,7 +42,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@ecc/s100-viewer": "0.1.0-alpha.11",
+    "@ecc/s100-viewer": "0.1.0-alpha.12",
     "3d-tiles-renderer": "^0.4.24"
   },
   "devDependencies": {

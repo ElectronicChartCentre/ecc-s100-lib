@@ -1,4 +1,12 @@
-import type { Material, Object3D } from "three";
+import {
+  ClampToEdgeWrapping,
+  DataTexture,
+  FloatType,
+  NearestFilter,
+  RedFormat,
+  type Material,
+  type Object3D,
+} from "three";
 import { normalizeDepthMeters } from "@ecc/s100-viewer/internal/products/depthStyle";
 import {
   assignS100TerrainShaderUniforms,
@@ -8,7 +16,9 @@ import {
   patchS100TerrainShaderSource,
   S100_TERRAIN_SHADER_CACHE_KEY,
   S100_TERRAIN_SHADER_DEFAULTS,
+  updateS100TerrainWaterLevelGridUniforms,
   updateS100TerrainVesselShadowUniforms,
+  type S100TerrainWaterLevelGridUniformState,
   type S100TerrainVesselShadowStamp,
   type S100TerrainShaderUniforms,
 } from "@ecc/s100-viewer/internal/products/s102TerrainShading";
@@ -33,6 +43,12 @@ type TerrainShader = Parameters<Material["onBeforeCompile"]>[0];
 
 export class TerrainMaterialController {
   private readonly uniforms: TerrainUniforms = createS100TerrainShaderUniforms();
+  private readonly emptyWaterLevelTexture = createEmptyWaterLevelTexture();
+  private waterLevelTexture: DataTexture | null = null;
+
+  constructor() {
+    this.uniforms.waterLevelGridTexture.value = this.emptyWaterLevelTexture;
+  }
 
   applyToObject(root: Object3D): void {
     root.traverse((object) => {
@@ -73,6 +89,25 @@ export class TerrainMaterialController {
     updateS100TerrainVesselShadowUniforms(this.uniforms, stamps);
   }
 
+  setWaterLevelGrid(grid: S100TerrainWaterLevelGridUniformState | null): void {
+    if (this.waterLevelTexture && this.waterLevelTexture !== grid?.texture) {
+      this.waterLevelTexture.dispose();
+    }
+    this.waterLevelTexture = grid?.texture instanceof DataTexture
+      ? grid.texture
+      : null;
+    updateS100TerrainWaterLevelGridUniforms(this.uniforms, grid);
+    if (!grid) {
+      this.uniforms.waterLevelGridTexture.value = this.emptyWaterLevelTexture;
+    }
+  }
+
+  dispose(): void {
+    this.waterLevelTexture?.dispose();
+    this.waterLevelTexture = null;
+    this.emptyWaterLevelTexture.dispose();
+  }
+
   private applyToMaterial(material: Material): void {
     const terrainMaterial = material as TerrainPatchedMaterial;
     if (terrainMaterial[TERRAIN_SHADER_PATCH] === this.uniforms) {
@@ -101,6 +136,24 @@ export class TerrainMaterialController {
     terrainMaterial.needsUpdate = true;
   }
 }
+
+const createEmptyWaterLevelTexture = (): DataTexture => {
+  const texture = new DataTexture(
+    new Float32Array([0]),
+    1,
+    1,
+    RedFormat,
+    FloatType,
+  );
+  texture.magFilter = NearestFilter;
+  texture.minFilter = NearestFilter;
+  texture.wrapS = ClampToEdgeWrapping;
+  texture.wrapT = ClampToEdgeWrapping;
+  texture.generateMipmaps = false;
+  texture.unpackAlignment = 1;
+  texture.needsUpdate = true;
+  return texture;
+};
 
 export class TerrainDisplayPropertyAdapter {
   private currentSafetyDepthMeters = 10;

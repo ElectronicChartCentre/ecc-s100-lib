@@ -13,7 +13,6 @@ import {
   type Texture,
   WebGLRenderer,
 } from "three";
-import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import {
   createNasaZUpSkyDome,
   disposeNasaSkyDome,
@@ -24,6 +23,7 @@ import {
   Z_UP_ENVIRONMENT_ROTATION_Y,
   Z_UP_ENVIRONMENT_ROTATION_Z,
 } from "../../environment/skyDome.js";
+import { createNasaHdrTextureLoader } from "../../environment/hdrLoader.js";
 import { S100Scene } from "./S100Scene.js";
 import type {
   S100NasaViewerConfig,
@@ -340,7 +340,7 @@ async function loadEnvironmentMap(
   pmremGenerator.compileEquirectangularShader();
 
   try {
-    const sourceTexture = await new RGBELoader().loadAsync(
+    const sourceTexture = await (await createNasaHdrTextureLoader()).loadAsync(
       config.environmentMapURL,
     );
     sourceTexture.mapping = EquirectangularReflectionMapping;

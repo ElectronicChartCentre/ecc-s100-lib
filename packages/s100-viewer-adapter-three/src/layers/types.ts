@@ -1,4 +1,8 @@
-import type { BaseLayerSpec, PickResult } from "@ecc/s100-viewer";
+import type {
+  BaseLayerSpec,
+  PickResult,
+  WaterLevelFieldState,
+} from "@ecc/s100-viewer";
 import * as THREE from "three";
 
 export type ThreeLayerNative<TSpec extends BaseLayerSpec = BaseLayerSpec> = {
@@ -6,6 +10,7 @@ export type ThreeLayerNative<TSpec extends BaseLayerSpec = BaseLayerSpec> = {
   readonly root: THREE.Object3D | null;
   update?(time: Date): void;
   patch?(patch: Partial<TSpec>): void | Promise<void>;
+  setWaterLevelField?(state: WaterLevelFieldState | null, time: Date): void;
   setVisible?(visible: boolean): void;
   setOpacity?(opacity: number): void;
   getPickableObjects?(): THREE.Object3D[];

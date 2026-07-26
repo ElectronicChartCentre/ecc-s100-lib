@@ -16,7 +16,7 @@ describe("@ecc/s100-viewer-adapter-three capabilities", () => {
       expect.arrayContaining(["wms-template", "3d-tiles", "static-json", "model"]),
     );
     expect(adapter.capabilities.waterLevelField).toBe("sampled");
-    expect(adapter.capabilities.waterLevelTerrainShading).toBe("global");
+    expect(adapter.capabilities.waterLevelTerrainShading).toBe("per-position");
     expect(adapter.capabilities.visualFeatures).toMatchObject({
       vesselTransformGizmo: {
         supported: true,

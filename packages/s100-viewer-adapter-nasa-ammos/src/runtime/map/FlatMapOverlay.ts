@@ -129,6 +129,7 @@ type TileResource = {
 
 type TileRequestPriorityContext = {
   camera: Camera | undefined;
+  coordinateOffset: [number, number];
   focus: [number, number];
   refinementRadius: number;
   zOffset: number;
@@ -140,6 +141,7 @@ export class FlatMapOverlay {
 
   private readonly camera: Camera | undefined;
   private readonly clipExtents: NormalizedExtents | null;
+  private readonly coordinateOffset: [number, number];
   private readonly origin: [number, number];
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: MeshBasicMaterial[] = [];
@@ -194,6 +196,7 @@ export class FlatMapOverlay {
 
     this.origin = getOverlayOrigin(specification);
     const originOffset = specification.originOffset ?? [0, 0, 0];
+    this.coordinateOffset = [originOffset[0], originOffset[1]];
     this.group.position.set(
       this.origin[0] + originOffset[0],
       this.origin[1] + originOffset[1],
@@ -330,14 +333,14 @@ export class FlatMapOverlay {
     }
 
     const verticalDistance = Math.abs(
-      this.camera.position.z - getLayerZOffset(this.specification.type),
+      this.camera.position.z - this.getLayerWorldZOffset(),
     );
     if (Number.isFinite(verticalDistance)) {
       return verticalDistance;
     }
 
     return this.camera.position.distanceTo(
-      new Vector3(this.origin[0], this.origin[1], 0),
+      new Vector3(this.group.position.x, this.group.position.y, 0),
     );
   }
 
@@ -659,9 +662,10 @@ export class FlatMapOverlay {
   private getRequestPriorityContext(): TileRequestPriorityContext {
     return {
       camera: this.camera,
+      coordinateOffset: this.coordinateOffset,
       focus: this.getRequestFocusPoint(),
       refinementRadius: this.getRequestFocusRadius(),
-      zOffset: getLayerZOffset(this.specification.type),
+      zOffset: this.getLayerWorldZOffset(),
     };
   }
 
@@ -670,7 +674,7 @@ export class FlatMapOverlay {
       return this.origin;
     }
 
-    const zOffset = getLayerZOffset(this.specification.type);
+    const zOffset = this.getLayerWorldZOffset();
     const direction = new Vector3(0, 0, -1).applyQuaternion(
       this.camera.quaternion,
     );
@@ -693,7 +697,7 @@ export class FlatMapOverlay {
     }
 
     const verticalDistance = Math.abs(
-      this.camera.position.z - getLayerZOffset(this.specification.type),
+      this.camera.position.z - this.getLayerWorldZOffset(),
     );
     const fov = getCameraVerticalFovRadians(this.camera);
     if (!Number.isFinite(verticalDistance) || !Number.isFinite(fov)) {
@@ -704,6 +708,10 @@ export class FlatMapOverlay {
       DETAIL_TARGET_TILE_SIZE_METERS,
       verticalDistance * Math.tan(fov / 2) * REFINEMENT_FOCUS_RADIUS_FACTOR,
     );
+  }
+
+  private getLayerWorldZOffset(): number {
+    return this.group.position.z + getLayerZOffset(this.specification.type);
   }
 }
 
@@ -1122,8 +1130,8 @@ function compareTileRequestPriority(
   const bVisibility = getTileVisibilityRank(b, context);
   return (
     aVisibility - bVisibility ||
-    getTileDistanceToFocus(a, context.focus) -
-      getTileDistanceToFocus(b, context.focus) ||
+    getTileDistanceToFocus(a, context) -
+      getTileDistanceToFocus(b, context) ||
     compareMapOverlayTiles(a, b)
   );
 }
@@ -1147,7 +1155,7 @@ function shouldRefineTile(
   }
 
   return (
-    getTileDistanceToFocusBounds(tile, context.focus) <=
+    getTileDistanceToFocusBounds(tile, context) <=
     context.refinementRadius
   );
 }
@@ -1219,7 +1227,7 @@ function getProjectedTileBounds(
   let maxY = Number.NEGATIVE_INFINITY;
   let maxZ = Number.NEGATIVE_INFINITY;
 
-  for (const point of getTileSamplePoints(tile, context.zOffset)) {
+  for (const point of getTileSamplePoints(tile, context)) {
     const cameraSpacePoint = point
       .clone()
       .applyMatrix4(context.camera!.matrixWorldInverse);
@@ -1240,32 +1248,38 @@ function getProjectedTileBounds(
   return { inFront, maxX, maxY, maxZ, minX, minY, minZ };
 }
 
-function getTileSamplePoints(tile: MapOverlayTile, zOffset: number): Vector3[] {
+function getTileSamplePoints(
+  tile: MapOverlayTile,
+  context: TileRequestPriorityContext,
+): Vector3[] {
+  const bounds = getTileWorldBounds(tile, context.coordinateOffset);
   return [
-    getTileCenter(tile, zOffset),
-    new Vector3(tile.bounds.xmin, tile.bounds.ymin, zOffset),
-    new Vector3(tile.bounds.xmin, tile.bounds.ymax, zOffset),
-    new Vector3(tile.bounds.xmax, tile.bounds.ymin, zOffset),
-    new Vector3(tile.bounds.xmax, tile.bounds.ymax, zOffset),
+    getTileCenter(tile, context),
+    new Vector3(bounds.xmin, bounds.ymin, context.zOffset),
+    new Vector3(bounds.xmin, bounds.ymax, context.zOffset),
+    new Vector3(bounds.xmax, bounds.ymin, context.zOffset),
+    new Vector3(bounds.xmax, bounds.ymax, context.zOffset),
   ];
 }
 
 function getTileDistanceToFocus(
   tile: MapOverlayTile,
-  focus: [number, number],
+  context: TileRequestPriorityContext,
 ): number {
-  const centerX = tile.bounds.xmin + (tile.bounds.xmax - tile.bounds.xmin) / 2;
-  const centerY = tile.bounds.ymin + (tile.bounds.ymax - tile.bounds.ymin) / 2;
-  return Math.hypot(centerX - focus[0], centerY - focus[1]);
+  const bounds = getTileWorldBounds(tile, context.coordinateOffset);
+  const centerX = bounds.xmin + (bounds.xmax - bounds.xmin) / 2;
+  const centerY = bounds.ymin + (bounds.ymax - bounds.ymin) / 2;
+  return Math.hypot(centerX - context.focus[0], centerY - context.focus[1]);
 }
 
 function getTileDistanceToFocusBounds(
   tile: MapOverlayTile,
-  focus: [number, number],
+  context: TileRequestPriorityContext,
 ): number {
-  const x = clamp(focus[0], tile.bounds.xmin, tile.bounds.xmax);
-  const y = clamp(focus[1], tile.bounds.ymin, tile.bounds.ymax);
-  return Math.hypot(x - focus[0], y - focus[1]);
+  const bounds = getTileWorldBounds(tile, context.coordinateOffset);
+  const x = clamp(context.focus[0], bounds.xmin, bounds.xmax);
+  const y = clamp(context.focus[1], bounds.ymin, bounds.ymax);
+  return Math.hypot(x - context.focus[0], y - context.focus[1]);
 }
 
 function getTileDistanceToCameraBounds(
@@ -1276,27 +1290,36 @@ function getTileDistanceToCameraBounds(
     return Number.POSITIVE_INFINITY;
   }
 
-  const x = clamp(
-    context.camera.position.x,
-    tile.bounds.xmin,
-    tile.bounds.xmax,
-  );
-  const y = clamp(
-    context.camera.position.y,
-    tile.bounds.ymin,
-    tile.bounds.ymax,
-  );
+  const bounds = getTileWorldBounds(tile, context.coordinateOffset);
+  const x = clamp(context.camera.position.x, bounds.xmin, bounds.xmax);
+  const y = clamp(context.camera.position.y, bounds.ymin, bounds.ymax);
   return context.camera.position.distanceTo(
     new Vector3(x, y, context.zOffset),
   );
 }
 
-function getTileCenter(tile: MapOverlayTile, zOffset: number): Vector3 {
+function getTileCenter(
+  tile: MapOverlayTile,
+  context: TileRequestPriorityContext,
+): Vector3 {
+  const bounds = getTileWorldBounds(tile, context.coordinateOffset);
   return new Vector3(
-    tile.bounds.xmin + (tile.bounds.xmax - tile.bounds.xmin) / 2,
-    tile.bounds.ymin + (tile.bounds.ymax - tile.bounds.ymin) / 2,
-    zOffset,
+    bounds.xmin + (bounds.xmax - bounds.xmin) / 2,
+    bounds.ymin + (bounds.ymax - bounds.ymin) / 2,
+    context.zOffset,
   );
+}
+
+function getTileWorldBounds(
+  tile: MapOverlayTile,
+  coordinateOffset: [number, number],
+): MapOverlayTile["bounds"] {
+  return {
+    xmin: tile.bounds.xmin + coordinateOffset[0],
+    ymin: tile.bounds.ymin + coordinateOffset[1],
+    xmax: tile.bounds.xmax + coordinateOffset[0],
+    ymax: tile.bounds.ymax + coordinateOffset[1],
+  };
 }
 
 function getLayerRenderOrder(type: number): number {

@@ -23,13 +23,16 @@ import {
   type S111SurfaceCurrentLayerSpec,
   type SimulatedWaterLevelLayerSpec,
   type VesselLayerSpec,
+  type WaterLevelFieldState,
   type WaterLevelFieldSource,
 } from "@ecc/s100-viewer";
 import { depthFromElevation } from "@ecc/s100-viewer/internal/products/depthStyle";
+import { renderedEngineZFromVesselPose } from "@ecc/s100-viewer/internal/products/vesselPose";
 import type { Vec3 } from "../runtime/index.js";
 import type {
   NasaSceneRuntime,
   SurfaceCurrentDataset,
+  Vec3Tuple,
 } from "../runtime/scene/NasaSceneRuntime.js";
 import * as THREE from "three";
 import type { NasaAmmosAdapterOptions } from "../options.js";
@@ -48,7 +51,9 @@ import {
   applyNasaLighting,
   isHdrEnvironmentMap,
 } from "../environment/environmentController.js";
+import { createNasaHdrTextureLoader } from "../environment/hdrLoader.js";
 import { resolveWaterLevel } from "../layers/simulatedWaterLevelLayer.js";
+import { createNasaWaterLevelTerrainGrid } from "../layers/s104WaterLevelTerrainGrid.js";
 import {
   applyPickingRayVisualOptions,
   getCanvasPointer,
@@ -79,7 +84,6 @@ import {
   TextureLoader,
   type Texture,
 } from "three";
-import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 
 const SIMULATED_WATER_LEVEL_PRODUCT = "simulated-water-level";
 
@@ -120,6 +124,7 @@ export class NasaAmmosEngineScene implements EngineScene {
   private livePickingSubscription: SubscriptionLike | null = null;
   private cameraChangeListener: EngineCameraChangeListener | null = null;
   private cameraChangeSubscription: SubscriptionLike | null = null;
+  private waterLevelFieldState: WaterLevelFieldState | null = null;
   private seaLevelSource: WaterLevelFieldSource = "static";
   private environmentLoadSerial = 0;
   private environmentTextures: Texture[] = [];
@@ -230,11 +235,13 @@ export class NasaAmmosEngineScene implements EngineScene {
         }
       }
     }
+    this.syncWaterLevelDependentLayers();
   }
 
   setSeaLevel(value: number, source: WaterLevelFieldSource = "static"): void {
     this.scene.seaLevel = value;
     this.seaLevelSource = source;
+    this.syncWaterLevelDependentLayers();
   }
 
   getSeaLevel(): number {
@@ -243,6 +250,11 @@ export class NasaAmmosEngineScene implements EngineScene {
 
   getSeaLevelSource(): WaterLevelFieldSource {
     return this.seaLevelSource;
+  }
+
+  setWaterLevelField(state: WaterLevelFieldState): void {
+    this.waterLevelFieldState = state;
+    this.syncWaterLevelDependentLayers();
   }
 
   setEnvironment(state: EnvironmentState): void {
@@ -278,6 +290,7 @@ export class NasaAmmosEngineScene implements EngineScene {
       },
     };
     this.layers.set(handle, native);
+    this.syncWaterLevelDependentLayer(native);
     return handle;
   }
 
@@ -489,33 +502,44 @@ export class NasaAmmosEngineScene implements EngineScene {
     url: string,
   ): void {
     const serial = ++this.environmentLoadSerial;
-    new RGBELoader().load(
-      url,
-      (texture) => {
+    void createNasaHdrTextureLoader()
+      .then((loader) => {
         if (this.disposed || serial !== this.environmentLoadSerial) {
-          texture.dispose();
           return;
         }
+        loader.load(
+          url,
+          (texture) => {
+            if (this.disposed || serial !== this.environmentLoadSerial) {
+              texture.dispose();
+              return;
+            }
 
-        texture.mapping = EquirectangularReflectionMapping;
-        const pmremGenerator = new PMREMGenerator(renderContext.renderer);
-        const environmentTexture = pmremGenerator.fromEquirectangular(texture).texture;
-        pmremGenerator.dispose();
-        this.replaceEnvironmentTextures([texture, environmentTexture]);
-        applyNasaEquirectangularEnvironmentTexture(
-          renderContext,
-          texture,
-          environmentTexture,
-          state,
+            texture.mapping = EquirectangularReflectionMapping;
+            const pmremGenerator = new PMREMGenerator(renderContext.renderer);
+            const environmentTexture = pmremGenerator.fromEquirectangular(texture).texture;
+            pmremGenerator.dispose();
+            this.replaceEnvironmentTextures([texture, environmentTexture]);
+            applyNasaEquirectangularEnvironmentTexture(
+              renderContext,
+              texture,
+              environmentTexture,
+              state,
+            );
+          },
+          undefined,
+          (error) => {
+            if (!this.disposed && serial === this.environmentLoadSerial) {
+              this.options.logger?.warn?.("Failed to load NASA-AMMOS HDR environment map", error);
+            }
+          },
         );
-      },
-      undefined,
-      (error) => {
+      })
+      .catch((error) => {
         if (!this.disposed && serial === this.environmentLoadSerial) {
           this.options.logger?.warn?.("Failed to load NASA-AMMOS HDR environment map", error);
         }
-      },
-    );
+      });
   }
 
   private replaceEnvironmentTextures(textures: Texture[]): void {
@@ -564,6 +588,103 @@ export class NasaAmmosEngineScene implements EngineScene {
     return {
       originOffset: [-origin.x, -origin.y, -origin.z],
     };
+  }
+
+  private getWaterLevelAt(coordinate: Coordinate): number {
+    const state = this.waterLevelFieldState;
+    if (!state?.sampler) {
+      return this.scene.seaLevel;
+    }
+
+    const sample = state.sampler.sample({
+      coordinate,
+      time: this.currentTime,
+    });
+    return sample.status === "value" && Number.isFinite(sample.heightMeters)
+      ? sample.heightMeters
+      : 0;
+  }
+
+  private coordinateToVesselRuntimePosition(coordinate: Coordinate): Vec3 {
+    const position = this.coordinateToEngineVec3(coordinate);
+    position.z =
+      renderedEngineZFromVesselPose(position.z, this.getWaterLevelAt(coordinate)) -
+      this.scene.seaLevel;
+    return position;
+  }
+
+  private vesselRuntimePositionToLayerPosition(
+    native: Extract<NasaLayerNative, { kind: "vessel" }>,
+    position: Vec3Tuple,
+  ): Vec3Tuple {
+    const coordinate = native.spec.pose.position;
+    if (coordinate.kind !== "projected") {
+      return [...position];
+    }
+
+    const origin = this.georeference.origin;
+    const sceneCrs = this.georeference.crs;
+    if (!origin || !sceneCrs || coordinate.crs.toUpperCase() !== sceneCrs.toUpperCase()) {
+      return [...position];
+    }
+
+    const projectedCoordinate: Coordinate = {
+      kind: "projected",
+      crs: coordinate.crs,
+      x: position[0] + origin.x,
+      y: position[1] + origin.y,
+      z: position[2] + origin.z,
+    };
+    const localWaterLevel = this.getWaterLevelAt(projectedCoordinate);
+
+    return [
+      projectedCoordinate.x,
+      projectedCoordinate.y,
+      position[2] + origin.z - localWaterLevel + this.scene.seaLevel,
+    ];
+  }
+
+  private syncWaterLevelDependentLayers(): void {
+    for (const native of this.layers.values()) {
+      this.syncWaterLevelDependentLayer(native);
+    }
+  }
+
+  private syncWaterLevelDependentLayer(native: NasaLayerNative): void {
+    if (native.kind === "terrain") {
+      this.syncTerrainWaterLevelField(native);
+      return;
+    }
+    if (native.kind === "vessel") {
+      this.applyVesselPose(native);
+    }
+  }
+
+  private syncTerrainWaterLevelField(
+    native: Extract<NasaLayerNative, { kind: "terrain" }>,
+  ): void {
+    const grid = createNasaWaterLevelTerrainGrid(
+      this.waterLevelFieldState,
+      this.currentTime,
+      this.georeference,
+    );
+    if (!grid) {
+      native.waterLevelGridKey = null;
+      native.view.setWaterLevelGrid(null);
+      return;
+    }
+    if (grid.key === native.waterLevelGridKey) {
+      grid.texture.dispose();
+      return;
+    }
+    native.waterLevelGridKey = grid.key;
+    native.view.setWaterLevelGrid(grid.uniforms);
+  }
+
+  private applyVesselPose(native: Extract<NasaLayerNative, { kind: "vessel" }>): void {
+    const position = this.coordinateToVesselRuntimePosition(native.spec.pose.position);
+    native.view.setPosition([position.x, position.y, position.z]);
+    native.view.setHeading(native.spec.pose.headingDegrees ?? native.view.getHeading());
   }
 
   private async createNativeLayer(spec: BaseLayerSpec): Promise<NasaLayerNative> {
@@ -675,15 +796,29 @@ export class NasaAmmosEngineScene implements EngineScene {
       shadow: getVesselShadowSpecification(spec),
       ...(verticalPositionLimits !== undefined ? { verticalPositionLimits } : {}),
     });
-    const position = this.coordinateToEngineVec3(spec.pose.position);
-    view.setPosition([position.x, position.y, position.z]);
-    view.setHeading(spec.pose.headingDegrees ?? 0);
     view.setVisibility(spec.visible ?? true);
     view.modelView.group.userData.s100Pickable = true;
     view.modelView.group.userData.s100PickMetadata = createVesselPickValues(spec);
     applyVesselPresentation(view, spec);
 
-    return { kind: "vessel", spec, view };
+    const native: Extract<NasaLayerNative, { kind: "vessel" }> = {
+      kind: "vessel",
+      spec,
+      view,
+      getPosition: () =>
+        this.vesselRuntimePositionToLayerPosition(native, view.getPosition()),
+      getHeading: () => view.getHeading(),
+      positionChanged: {
+        subscribe: (listener) =>
+          view.positionChanged.subscribe((position) => {
+            listener(this.vesselRuntimePositionToLayerPosition(native, position));
+          }),
+      },
+      transformControls: view.transformControls,
+      seaLevelIndicator: view.seaLevelIndicator,
+    };
+    this.applyVesselPose(native);
+    return native;
   }
 
   private async createRoutePlanLayer(spec: RoutePlanLayerSpec): Promise<NasaLayerNative> {
@@ -728,9 +863,7 @@ export class NasaAmmosEngineScene implements EngineScene {
       } = await loadNasaVesselLayerModule();
       const vesselPatch = patch as LayerPatch<VesselLayerSpec>;
       if (vesselPatch.pose) {
-        const position = this.coordinateToEngineVec3(native.spec.pose.position);
-        native.view.setPosition([position.x, position.y, position.z]);
-        native.view.setHeading(native.spec.pose.headingDegrees ?? native.view.getHeading());
+        this.applyVesselPose(native);
       }
       if (
         vesselPatch.dimensions !== undefined ||

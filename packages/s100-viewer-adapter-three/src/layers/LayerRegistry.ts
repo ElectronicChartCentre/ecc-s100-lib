@@ -1,8 +1,10 @@
 import {
   S100Error,
   type BaseLayerSpec,
+  type Coordinate,
   type EngineLayerHandle,
   type LayerPatch,
+  type WaterLevelFieldState,
   type WaterLevelFieldSource,
 } from "@ecc/s100-viewer";
 import * as THREE from "three";
@@ -20,6 +22,8 @@ import {
 
 export class LayerRegistry {
   private readonly layers = new Map<EngineLayerHandle, ThreeLayerNative>();
+  private currentTime = new Date(0);
+  private waterLevelFieldState: WaterLevelFieldState | null = null;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -28,6 +32,7 @@ export class LayerRegistry {
     private readonly reference: ThreeProjectedLocalReference,
     private readonly fetchHandler: FetchLike | undefined,
     private readonly getSeaLevel: () => number,
+    private readonly getWaterLevelAt: (coordinate: Coordinate) => number,
     private readonly setSeaLevel: (value: number, source?: WaterLevelFieldSource) => void,
     private readonly setCameraInteractionSuppressed: (suppressed: boolean) => void,
   ) {}
@@ -42,6 +47,7 @@ export class LayerRegistry {
       },
     };
     this.layers.set(handle, native);
+    native.setWaterLevelField?.(this.waterLevelFieldState, this.currentTime);
     return handle;
   }
 
@@ -64,8 +70,17 @@ export class LayerRegistry {
   }
 
   update(time: Date): void {
+    this.currentTime = new Date(time);
     for (const native of this.layers.values()) {
       native.update?.(time);
+      native.setWaterLevelField?.(this.waterLevelFieldState, this.currentTime);
+    }
+  }
+
+  setWaterLevelField(state: WaterLevelFieldState | null): void {
+    this.waterLevelFieldState = state;
+    for (const native of this.layers.values()) {
+      native.setWaterLevelField?.(state, this.currentTime);
     }
   }
 
@@ -116,6 +131,7 @@ export class LayerRegistry {
         this.scene,
         this.reference,
         this.getSeaLevel,
+        this.getWaterLevelAt,
         this.camera,
         this.renderer.domElement,
         this.setCameraInteractionSuppressed,

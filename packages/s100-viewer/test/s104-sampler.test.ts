@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  createS104WaterLevelFieldGrid,
   createS104WaterLevelSampler,
   decodeS104Dataset,
+  projectS104WaterLevelFieldGrid,
   S100DataCodingFormat,
   S104Workflow,
   sampleS104WaterLevel,
@@ -257,6 +259,60 @@ describe("S-104 water-level sampler", () => {
     });
 
     expect(S104Workflow.createSampler({ datasets: prepared })).toBeDefined();
+  });
+
+  it("creates a nearest-neighbor render field with explicit no-data cells", () => {
+    const sampler = createS104WaterLevelSampler({ datasets: decodedFixture() });
+    const grid = createS104WaterLevelFieldGrid({
+      sampler,
+      time: "20260726T000500Z",
+    });
+
+    expect(grid).toMatchObject({
+      datasetId: "fixture",
+      crs: "EPSG:32631",
+      width: 2,
+      height: 2,
+      noDataValue: -1_000_000,
+      origin: { x: 0, y: 0 },
+      sourceTime: new Date(Date.UTC(2026, 6, 26, 0, 0, 0)),
+      timeIndex: 0,
+    });
+    expect(grid?.values[0]).toBeCloseTo(0.1);
+    expect(grid?.values[1]).toBe(-1_000_000);
+    expect(grid?.values[2]).toBeCloseTo(0.3);
+    expect(grid?.values[3]).toBeCloseTo(0.4);
+  });
+
+  it("projects S-104 render fields and honors cell-center origins", () => {
+    const sampler = createS104WaterLevelSampler({
+      datasets: decodedFixture({
+        grid: {
+          ...s104Grid(),
+          dataOffsetCode: "cell-center",
+        },
+      }),
+    });
+    const grid = createS104WaterLevelFieldGrid({
+      sampler,
+      time: "20260726T001000Z",
+    });
+    const projected = grid
+      ? projectS104WaterLevelFieldGrid(grid, "EPSG:32631")
+      : null;
+
+    expect(projected).toMatchObject({
+      origin: { x: 5, y: 5 },
+      offsetVectors: {
+        longitudinal: [10, 0],
+        latitudinal: [0, 10],
+      },
+      timeIndex: 1,
+    });
+    expect(projected?.values[0]).toBeCloseTo(0.2);
+    expect(projected?.values[1]).toBeCloseTo(0.3);
+    expect(projected?.values[2]).toBeCloseTo(0.4);
+    expect(projected?.values[3]).toBeCloseTo(0.5);
   });
 });
 

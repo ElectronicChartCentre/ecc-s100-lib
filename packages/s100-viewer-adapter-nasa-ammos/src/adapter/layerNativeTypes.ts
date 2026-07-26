@@ -15,6 +15,7 @@ import type {
   S111View,
   TerrainView,
   VesselView,
+  Vec3Tuple,
 } from "../runtime/scene/NasaSceneRuntime.js";
 import type { Vec3 } from "../runtime/index.js";
 import type { NasaRoutePlanView } from "../layers/routePlanLayer.js";
@@ -26,12 +27,27 @@ export type NasaSceneGeoreference = {
 
 export type NasaRenderContext = S100RenderContext;
 
+export type NasaVesselNativeView = {
+  getPosition(): Vec3Tuple;
+  getHeading(): number;
+  positionChanged: {
+    subscribe(listener: (position: Vec3Tuple) => void): { unsubscribe(): void };
+  };
+  transformControls: VesselView["transformControls"];
+  seaLevelIndicator: VesselView["seaLevelIndicator"];
+};
+
 export type NasaLayerNative =
-  | { kind: "terrain"; spec: S102BathymetryLayerSpec; view: TerrainView }
+  | {
+      kind: "terrain";
+      spec: S102BathymetryLayerSpec;
+      view: TerrainView;
+      waterLevelGridKey?: string | null;
+    }
   | { kind: "s111"; spec: S111SurfaceCurrentLayerSpec; view: S111View }
   | { kind: "simulated-water-level"; spec: SimulatedWaterLevelLayerSpec; data: unknown }
   | { kind: "map"; spec: EncLayerSpec | MapOverlayLayerSpec; view: MapView }
-  | { kind: "vessel"; spec: VesselLayerSpec; view: VesselView }
+  | ({ kind: "vessel"; spec: VesselLayerSpec; view: VesselView } & NasaVesselNativeView)
   | { kind: "route-plan"; spec: RoutePlanLayerSpec; view: NasaRoutePlanView }
   | { kind: "model"; spec: BaseLayerSpec; view: CustomModelView };
 
