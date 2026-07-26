@@ -142,13 +142,14 @@ scene.setSeaLevel(value);
 scene.getSeaLevel();
 ```
 
-Real S-104 can vary horizontally, so later phases should add a scene-level
+Real S-104 can vary horizontally, so the core scene now exposes a scene-level
 water-level field controller instead of forcing S-104 into the global scalar.
 
 Preferred direction:
 
 ```ts
-scene.waterLevel.sample({ coordinate, time });
+scene.waterLevel.setSampler(workflowResult.sampler);
+const sample = scene.waterLevel.sample({ coordinate, time });
 ```
 
 The global sea-level scalar should remain as a compatibility fallback for:
@@ -156,6 +157,11 @@ The global sea-level scalar should remain as a compatibility fallback for:
 - static sea level;
 - existing simulated water-level behavior;
 - adapters or tools that cannot yet consume point-specific S-104 samples.
+
+The sample result includes `source`, allowing app code to distinguish `static`,
+`simulated-water-level`, and `s104` values. The S-104 source preserves the
+sampler provenance, including dataset id, source time, grid index, datum, and
+sampling mode.
 
 ## Adapter Integration Direction
 

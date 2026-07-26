@@ -166,13 +166,15 @@ The library-level product/version matrix is exported as
 
 S-104 is exposed from `@ecc/s100-viewer/products/s104` as a water-level data and
 workflow API. It is intentionally not yet a renderable adapter layer product;
-adapters should consume prepared/sampled water-level data through later
-scene-level integration rather than parsing S-104 grids themselves.
+applications can attach prepared S-104 samplers to `scene.waterLevel`, while
+adapters should consume sampled water-level data through scene-level APIs rather
+than parsing S-104 grids themselves.
 
 ## Core Concepts
 
 - `S100Viewer`: owns one adapter-backed viewer host.
-- `S100Scene`: owns layers, camera, time, picking, environment, and events.
+- `S100Scene`: owns layers, camera, time, picking, environment, water level, and
+  events.
 - `LayerCollection`: adds and removes product layer specs.
 - `S100EngineAdapter`: renderer-specific implementation boundary.
 - `SceneGeoreference`: projected-local now, ellipsoid/ECEF later.

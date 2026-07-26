@@ -856,6 +856,7 @@ scene.time;
 scene.picking;
 scene.depthRay;
 scene.environment;
+scene.waterLevel;
 scene.events;
 scene.georeference;
 scene.adapterCapabilities;
@@ -923,7 +924,20 @@ Sea level:
 ```ts
 scene.setSeaLevel(1.2);
 const seaLevel = scene.getSeaLevel();
+
+const waterLevel = scene.waterLevel.sample({
+  coordinate: {
+    kind: "projected",
+    crs: "EPSG:32619",
+    x: 331100,
+    y: 5186420,
+  },
+});
 ```
+
+`scene.waterLevel` is the coordinate/time-aware API. It returns the global
+static or simulated sea-level fallback until an S-104 workflow sampler is
+attached with `scene.waterLevel.setSampler(...)`.
 
 Native handles:
 

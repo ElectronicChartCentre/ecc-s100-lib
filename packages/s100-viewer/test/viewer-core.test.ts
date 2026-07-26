@@ -14,6 +14,7 @@ import {
   S100ProductType,
   type BaseLayerSpec,
   type EngineCameraChangeListener,
+  type S104WaterLevelSampler,
 } from "../src/index.js";
 
 describe("createS100Viewer", () => {
@@ -316,9 +317,13 @@ describe("createS100Viewer", () => {
     const scene = await viewer.createScene({ id: "state-test-scene" });
     const times: string[] = [];
     const seaLevels: number[] = [];
+    const waterLevelStates: string[] = [];
 
     scene.time.onChanged((time) => times.push(time.toISOString()));
     scene.events.on("seaLevel.changed", (value) => seaLevels.push(value));
+    scene.waterLevel.onChanged((state) => {
+      waterLevelStates.push(`${state.source}:${state.seaLevelMeters}`);
+    });
 
     scene.time.setCurrent(new Date("2026-05-29T12:00:00Z"));
     scene.camera.setPose({
@@ -343,17 +348,151 @@ describe("createS100Viewer", () => {
       skyboxUrl: "/textures/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
     });
     const pick = await scene.picking.pick({ screenX: 20, screenY: 40 });
+    const waterLevelSample = scene.waterLevel.sample({
+      coordinate: {
+        kind: "projected",
+        crs: scene.crs ?? "EPSG:3857",
+        x: 1,
+        y: 2,
+      },
+    });
 
     expect(times).toEqual(["2026-05-29T12:00:00.000Z"]);
     expect(scene.camera.getPose().position).toEqual({ x: 1, y: 2, z: 3 });
     expect(scene.getSeaLevel()).toBe(1.2);
     expect(seaLevels).toEqual([1.2]);
+    expect(waterLevelStates).toEqual(["static:1.2"]);
+    expect(scene.waterLevel.getState()).toMatchObject({
+      sampler: null,
+      source: "static",
+      seaLevelMeters: 1.2,
+    });
+    expect(waterLevelSample).toMatchObject({
+      status: "value",
+      source: "static",
+      heightMeters: 1.2,
+      samplingMode: "scene-global-sea-level",
+      requestedTime: new Date("2026-05-29T12:00:00Z"),
+    });
     expect(scene.environment.getState().preset).toBe("day");
     expect(scene.environment.getState().skyboxFaces).toBeUndefined();
     expect(scene.environment.getState().skyboxUrl)
       .toBe("/textures/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
     expect(pick?.screen).toEqual({ x: 20, y: 40 });
     expect(pick?.depthMeters).toBe(12);
+
+    await viewer.destroy();
+  });
+
+  it("exposes an S-104 sampler through the scene water-level field", async () => {
+    const viewer = await createS100Viewer({
+      adapter: createInMemoryAdapter(),
+    });
+    const scene = await viewer.createScene({ id: "s104-water-level-field-scene" });
+    const coordinate = {
+      kind: "projected" as const,
+      crs: scene.crs ?? "EPSG:3857",
+      x: 100,
+      y: 200,
+    };
+    const sampleFromSampler = vi.fn((options: Parameters<S104WaterLevelSampler["sample"]>[0]) => {
+      const requestedTime = new Date(options.time);
+      return {
+        status: "value" as const,
+        heightMeters: 2.4,
+        trend: "steady" as const,
+        coordinate,
+        requestedCoordinate: options.coordinate,
+        projectedCoordinate: coordinate,
+        sourceTime: requestedTime,
+        requestedTime,
+        timeIndex: 0,
+        gridIndex: { i: 0, j: 0 },
+        linearIndex: 0,
+        datasetId: "s104-stavanger",
+        verticalDatum: "MSL",
+        samplingMode: "s104-nearest-neighbor" as const,
+      };
+    });
+    const sampler: S104WaterLevelSampler = {
+      sample: sampleFromSampler,
+    };
+    const sources: string[] = [];
+
+    scene.waterLevel.onChanged((state) => {
+      sources.push(state.source);
+    });
+    scene.time.setCurrent(new Date("2026-07-26T00:00:00Z"));
+    scene.waterLevel.setSampler(sampler);
+
+    const sample = scene.waterLevel.sample({ coordinate });
+
+    expect(sources).toEqual(["s104"]);
+    expect(scene.waterLevel.getSampler()).toBe(sampler);
+    expect(scene.waterLevel.getState()).toMatchObject({
+      sampler,
+      source: "s104",
+      seaLevelMeters: 0,
+    });
+    expect(sampleFromSampler).toHaveBeenCalledWith({
+      coordinate,
+      time: new Date("2026-07-26T00:00:00Z"),
+    });
+    expect(sample).toMatchObject({
+      status: "value",
+      source: "s104",
+      heightMeters: 2.4,
+      datasetId: "s104-stavanger",
+      verticalDatum: "MSL",
+    });
+
+    scene.setSeaLevel(1.1);
+    scene.waterLevel.setSampler(null);
+    expect(scene.waterLevel.sample({ coordinate })).toMatchObject({
+      status: "value",
+      source: "static",
+      heightMeters: 1.1,
+      samplingMode: "scene-global-sea-level",
+    });
+
+    await viewer.destroy();
+  });
+
+  it("reports simulated water level as the source for engine-origin sea-level changes", async () => {
+    let engineSeaLevel = 3.2;
+    const viewer = await createS100Viewer({
+      adapter: createInMemoryAdapter({
+        getSeaLevel: () => engineSeaLevel,
+      }),
+    });
+    const scene = await viewer.createScene({ id: "simulated-water-level-field-scene" });
+    const coordinate = {
+      kind: "projected" as const,
+      crs: scene.crs ?? "EPSG:3857",
+      x: 0,
+      y: 0,
+    };
+
+    scene.time.setCurrent(new Date("2026-07-26T00:00:00Z"));
+    expect(scene.getSeaLevel()).toBe(3.2);
+    expect(scene.waterLevel.getState()).toMatchObject({
+      sampler: null,
+      source: "simulated-water-level",
+      seaLevelMeters: 3.2,
+    });
+    expect(scene.waterLevel.sample({ coordinate })).toMatchObject({
+      status: "value",
+      source: "simulated-water-level",
+      heightMeters: 3.2,
+      samplingMode: "scene-global-sea-level",
+    });
+
+    engineSeaLevel = 3.4;
+    scene.time.setCurrent(new Date("2026-07-26T00:10:00Z"));
+    expect(scene.waterLevel.sample({ coordinate })).toMatchObject({
+      source: "simulated-water-level",
+      heightMeters: 3.4,
+    });
 
     await viewer.destroy();
   });

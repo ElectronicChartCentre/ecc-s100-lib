@@ -14,7 +14,13 @@ import { CoreDepthRayController } from "../picking/CoreDepthRayController.js";
 import { CorePickingController } from "../picking/CorePickingController.js";
 import { CoreTimeController } from "../time/CoreTimeController.js";
 import { CoreEnvironmentController } from "./CoreEnvironmentController.js";
-import type { EnvironmentController, S100Scene, S100SceneEvents } from "./types.js";
+import { CoreWaterLevelFieldController } from "./CoreWaterLevelFieldController.js";
+import type {
+  EnvironmentController,
+  S100Scene,
+  S100SceneEvents,
+  WaterLevelFieldSource,
+} from "./types.js";
 
 let nextSceneId = 1;
 
@@ -36,7 +42,9 @@ export class CoreS100Scene implements S100Scene {
   readonly picking: CorePickingController;
   readonly depthRay: CoreDepthRayController;
   readonly environment: EnvironmentController;
+  readonly waterLevel: CoreWaterLevelFieldController;
   private seaLevel = 0;
+  private seaLevelSource: Exclude<WaterLevelFieldSource, "s104"> = "static";
   private destroyed = false;
 
   constructor(private readonly options: CoreS100SceneOptions) {
@@ -52,6 +60,11 @@ export class CoreS100Scene implements S100Scene {
     this.picking = new CorePickingController(options.engineScene, this.events);
     this.depthRay = new CoreDepthRayController(this.picking, this.events);
     this.environment = new CoreEnvironmentController(options.engineScene, this.events);
+    this.waterLevel = new CoreWaterLevelFieldController(this.events, {
+      getSeaLevel: () => this.seaLevel,
+      getSeaLevelSource: () => this.seaLevelSource,
+      getSceneTime: () => this.time.getCurrent(),
+    });
   }
 
   get adapterCapabilities(): AdapterCapabilities {
@@ -83,17 +96,25 @@ export class CoreS100Scene implements S100Scene {
 
   setSeaLevel(value: number): void {
     this.seaLevel = value;
+    this.seaLevelSource = "static";
     this.options.engineScene.setSeaLevel(value);
     this.events.emit("seaLevel.changed", value);
+    this.waterLevel.notifyChanged();
   }
 
   private setSeaLevelFromEngine(value: number): void {
-    if (Object.is(this.seaLevel, value)) {
+    const previousSeaLevel = this.seaLevel;
+    const sourceChanged = this.seaLevelSource !== "simulated-water-level";
+    if (Object.is(previousSeaLevel, value) && !sourceChanged) {
       return;
     }
 
     this.seaLevel = value;
-    this.events.emit("seaLevel.changed", value);
+    this.seaLevelSource = "simulated-water-level";
+    if (!Object.is(previousSeaLevel, value)) {
+      this.events.emit("seaLevel.changed", value);
+    }
+    this.waterLevel.notifyChanged();
   }
 
   getSeaLevel(): number {

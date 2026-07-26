@@ -34,6 +34,7 @@ An `S100Scene` exposes:
 - `time`
 - `picking`
 - `environment`
+- `waterLevel`
 - `events`
 - `getEngineHandles()`
 - `setSeaLevel(value)`
@@ -41,6 +42,29 @@ An `S100Scene` exposes:
 - `showHoverPrism(...)`
 - `clearHoverPrism()`
 - `destroy()`
+
+`setSeaLevel(value)` and `getSeaLevel()` remain the global static/simulated
+fallback. Use `scene.waterLevel` for coordinate/time-aware water-level queries:
+
+```ts
+const sample = scene.waterLevel.sample({
+  coordinate: {
+    kind: "projected",
+    crs: "EPSG:32631",
+    x: 654390,
+    y: 6542760,
+  },
+});
+
+if (sample.status === "value") {
+  console.log(sample.heightMeters, sample.source);
+}
+```
+
+When an S-104 workflow is prepared, attach its sampler with
+`scene.waterLevel.setSampler(result.sampler)`. Without an S-104 sampler the
+controller returns the current global sea level with source `static` or
+`simulated-water-level`.
 
 ## Layers
 

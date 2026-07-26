@@ -40,6 +40,7 @@ export type InMemoryAdapterOptions = {
   onClearHoverPrism?: () => void;
   onLayerPatchListener?: (listener: EngineLayerPatchListener | null) => void;
   onCameraChangeListener?: (listener: EngineCameraChangeListener | null) => void;
+  getSeaLevel?: () => number;
   failAddLayerIds?: readonly string[];
 };
 
@@ -105,6 +106,7 @@ export const createInMemoryAdapter = (options: InMemoryAdapterOptions = {}): S10
             options.onClearHoverPrism,
             options.onLayerPatchListener,
             options.onCameraChangeListener,
+            options.getSeaLevel,
             options.failAddLayerIds,
           );
         },
@@ -151,6 +153,7 @@ class InMemoryEngineScene implements EngineScene {
     private readonly onCameraChangeListener:
       | ((listener: EngineCameraChangeListener | null) => void)
       | undefined,
+    private readonly getSeaLevelOverride: (() => number) | undefined,
     private readonly failAddLayerIds: readonly string[] | undefined,
   ) {}
 
@@ -199,6 +202,10 @@ class InMemoryEngineScene implements EngineScene {
 
   setSeaLevel(value: number): void {
     this.seaLevel = value;
+  }
+
+  getSeaLevel(): number {
+    return this.getSeaLevelOverride?.() ?? Number.NaN;
   }
 
   setEnvironment(state: EnvironmentState): void {

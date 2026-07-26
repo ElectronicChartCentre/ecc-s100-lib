@@ -5,11 +5,12 @@ import type {
   EngineRgba,
 } from "../adapters/types.js";
 import type { CameraController, CameraPose, Vec3 } from "../camera/types.js";
-import type { SceneGeoreference } from "../coordinates/types.js";
+import type { Coordinate, SceneGeoreference } from "../coordinates/types.js";
 import type { S100Error } from "../errors/S100Error.js";
 import type { S100EventBus, S100Unsubscribe } from "../events/S100EventBus.js";
 import type { LayerCollection, S100Layer } from "../layers/types.js";
 import type { DepthRayController, PickResult, PickingController } from "../picking/types.js";
+import type { S104WaterLevelSample, S104WaterLevelSampler } from "../products/s104.js";
 import type { TimeController, TimePlaybackState } from "../time/types.js";
 
 export type SceneOptions = {
@@ -51,12 +52,51 @@ export interface EnvironmentController {
   onChanged(listener: (state: EnvironmentState) => void): S100Unsubscribe;
 }
 
+export type WaterLevelFieldSource = "static" | "simulated-water-level" | "s104";
+
+export type StaticWaterLevelFieldSample = {
+  status: "value";
+  source: Exclude<WaterLevelFieldSource, "s104">;
+  heightMeters: number;
+  coordinate: Coordinate;
+  requestedCoordinate: Coordinate;
+  sourceTime: Date;
+  requestedTime: Date;
+  samplingMode: "scene-global-sea-level";
+};
+
+export type S104WaterLevelFieldSample = S104WaterLevelSample & {
+  source: "s104";
+};
+
+export type WaterLevelFieldSample =
+  | StaticWaterLevelFieldSample
+  | S104WaterLevelFieldSample;
+
+export type WaterLevelFieldState = {
+  sampler: S104WaterLevelSampler | null;
+  source: WaterLevelFieldSource;
+  seaLevelMeters: number;
+};
+
+export interface WaterLevelFieldController {
+  setSampler(sampler: S104WaterLevelSampler | null): void;
+  getSampler(): S104WaterLevelSampler | null;
+  getState(): WaterLevelFieldState;
+  sample(options: {
+    coordinate: Coordinate;
+    time?: Date | number | string;
+  }): WaterLevelFieldSample;
+  onChanged(listener: (state: WaterLevelFieldState) => void): S100Unsubscribe;
+}
+
 export type S100SceneEvents = {
   "camera.changed": CameraPose;
   "time.changed": Date;
   "time.playback.changed": TimePlaybackState;
   "environment.changed": EnvironmentState;
   "seaLevel.changed": number;
+  "waterLevel.changed": WaterLevelFieldState;
   "layer.added": S100Layer;
   "layer.removed": { id: string };
   "layer.updated": S100Layer;
@@ -74,6 +114,7 @@ export interface S100Scene {
   readonly picking: PickingController;
   readonly depthRay: DepthRayController;
   readonly environment: EnvironmentController;
+  readonly waterLevel: WaterLevelFieldController;
   readonly events: S100EventBus<S100SceneEvents>;
   readonly crs: string | null;
   getCapabilities(): AdapterCapabilities;

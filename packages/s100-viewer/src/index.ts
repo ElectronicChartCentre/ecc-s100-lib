@@ -135,6 +135,12 @@ export type {
   S100Scene,
   S100SceneEvents,
   SceneOptions,
+  StaticWaterLevelFieldSample,
+  S104WaterLevelFieldSample,
+  WaterLevelFieldController,
+  WaterLevelFieldSample,
+  WaterLevelFieldSource,
+  WaterLevelFieldState,
 } from "./scene/types.js";
 export type {
   TimeController,
