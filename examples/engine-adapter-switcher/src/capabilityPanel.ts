@@ -34,6 +34,8 @@ export const formatCapabilities = (
     `Time dynamic layers: ${formatBoolean(capabilities.timeDynamicLayers)}`,
     `Native handles: ${formatBoolean(capabilities.nativeHandles)}`,
     `Precision strategy: ${capabilities.precisionStrategy ?? "unspecified"}`,
+    `Water-level field: ${capabilities.waterLevelField ?? "none"}`,
+    `Water-level terrain shading: ${capabilities.waterLevelTerrainShading ?? "none"}`,
     "",
     "Visual features:",
     ...formatVisualFeatures(capabilities),

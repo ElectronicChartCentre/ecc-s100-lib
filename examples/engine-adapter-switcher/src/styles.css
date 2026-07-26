@@ -239,6 +239,29 @@ pre {
   gap: 6px;
 }
 
+.water-level-samples {
+  display: grid;
+  gap: 6px;
+  color: #b9c7d3;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.water-level-sample__row {
+  display: grid;
+  grid-template-columns: minmax(74px, auto) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.water-level-sample__label {
+  color: #81909f;
+}
+
+.water-level-sample__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .live-ais-status,
 .live-ais-details {
   display: grid;

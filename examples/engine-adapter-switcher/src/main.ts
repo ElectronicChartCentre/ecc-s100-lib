@@ -31,6 +31,7 @@ const liveAisSelectionPanel = getElement<HTMLElement>("live-ais-selection");
 const logPanel = getElement<HTMLOListElement>("log-panel");
 const sceneControlPanel = createSceneControlPanel({
   root: controlPanel,
+  viewerElement,
   log: appendLog,
 });
 

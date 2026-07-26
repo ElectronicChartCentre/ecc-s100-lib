@@ -1,17 +1,13 @@
 import type { LiveAisVessel } from "@ecc/s100-viewer/products/vessel";
-import type {
-  DemoLiveAisConfig,
-  DemoSceneSettings,
+import {
+  stavangerDemoLonLatBbox,
+  stavangerDemoSceneSettings,
+  type DemoLiveAisConfig,
+  type DemoSceneSettings,
+  type LonLatBoundingBox,
 } from "./demoConfig";
 
 const WGS84_CRS = "EPSG:4326";
-
-export type LonLatBoundingBox = [
-  west: number,
-  south: number,
-  east: number,
-  north: number,
-];
 
 export type LiveAisProxyResponse = {
   generatedAt: string;
@@ -58,22 +54,9 @@ export type LiveAisDemoStatus =
       message: string;
     };
 
-export const norwayLiveAisSceneSettings: DemoSceneSettings = {
-  crs: "EPSG:32631",
-  origin: {
-    x: 654_390.818,
-    y: 6_542_760.725,
-    z: 0,
-  },
-  mapWidthMeters: 9_000,
-};
+export const norwayLiveAisSceneSettings: DemoSceneSettings = stavangerDemoSceneSettings;
 
-export const norwayLiveAisSceneBbox: LonLatBoundingBox = [
-  5.625,
-  58.968708,
-  5.749944,
-  59.024184,
-];
+export const norwayLiveAisSceneBbox: LonLatBoundingBox = stavangerDemoLonLatBbox;
 
 export const inactiveLiveAisStatus = (configured: boolean): LiveAisDemoStatus => ({
   state: "inactive",

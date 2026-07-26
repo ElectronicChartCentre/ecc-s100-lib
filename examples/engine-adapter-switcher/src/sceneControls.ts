@@ -1,8 +1,11 @@
 import {
   S100ProductType,
+  type Coordinate,
   type S100Layer,
   type S100Scene,
+  type WaterLevelFieldSample,
 } from "@ecc/s100-viewer";
+import { getS104DemoBinding } from "./s104Demo";
 import type { DemoLogSink, ViewerSession } from "./viewerLifecycle";
 
 export type SceneControlPanel = {
@@ -13,10 +16,12 @@ export type SceneControlPanel = {
 
 export type CreateSceneControlPanelOptions = {
   root: HTMLElement;
+  viewerElement: HTMLElement;
   log: DemoLogSink;
 };
 
 const defaultS111PlaybackRate = 10;
+const defaultS104PlaybackRate = 2;
 const minSafetyDepthMeters = 0;
 const maxSafetyDepthMeters = 30;
 const minPlaybackRate = 1;
@@ -28,6 +33,7 @@ export const createSceneControlPanel = (
   options: CreateSceneControlPanelOptions,
 ): SceneControlPanel => {
   const root = options.root;
+  const viewerElement = options.viewerElement;
   const log = options.log;
   let cleanupCallbacks: Array<() => void> = [];
   let controlledElements: Array<HTMLInputElement | HTMLButtonElement> = [];
@@ -58,6 +64,8 @@ export const createSceneControlPanel = (
     const groups = [
       createEncTransparencyControl(session.scene, log, cleanupCallbacks, controlledElements),
       createTerrainDepthControl(session.scene, log, cleanupCallbacks, controlledElements),
+      createS104WaterLevelControl(session.scene, viewerElement, log, cleanupCallbacks, controlledElements),
+      createS104TimeControl(session.scene, cleanupCallbacks, controlledElements),
       createS111TimeControl(session.scene, cleanupCallbacks, controlledElements),
     ].filter((group): group is HTMLElement => group !== null);
 
@@ -170,6 +178,158 @@ const createTerrainDepthControl = (
   return control.element;
 };
 
+const createS104WaterLevelControl = (
+  scene: S100Scene,
+  viewerElement: HTMLElement,
+  log: DemoLogSink,
+  cleanupCallbacks: Array<() => void>,
+  controlledElements: Array<HTMLInputElement | HTMLButtonElement>,
+): HTMLElement | null => {
+  const binding = getS104DemoBinding(scene);
+  if (!binding) {
+    return null;
+  }
+
+  const group = createControlGroup("S-104 water level");
+  const toggleLabel = document.createElement("label");
+  toggleLabel.className = "control-toggle";
+
+  const toggleInput = document.createElement("input");
+  toggleInput.type = "checkbox";
+  toggleInput.checked = scene.waterLevel.getSampler() === binding.sampler;
+
+  const toggleText = document.createElement("span");
+  toggleText.textContent = "Use fixture field";
+  toggleLabel.append(toggleInput, toggleText);
+
+  const samples = document.createElement("div");
+  samples.className = "water-level-samples";
+  let cursorCoordinate: Coordinate | null = null;
+  let pointerTimer: ReturnType<typeof setTimeout> | null = null;
+  let latestPointerEvent: PointerEvent | null = null;
+  let pickSequence = 0;
+
+  const render = (): void => {
+    const state = scene.waterLevel.getState();
+    const rows: HTMLElement[] = [
+      createWaterLevelRow("Dataset", binding.datasetTitle ?? binding.datasetId),
+      createWaterLevelRow("Source", state.source),
+      createWaterLevelRow("Time", formatTimestamp(scene.time.getCurrent().getTime())),
+    ];
+
+    if (binding.observedGrid) {
+      rows.push(
+        createWaterLevelRow(
+          "Grid",
+          `${formatMeters(binding.observedGrid.minMeters)}-${formatMeters(binding.observedGrid.maxMeters)}`,
+        ),
+      );
+    }
+
+    const vesselCoordinate = binding.getVesselCoordinate?.() ?? null;
+    if (vesselCoordinate) {
+      rows.push(createWaterLevelRow("Vessel", formatWaterLevelSample(
+        scene.waterLevel.sample({ coordinate: vesselCoordinate }),
+      )));
+    }
+
+    for (const point of binding.samplePoints) {
+      rows.push(createWaterLevelRow(point.label, formatWaterLevelSample(
+        scene.waterLevel.sample({ coordinate: point.coordinate }),
+      )));
+    }
+
+    rows.push(createWaterLevelRow(
+      "Cursor",
+      cursorCoordinate
+        ? formatWaterLevelSample(scene.waterLevel.sample({ coordinate: cursorCoordinate }))
+        : "move over scene",
+    ));
+    samples.replaceChildren(...rows);
+  };
+
+  const setFieldEnabled = (): void => {
+    if (toggleInput.checked) {
+      scene.waterLevel.setSampler(binding.sampler);
+      log("info", "S-104 water-level fixture field enabled.");
+    } else {
+      scene.waterLevel.setSampler(null);
+      log("info", "S-104 water-level fixture field disabled.");
+    }
+    render();
+  };
+
+  const pickCursor = (): void => {
+    if (pointerTimer !== null || latestPointerEvent === null) {
+      return;
+    }
+    pointerTimer = setTimeout(() => {
+      pointerTimer = null;
+      const event = latestPointerEvent;
+      latestPointerEvent = null;
+      if (!event) {
+        return;
+      }
+      const sequence = ++pickSequence;
+      void (async () => {
+        try {
+          const pick = await scene.picking.pick({
+            screenX: event.clientX,
+            screenY: event.clientY,
+            fallback: "sea-level-plane",
+            includeNative: false,
+          });
+          if (sequence !== pickSequence) {
+            return;
+          }
+          cursorCoordinate = pick?.world ?? null;
+          render();
+        } catch {
+          if (sequence === pickSequence) {
+            cursorCoordinate = null;
+            render();
+          }
+        }
+      })();
+    }, 150);
+  };
+
+  const handlePointerMove = (event: PointerEvent): void => {
+    latestPointerEvent = event;
+    pickCursor();
+  };
+  const handlePointerLeave = (): void => {
+    latestPointerEvent = null;
+    cursorCoordinate = null;
+    render();
+  };
+
+  toggleInput.addEventListener("change", setFieldEnabled);
+  viewerElement.addEventListener("pointermove", handlePointerMove);
+  viewerElement.addEventListener("pointerleave", handlePointerLeave);
+  const waterLevelUnsubscribe = scene.waterLevel.onChanged(render);
+  const timeUnsubscribe = scene.time.onChanged(render);
+
+  cleanupCallbacks.push(
+    waterLevelUnsubscribe,
+    timeUnsubscribe,
+    () => {
+      toggleInput.removeEventListener("change", setFieldEnabled);
+      viewerElement.removeEventListener("pointermove", handlePointerMove);
+      viewerElement.removeEventListener("pointerleave", handlePointerLeave);
+      if (pointerTimer !== null) {
+        clearTimeout(pointerTimer);
+      }
+      pickSequence += 1;
+    },
+  );
+  controlledElements.push(toggleInput);
+
+  group.body.append(toggleLabel, samples);
+  render();
+  return group.element;
+};
+
 const createS111TimeControl = (
   scene: S100Scene,
   cleanupCallbacks: Array<() => void>,
@@ -179,6 +339,41 @@ const createS111TimeControl = (
     return null;
   }
 
+  return createTimelineControl(scene, cleanupCallbacks, controlledElements, {
+    label: "S-111 time",
+    defaultRate: defaultS111PlaybackRate,
+  });
+};
+
+const createS104TimeControl = (
+  scene: S100Scene,
+  cleanupCallbacks: Array<() => void>,
+  controlledElements: Array<HTMLInputElement | HTMLButtonElement>,
+): HTMLElement | null => {
+  const binding = getS104DemoBinding(scene);
+  if (!binding) {
+    return null;
+  }
+
+  return createTimelineControl(scene, cleanupCallbacks, controlledElements, {
+    label: "S-104 time",
+    defaultRate: defaultS104PlaybackRate,
+    ...(binding.timeline?.stepSeconds !== undefined
+      ? { stepMs: binding.timeline.stepSeconds * 1000 }
+      : {}),
+  });
+};
+
+const createTimelineControl = (
+  scene: S100Scene,
+  cleanupCallbacks: Array<() => void>,
+  controlledElements: Array<HTMLInputElement | HTMLButtonElement>,
+  options: {
+    label: string;
+    defaultRate: number;
+    stepMs?: number;
+  },
+): HTMLElement | null => {
   const availability = scene.time.getAvailability();
   if (!availability) {
     return null;
@@ -187,11 +382,11 @@ const createS111TimeControl = (
   const playbackState = scene.time.getPlaybackState();
   const startTime = availability.start.getTime();
   const endTime = availability.end.getTime();
-  const stepMs = positiveFiniteNumber(playbackState.stepMs, 1000);
+  const stepMs = positiveFiniteNumber(options.stepMs ?? playbackState.stepMs, 1000);
   const maxStep = Math.max(0, Math.round((endTime - startTime) / stepMs));
   let preferredLoop = playbackState.loop;
   let preferredRate = clamp(
-    positiveFiniteNumber(playbackState.rate, defaultS111PlaybackRate),
+    positiveFiniteNumber(playbackState.rate, options.defaultRate),
     minPlaybackRate,
     maxPlaybackRate,
   );
@@ -200,7 +395,7 @@ const createS111TimeControl = (
     return null;
   }
 
-  const group = createControlGroup("S-111 time");
+  const group = createControlGroup(options.label);
   const timeRow = document.createElement("div");
   timeRow.className = "scene-control__time-row";
 
@@ -390,6 +585,38 @@ const createEmptyState = (message: string): HTMLElement => {
   return element;
 };
 
+const createWaterLevelRow = (label: string, value: string): HTMLElement => {
+  const row = document.createElement("div");
+  row.className = "water-level-sample__row";
+
+  const rowLabel = document.createElement("span");
+  rowLabel.className = "water-level-sample__label";
+  rowLabel.textContent = label;
+
+  const rowValue = document.createElement("span");
+  rowValue.className = "water-level-sample__value";
+  rowValue.textContent = value;
+
+  row.append(rowLabel, rowValue);
+  return row;
+};
+
+const formatWaterLevelSample = (sample: WaterLevelFieldSample): string => {
+  if (sample.status !== "value") {
+    return `${formatStatus(sample.status)}: ${sample.reason}`;
+  }
+
+  const trend = "trend" in sample ? `, ${sample.trend}` : "";
+  const datum = "verticalDatum" in sample && sample.verticalDatum
+    ? ` ${sample.verticalDatum}`
+    : "";
+  const sourceTime = "sourceTime" in sample ? ` @ ${formatTimestamp(sample.sourceTime.getTime())}` : "";
+  return `${sample.heightMeters.toFixed(2)} m${datum}${trend}${sourceTime}`;
+};
+
+const formatStatus = (status: string): string =>
+  status.replace(/-/g, " ");
+
 const isEncMapLayer = (layer: S100Layer): boolean =>
   layer.controllers.map !== undefined &&
   (layer.product === S100ProductType.S101 || layer.product === "S-57");
@@ -451,6 +678,9 @@ const stepFromTime = (
 
 const formatTimestamp = (time: number): string =>
   new Date(time).toISOString().replace(".000Z", "Z");
+
+const formatMeters = (value: number): string =>
+  `${value.toFixed(value < 10 ? 1 : 0)} m`;
 
 const positiveFiniteNumber = (value: number, fallback: number): number =>
   Number.isFinite(value) && value > 0 ? value : fallback;

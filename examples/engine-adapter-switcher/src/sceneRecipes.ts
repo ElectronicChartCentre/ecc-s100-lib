@@ -1,6 +1,4 @@
 import {
-  createBoundingBox,
-  createQuatIdentity,
   LayerBuilder,
   type AdapterCapabilities,
   type Coordinate,
@@ -16,15 +14,12 @@ import {
   createProjectedLiveAisPositionMapper,
   type LiveVesselFeedController,
   type LiveVesselFeedVesselState,
-  type VesselDimensions,
 } from "@ecc/s100-viewer/products/vessel";
 import {
   getDemoLiveAisConfig,
   getDemoLiveAisS101Enabled,
   getDemoLiveAisS102DatasetIds,
-  getDemoSceneSettings,
   getDemoLookAtTarget,
-  getDemoServiceConfig,
   requireDemoServiceConfig,
   type DemoSceneSettings,
 } from "./demoConfig";
@@ -38,17 +33,25 @@ import {
   type LiveAisDemoStatus,
 } from "./liveAisDemo";
 import {
-  appendWmsTemplateParameters,
-  buildS101WmsUrlTemplate,
+  addDemoVesselLayer,
+  addTransparentS101Overlay,
+  createS101BasemapLayer,
+  errorMessage,
+  requireConfiguredValue,
+  tryAddOptionalS101Basemap,
+  tryAddStavangerS102Terrain,
+} from "./sceneRecipeShared";
+import {
   buildS102TilesUrl,
 } from "./serviceData";
-import { demoVesselModelUrl } from "./staticAssets";
+import { s104WaterLevelRecipe } from "./s104SceneRecipe";
 
 export type DemoRecipeId =
   | "minimal"
   | "s101-enc"
   | "s102-terrain"
   | "s111-time"
+  | "s104-water-level"
   | "vessel"
   | "live-ais";
 
@@ -68,6 +71,7 @@ export type DemoSceneRecipe = {
   description: string;
   requiredProducts?: readonly string[];
   requiredDataSources?: readonly string[];
+  requiredWaterLevelField?: "sampled";
   requiredVisualFeatures?: readonly (keyof NonNullable<AdapterCapabilities["visualFeatures"]>)[];
   sceneSettings?: DemoSceneSettings;
   initialCamera?: {
@@ -84,24 +88,6 @@ export type DemoRecipeSupport = {
   reasons: readonly string[];
 };
 
-const demoVesselDimensions: VesselDimensions = {
-  draught: 12,
-  bow: 195.2,
-  stern: 30,
-  port: 20.8,
-  starboard: 11.2,
-};
-
-const demoVesselBoundingBox = createBoundingBox(
-  [-demoVesselDimensions.port, -demoVesselDimensions.stern, -40.2],
-  [demoVesselDimensions.starboard, demoVesselDimensions.bow, 6.4],
-);
-
-const demoEncMapMinLevel = 3;
-const demoEncMapMaxLevel = 5;
-const demoEncMapQuality = 2;
-const demoEncMapScale = 1;
-const demoEncWmsImageSizePixels = 2048;
 const s111PlaybackTimestepsPerSecond = 10;
 
 export const sceneRecipes = {
@@ -227,6 +213,7 @@ export const sceneRecipes = {
       context.log("info", `Fetched and added ${workflowResult.acceptedCount} S-111 dataset(s).`);
     },
   },
+  "s104-water-level": s104WaterLevelRecipe,
   vessel: {
     id: "vessel",
     label: "Vessel",
@@ -235,44 +222,13 @@ export const sceneRecipes = {
     requiredDataSources: ["model", "wms"],
     async apply(scene, context) {
       const showOceanSurface = context.engineId !== "cesium";
-      const lookAtTarget = getDemoLookAtTarget(context.sceneSettings);
       await addTransparentS101Overlay(scene, context);
-      const vessel = await scene.layers.add(
-        LayerBuilder.createVessel({
-          id: "demo-vessel",
-          title: "Demo vessel",
-          url: demoVesselModelUrl,
-          format: "glb",
-          crs: lookAtTarget.crs,
-          pose: {
-            position: lookAtTarget,
-            headingDegrees: 35,
-          },
-          dimensions: demoVesselDimensions,
-          model: {
-            boundingBox: demoVesselBoundingBox,
-            orientation: createQuatIdentity(),
-          },
-          referencePoint: "transponder",
-          style: {
-            draughtMeters: demoVesselDimensions.draught,
-            showSeaLevelIndicator: true,
-            transformControls: "translate-rotate",
-            transformGizmo: {
-              enabled: true,
-              mode: "translate-rotate",
-              sizeMeters: 45,
-              verticalPositionLimits: { minMeters: -30, maxMeters: 12 },
-            },
-            oceanSurface: { enabled: showOceanSurface, radiusMeters: 260, opacity: 0.35 },
-            shadow: { enabled: true, opacity: 0.2 },
-          },
-        }),
-      );
-
-      await vessel.controllers.vessel.setOceanSurfaceVisible(showOceanSurface);
-      await vessel.controllers.vessel.setTransformMode("translate-rotate");
-      context.log("info", "Added vessel and configured transform/ocean-surface controllers.");
+      await addDemoVesselLayer(scene, context, {
+        id: "demo-vessel",
+        title: "Demo vessel",
+        headingDegrees: 35,
+        showOceanSurface,
+      });
     },
   },
   "live-ais": {
@@ -356,6 +312,7 @@ export const getSceneRecipe = (id: string): DemoSceneRecipe => {
     id === "s101-enc" ||
     id === "s102-terrain" ||
     id === "s111-time" ||
+    id === "s104-water-level" ||
     id === "vessel" ||
     id === "live-ais"
   ) {
@@ -363,52 +320,6 @@ export const getSceneRecipe = (id: string): DemoSceneRecipe => {
   }
 
   return sceneRecipes.minimal;
-};
-
-const createS101BasemapLayer = (settings: DemoSceneSettings = getDemoSceneSettings()) => {
-  const config = requireDemoServiceConfig([
-    "licenseeKey",
-    "s101WmsBaseUrl",
-  ], settings);
-  const urlTemplate = buildS101WmsUrlTemplate(config, {
-    imageSizePixels: demoEncWmsImageSizePixels,
-    styleId: config.s101WmsBasemapStyleId,
-    transparent: false,
-  });
-  const projectedMap = LayerBuilder.ProjectedMap.fromCenterExtent({
-    center: {
-      x: config.origin.x,
-      y: config.origin.y,
-      crs: config.crs,
-    },
-    widthMeters: config.mapWidthMeters,
-    heightMeters: config.mapWidthMeters,
-    crs: config.crs,
-    minLevel: demoEncMapMinLevel,
-    maxLevel: demoEncMapMaxLevel,
-    quality: demoEncMapQuality,
-    scale: demoEncMapScale,
-    discardMode: LayerBuilder.ProjectedMapDiscardMode.None,
-  });
-
-  return LayerBuilder.createS101WmsTemplate({
-    id: "demo-s101-basemap",
-    title: "S-101 ENC basemap",
-    urlTemplate,
-    layers: config.s101WmsLayers,
-    role: "basemap",
-    ...projectedMap,
-    style: {
-      visible: true,
-      opacity: 1,
-      cutout: {
-        enabled: false,
-      },
-    },
-    metadata: {
-      description: "Service-backed S-101 WMS basemap for the current projected-local scene.",
-    },
-  });
 };
 
 const demoProjectedBounds = (config: ReturnType<typeof requireDemoServiceConfig>): S111ProjectedBounds => {
@@ -421,119 +332,17 @@ const demoProjectedBounds = (config: ReturnType<typeof requireDemoServiceConfig>
   };
 };
 
-const requireConfiguredValue = (value: string | undefined, label: string): string => {
-  if (!value) {
-    throw new Error(`Missing ${label}.`);
-  }
-  return value;
-};
-
-const addTransparentS101Overlay = async (
-  scene: S100Scene,
-  context: DemoSceneRecipeContext,
-): Promise<void> => {
-  await scene.layers.add(createTransparentS101OverlayLayer(context.sceneSettings));
-  context.log("info", "Added transparent S-101 ENC overlay.");
-};
-
-const createTransparentS101OverlayLayer = (settings?: DemoSceneSettings) => {
-  const config = requireDemoServiceConfig([
-    "licenseeKey",
-    "s101WmsBaseUrl",
-  ], settings);
-  const baseTemplate = buildS101WmsUrlTemplate(config, {
-    imageSizePixels: demoEncWmsImageSizePixels,
-    styleId: config.s101WmsStyleId,
-    transparent: true,
-  });
-  const transparentTemplate = appendWmsTemplateParameters(baseTemplate, [
-    ["IGNORE", "DepthArea,DepthContour,DredgedArea"],
-    ["HIDE", "90010,90020"],
-  ]);
-
-  const mapPair = LayerBuilder.createEncWmsPair({
-    standard: LayerBuilder.EncStandard.S101,
-    center: {
-      x: config.origin.x,
-      y: config.origin.y,
-      crs: config.crs,
-    },
-    widthMeters: config.mapWidthMeters,
-    crs: config.crs,
-    minLevel: demoEncMapMinLevel,
-    maxLevel: demoEncMapMaxLevel,
-    quality: demoEncMapQuality,
-    discardMode: LayerBuilder.ProjectedMapDiscardMode.None,
-    transparent: {
-      id: "demo-s101-enc",
-      urlTemplate: transparentTemplate,
-      layers: config.s101WmsLayers,
-      role: "overlay",
-      visible: true,
-      opacity: 1,
-      style: {
-        alphaMode: "binary",
-        alphaCutoff: 0.01,
-      },
-      scale: demoEncMapScale,
-    },
-  });
-
-  return mapPair.transparent;
-};
-
-const tryAddOptionalS101Basemap = async (
-  scene: S100Scene,
-  context: DemoSceneRecipeContext,
-): Promise<void> => {
-  const config = getDemoServiceConfig(context.sceneSettings);
-  if (!config.licenseeKey || !config.s101WmsBaseUrl) {
-    context.log("warn", "Optional S-101 basemap skipped for live AIS scene; WMS config is incomplete.");
-    return;
-  }
-
-  await scene.layers.add(createS101BasemapLayer(context.sceneSettings));
-  context.log("info", "Added optional S-101 basemap for live AIS scene.");
-};
-
 const tryAddLiveAisS102Terrain = async (
   scene: S100Scene,
   context: DemoSceneRecipeContext,
 ): Promise<void> => {
-  const datasetIds = getDemoLiveAisS102DatasetIds();
-  const baseConfig = getDemoServiceConfig(context.sceneSettings);
-  if (!baseConfig.primarApiKey || !baseConfig.s102TilesEndpoint || datasetIds.length === 0) {
-    context.log("warn", "Live AIS S-102 terrain skipped; S-102 endpoint, API key, or dataset ids are incomplete.");
-    return;
-  }
-
-  const config = {
-    ...baseConfig,
-    s102DatasetIds: datasetIds,
-  };
-  const datasetLabel = datasetIds.join(",");
-  const terrain = await scene.layers.add(
-    LayerBuilder.createS102({
-      id: "demo-live-ais-s102-terrain",
-      title: "Stavanger S-102 bathymetry",
-      url: buildS102TilesUrl(config),
-      crs: config.crs,
-      query: { crs: config.crs },
-      rendering: {
-        detailFactor: 500,
-      },
-      style: {
-        safetyDepthMeters: 10,
-        shading: "hypsometric",
-      },
-      metadata: {
-        datasetId: datasetLabel,
-        description: "Stavanger S-102 terrain used by the Live AIS Norway demo scene.",
-      },
-    }),
-  );
-  await terrain.controllers.terrain.setContours({ visible: true, intervalMeters: 5 });
-  context.log("info", `Added Stavanger S-102 terrain datasets: ${datasetLabel}.`);
+  await tryAddStavangerS102Terrain(scene, context, {
+    id: "demo-live-ais-s102-terrain",
+    title: "Stavanger S-102 bathymetry",
+    description: "Stavanger S-102 terrain used by the Live AIS Norway demo scene.",
+    safetyDepthMeters: 10,
+    datasetIds: getDemoLiveAisS102DatasetIds(),
+  });
 };
 
 const registerLiveAisPolling = (options: {
@@ -693,9 +502,6 @@ const liveAisMmsiFromLayerId = (layerId: string | undefined): number | null => {
 const isAbortError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === "AbortError";
 
-const errorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
-
 export const assessRecipeSupport = (
   recipe: DemoSceneRecipe,
   capabilities: AdapterCapabilities,
@@ -712,6 +518,13 @@ export const assessRecipeSupport = (
     if (!capabilities.dataSources.includes(source)) {
       reasons.push(`Missing data source: ${source}`);
     }
+  }
+
+  if (
+    recipe.requiredWaterLevelField === "sampled" &&
+    capabilities.waterLevelField !== "sampled"
+  ) {
+    reasons.push("Missing sampled water-level field support.");
   }
 
   for (const feature of recipe.requiredVisualFeatures ?? []) {

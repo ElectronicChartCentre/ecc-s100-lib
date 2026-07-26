@@ -8,6 +8,13 @@ export type DemoSceneSettings = {
   mapWidthMeters: number;
 };
 
+export type LonLatBoundingBox = [
+  west: number,
+  south: number,
+  east: number,
+  north: number,
+];
+
 export type DemoServiceConfig = DemoSceneSettings & {
   primarApiKey: string | undefined;
   licenseeKey: string | undefined;
@@ -28,6 +35,12 @@ export type DemoLiveAisConfig = {
   maxAgeSeconds?: number;
 };
 
+export type DemoS104FixtureConfig = {
+  serviceUrl: string;
+  datasetId: string;
+  maxDataPoints: number;
+};
+
 export type DemoServiceRequirement =
   | "primarApiKey"
   | "licenseeKey"
@@ -36,6 +49,32 @@ export type DemoServiceRequirement =
   | "s111Endpoint"
   | "s111DatasetIds"
   | "s101WmsBaseUrl";
+
+export const stavangerDemoSceneSettings: DemoSceneSettings = {
+  crs: "EPSG:32631",
+  origin: {
+    x: 654_390.818,
+    y: 6_542_760.725,
+    z: 0,
+  },
+  mapWidthMeters: 9_000,
+};
+
+export const stavangerDemoLonLatBbox: LonLatBoundingBox = [
+  5.625,
+  58.968708,
+  5.749944,
+  59.024184,
+];
+
+export const stavangerS102DatasetIds = [
+  "102NO006J0811_10_U",
+  "102NO006T0711_40_U",
+  "102NO006T0711_30_U",
+  "102NO006J0811_20_U",
+] as const;
+
+export const defaultS104FixtureDatasetId = "stavanger-spatial-phase-tide";
 
 export const getDemoSceneSettings = (): DemoSceneSettings => ({
   crs: readEnv("VITE_DEMO_CRS") ?? "EPSG:32619",
@@ -115,15 +154,21 @@ export const getDemoLiveAisConfig = (): DemoLiveAisConfig => {
 };
 
 export const getDemoLiveAisS102DatasetIds = (): readonly string[] =>
-  readCsvEnv("VITE_DEMO_LIVE_AIS_S102_DATASET_IDS", [
-    "102NO006J0811_10_U",
-    "102NO006T0711_40_U",
-    "102NO006T0711_30_U",
-    "102NO006J0811_20_U",
-  ]);
+  readCsvEnv("VITE_DEMO_LIVE_AIS_S102_DATASET_IDS", getDemoStavangerS102DatasetIds());
+
+export const getDemoStavangerS102DatasetIds = (): readonly string[] =>
+  readCsvEnv("VITE_DEMO_STAVANGER_S102_DATASET_IDS", stavangerS102DatasetIds);
 
 export const getDemoLiveAisS101Enabled = (): boolean =>
   readBooleanEnv("VITE_DEMO_LIVE_AIS_S101_ENABLED", false);
+
+export const getDemoS104FixtureConfig = (): DemoS104FixtureConfig => ({
+  serviceUrl: readFirstEnv(["VITE_S104_FIXTURE_SERVICE_URL", "VITE_DEMO_S104_FIXTURE_SERVICE_URL"])
+    ?? "http://localhost:8794",
+  datasetId: readFirstEnv(["VITE_S104_DATASET_ID", "VITE_DEMO_S104_DATASET_ID"])
+    ?? defaultS104FixtureDatasetId,
+  maxDataPoints: readPositiveIntegerEnv("VITE_S104_MAX_DATA_POINTS", 100_000),
+});
 
 const readFirstEnv = (keys: readonly string[]): string | undefined => {
   for (const key of keys) {

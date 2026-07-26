@@ -50,10 +50,27 @@ Optional for the `Live AIS Norway` recipe:
   AIS scene. It defaults to `false` so the demo remains terrain-first and a
   bad WMS style cannot mask the S-102 terrain as an opaque black plane.
 
-Optional for future S-104 water-level scenes:
+Optional for the `S-104 Water Level` recipe:
 
 - `VITE_S104_FIXTURE_SERVICE_URL`: local generated S-104 fixture service URL,
   for example `http://localhost:8794`.
+- `VITE_S104_DATASET_ID`: generated fixture dataset id. Defaults to
+  `stavanger-spatial-phase-tide`.
+- `VITE_S104_MAX_DATA_POINTS`: guardrail for fixture preparation. Defaults to
+  `100000`.
+
+Start the fixture service from the `ecc-s100-lib` root before opening the S-104
+recipe:
+
+```sh
+npm run demo:s104-fixture-service
+```
+
+The S-104 recipe uses the generated Stavanger fixture service as product data,
+not as a renderable layer. The demo attaches the prepared sampler to
+`scene.waterLevel`, shows point samples at the vessel, cursor, and fixed scene
+points, and reuses scene time controls for fixture playback. Keep generated
+fixture files in the static files repository.
 
 For local live AIS testing, start the proxy from the super-repo root:
 
