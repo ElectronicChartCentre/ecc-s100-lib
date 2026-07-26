@@ -167,10 +167,12 @@ Public product entrypoints:
 entrypoint. It currently provides service contracts, metadata assessment,
 regular-grid dataset decoding, deterministic point-specific sampling, and
 workflow preparation for generated fixture or future service-backed datasets.
-Successful prepared datasets include normalized grid geometry, timeline, typed
-water-level arrays, fill values, and source provenance. The sampler returns
-height, trend, uncertainty, nearest grid/time provenance, and CRS-bearing
-coordinates. Rendering integration is implemented in later S-104 phases.
+Successful workflow results include prepared datasets, per-dataset statuses, a
+merged timeline, observed grid spacing, and a ready sampler. Prepared datasets
+include normalized grid geometry, timeline, typed water-level arrays, fill
+values, and source provenance. The sampler returns height, trend, uncertainty,
+nearest grid/time provenance, and CRS-bearing coordinates. Rendering integration
+is implemented in later S-104 phases.
 `simulated-water-level` remains a separate non-IHO operational helper product.
 
 ## Feature Sessions

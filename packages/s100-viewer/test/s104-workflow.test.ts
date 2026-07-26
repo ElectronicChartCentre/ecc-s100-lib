@@ -66,6 +66,85 @@ describe("S104Workflow", () => {
         },
       },
     });
+    expect(result.timeline).toEqual({
+      startTime: Date.UTC(2026, 6, 26, 0, 0, 0),
+      endTime: Date.UTC(2026, 6, 26, 0, 10, 0),
+      stepSeconds: 600,
+      times: [
+        Date.UTC(2026, 6, 26, 0, 0, 0),
+        Date.UTC(2026, 6, 26, 0, 10, 0),
+      ],
+      initialTime: Date.UTC(2026, 6, 26, 0, 0, 0),
+    });
+    expect(result.observedGrid).toEqual({
+      minMeters: 10,
+      maxMeters: 10,
+    });
+    expect(result.sampler.sample({
+      coordinate: {
+        kind: "projected",
+        crs: "EPSG:32631",
+        x: 1,
+        y: 1,
+      },
+      time: "2026-07-26T00:00:00Z",
+    })).toMatchObject({
+      status: "value",
+      datasetId: "stavanger",
+      heightMeters: 0.1,
+    });
+  });
+
+  it("supports partial success and samples the accepted S-104 datasets", async () => {
+    const service = fakeS104Service({
+      accepted: s104Dataset("accepted"),
+      malformed: {
+        ...s104Dataset("malformed"),
+        values: [
+          { timePoint: "20260726T000000Z", waterLevelHeight: [0.1] },
+          { timePoint: "20260726T001000Z", waterLevelHeight: [0.2, 0.3, 0.4, 0.5] },
+        ],
+      },
+    });
+
+    const result = await S104Workflow.prepare({
+      datasets: [{ id: "accepted" }, { id: "malformed" }],
+      crs: "EPSG:32631",
+      service,
+      messages: {
+        datasetError: "data failed",
+      },
+    });
+
+    expect(result.statuses).toMatchObject([
+      { datasetId: "accepted", status: "success" },
+      { datasetId: "malformed", status: "error", code: "dataset-error", message: "data failed" },
+    ]);
+    expect(result.acceptedCount).toBe(1);
+    expect(result.rejectedCount).toBe(1);
+    expect(result.prepared).toHaveLength(1);
+    expect(result.timeline).toMatchObject({
+      startTime: Date.UTC(2026, 6, 26, 0, 0, 0),
+      endTime: Date.UTC(2026, 6, 26, 0, 10, 0),
+      stepSeconds: 600,
+    });
+    expect(result.observedGrid).toEqual({
+      minMeters: 10,
+      maxMeters: 10,
+    });
+    expect(result.sampler.sample({
+      coordinate: {
+        kind: "projected",
+        crs: "EPSG:32631",
+        x: 10,
+        y: 10,
+      },
+      time: Date.UTC(2026, 6, 26, 0, 10, 0),
+    })).toMatchObject({
+      status: "value",
+      datasetId: "accepted",
+      heightMeters: 0.5,
+    });
   });
 
   it("rejects unsupported, too-large, and malformed metadata before data fetch", async () => {

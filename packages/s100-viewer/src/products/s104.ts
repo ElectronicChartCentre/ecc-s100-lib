@@ -159,6 +159,24 @@ export type S104ProductTimeline = {
   times: readonly number[];
 };
 
+export type S104WorkflowTimeline = {
+  startTime: number;
+  endTime: number;
+  stepSeconds: number;
+  times: readonly number[];
+  initialTime: number;
+};
+
+export type S104ObservedGrid = {
+  minMeters: number;
+  maxMeters: number;
+};
+
+export type S104PreparedDatasetSummary = {
+  timeline: S104WorkflowTimeline | null;
+  observedGrid: S104ObservedGrid | null;
+};
+
 export type S104NormalizedRegularGrid = {
   crs: string;
   origin: {

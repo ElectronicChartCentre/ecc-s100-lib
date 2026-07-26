@@ -2,9 +2,11 @@ import type {
   S104CatalogDataset,
   S104DatasetDecodeResult,
   S104MetadataLike,
+  S104PreparedDatasetSummary,
   S104ProjectedBounds,
   PreparedS104Dataset,
   S104WaterLevelData,
+  S104WaterLevelSampler,
 } from "./s104.js";
 import { decodeS104Dataset } from "./s104-dataset.js";
 import {
@@ -89,6 +91,9 @@ export type S104WorkflowStatus =
 export type S104WorkflowResult<TData = unknown, TMetadata = unknown> = {
   prepared: readonly PreparedS104Dataset<TData, TMetadata>[];
   statuses: readonly S104WorkflowStatus[];
+  timeline: S104PreparedDatasetSummary["timeline"];
+  observedGrid: S104PreparedDatasetSummary["observedGrid"];
+  sampler: S104WaterLevelSampler;
   acceptedCount: number;
   rejectedCount: number;
 };
@@ -255,12 +260,59 @@ export const prepareS104Workflow = async <
   const statuses = options.datasets
     .map((dataset) => statusesByDataset.get(dataset.id))
     .filter((status): status is S104WorkflowStatus => status !== undefined);
+  const summary = summarizePreparedS104Datasets(preparedDatasets);
+  const sampler = createS104WaterLevelSampler({ datasets: preparedDatasets });
 
   return {
     prepared: preparedDatasets,
     statuses,
+    timeline: summary.timeline,
+    observedGrid: summary.observedGrid,
+    sampler,
     acceptedCount: preparedDatasets.length,
     rejectedCount: statuses.filter((status) => status.status === "error").length,
+  };
+};
+
+export const summarizePreparedS104Datasets = (
+  datasets: readonly Pick<PreparedS104Dataset, "decoded">[],
+): S104PreparedDatasetSummary => {
+  if (datasets.length === 0) {
+    return {
+      timeline: null,
+      observedGrid: null,
+    };
+  }
+
+  const timelines = datasets.map((dataset) => dataset.decoded.timeline);
+  const startTimes = timelines.map((timeline) => timeline.startTime);
+  const endTimes = timelines.map((timeline) => timeline.endTime);
+  const positiveSteps = timelines
+    .map((timeline) => timeline.intervalSeconds)
+    .filter((step) => step > 0);
+  const times = [...new Set(timelines.flatMap((timeline) => timeline.times))]
+    .sort((a, b) => a - b);
+  const observedGrids = datasets
+    .flatMap((dataset) => [
+      vectorLengthMeters(dataset.decoded.grid.offsetVectors.longitudinal),
+      vectorLengthMeters(dataset.decoded.grid.offsetVectors.latitudinal),
+    ])
+    .filter((value) => value > 0);
+
+  return {
+    timeline: {
+      startTime: Math.min(...startTimes),
+      endTime: Math.max(...endTimes),
+      stepSeconds: positiveSteps.length > 0 ? Math.min(...positiveSteps) : 1,
+      times,
+      initialTime: times[0] ?? Math.min(...startTimes),
+    },
+    observedGrid: observedGrids.length > 0
+      ? {
+          minMeters: Math.min(...observedGrids),
+          maxMeters: Math.max(...observedGrids),
+        }
+      : null,
   };
 };
 
@@ -427,6 +479,9 @@ const rejectWithStatus = <TMetadata, TLatLonBounds>(
 
 const isWorkflowStatus = (value: unknown): value is S104WorkflowStatus =>
   recordFromUnknown(value).status === "success" || recordFromUnknown(value).status === "error";
+
+const vectorLengthMeters = (vector: readonly [number, number]): number =>
+  Math.hypot(vector[0], vector[1]);
 
 const isWorkflowCanceled = (
   options: Pick<PrepareS104WorkflowOptions, "signal" | "isCanceled">,

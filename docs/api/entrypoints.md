@@ -105,9 +105,9 @@ import {
 Use for S-104 water-level service access, regular-grid metadata assessment,
 fixture/service dataset decoding, deterministic point-specific sampling, and
 workflow preparation. Successful `S104Workflow.prepare` results include
-normalized decoded grids and time records and can be passed to
-`S104Workflow.createSampler` or `createS104WaterLevelSampler`. Adapter rendering
-and scene integration land in later S-104 phases.
+normalized decoded grids, time records, merged timeline metadata, observed grid
+spacing, and a ready `sampler`. Adapter rendering and scene integration land in
+later S-104 phases.
 
 ## Route Entrypoint
 

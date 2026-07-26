@@ -174,12 +174,14 @@ The next implementation phases should proceed in this order:
 2. Generated S-104 fixture generator.
 3. Localhost fixture service served from the static files repository output.
 4. `@ecc/s100-viewer/products/s104` entrypoint, public types, service helpers,
-   metadata assessment, and workflow preparation.
+   metadata assessment, and initial workflow preparation.
 5. Strict metadata assessment and regular-grid dataset decoder.
 6. Point-specific water-level sampler.
-7. Scene water-level field controller.
-8. Demo and S-100 Explorer integration.
-9. Real HDF5 and production service path when sample files and backend planning
+7. Workflow orchestration with partial success, merged timeline, observed grid
+   spacing, and sampler construction.
+8. Scene water-level field controller.
+9. Demo and S-100 Explorer integration.
+10. Real HDF5 and production service path when sample files and backend planning
    are available.
 
 ## Guardrails
