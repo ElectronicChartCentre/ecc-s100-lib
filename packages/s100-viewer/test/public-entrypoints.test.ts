@@ -43,6 +43,12 @@ const publicEntrypoints = [
     typesPath: "./dist/entrypoints/products/s102.d.ts",
   },
   {
+    subpath: "./products/s104",
+    source: "src/entrypoints/products/s104.ts",
+    importPath: "./dist/entrypoints/products/s104.js",
+    typesPath: "./dist/entrypoints/products/s104.d.ts",
+  },
+  {
     subpath: "./products/s111",
     source: "src/entrypoints/products/s111.ts",
     importPath: "./dist/entrypoints/products/s111.js",

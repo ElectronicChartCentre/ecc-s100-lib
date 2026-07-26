@@ -164,6 +164,11 @@ The library-level product/version matrix is exported as
 `S100SupportedProductVersions`. Adapters publish their own renderable subset on
 `adapter.capabilities.supportedProductVersions`.
 
+S-104 is exposed from `@ecc/s100-viewer/products/s104` as a water-level data and
+workflow API. It is intentionally not yet a renderable adapter layer product;
+adapters should consume prepared/sampled water-level data through later
+scene-level integration rather than parsing S-104 grids themselves.
+
 ## Core Concepts
 
 - `S100Viewer`: owns one adapter-backed viewer host.

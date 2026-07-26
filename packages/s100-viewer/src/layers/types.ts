@@ -5,6 +5,7 @@ import type { LayerControllers } from "./controllers.js";
 export const S100ProductType = {
   S101: "S-101",
   S102: "S-102",
+  S104: "S-104",
   S111: "S-111",
 } as const;
 

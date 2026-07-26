@@ -34,6 +34,12 @@ describe("@ecc/s100-viewer product specs", () => {
         defaultVersion: S100ProductSpecificationVersions.S102.LATEST_CONFIRMED_SUPPORTED,
       },
       {
+        product: S100ProductType.S104,
+        versions: [S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED],
+        defaultVersion: S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED,
+        notes: "Product data and sampler workflow support; adapter layer rendering is a later capability.",
+      },
+      {
         product: S100ProductType.S111,
         versions: [S100ProductSpecificationVersions.S111.LATEST_CONFIRMED_SUPPORTED],
         defaultVersion: S100ProductSpecificationVersions.S111.LATEST_CONFIRMED_SUPPORTED,

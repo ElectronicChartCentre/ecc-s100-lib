@@ -54,6 +54,10 @@
       "types": "./dist/entrypoints/products/s102.d.ts",
       "import": "./dist/entrypoints/products/s102.js"
     },
+    "./products/s104": {
+      "types": "./dist/entrypoints/products/s104.d.ts",
+      "import": "./dist/entrypoints/products/s104.js"
+    },
     "./products/s111": {
       "types": "./dist/entrypoints/products/s111.d.ts",
       "import": "./dist/entrypoints/products/s111.js"

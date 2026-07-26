@@ -34,6 +34,9 @@ export const S100ProductSpecificationVersions = {
   S102: {
     LATEST_CONFIRMED_SUPPORTED: LATEST_CONFIRMED_SUPPORTED_PRODUCT_SPEC_VERSION,
   },
+  S104: {
+    LATEST_CONFIRMED_SUPPORTED: LATEST_CONFIRMED_SUPPORTED_PRODUCT_SPEC_VERSION,
+  },
   S111: {
     LATEST_CONFIRMED_SUPPORTED: LATEST_CONFIRMED_SUPPORTED_PRODUCT_SPEC_VERSION,
   },
@@ -56,6 +59,12 @@ export const S100SupportedProductVersions = [
     product: S100ProductType.S102,
     versions: [S100ProductSpecificationVersions.S102.LATEST_CONFIRMED_SUPPORTED],
     defaultVersion: S100ProductSpecificationVersions.S102.LATEST_CONFIRMED_SUPPORTED,
+  },
+  {
+    product: S100ProductType.S104,
+    versions: [S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED],
+    defaultVersion: S100ProductSpecificationVersions.S104.LATEST_CONFIRMED_SUPPORTED,
+    notes: "Product data and sampler workflow support; adapter layer rendering is a later capability.",
   },
   {
     product: S100ProductType.S111,

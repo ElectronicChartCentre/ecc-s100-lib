@@ -89,6 +89,20 @@ import {
 Use for S-111 service access, metadata assessment, static/current layers,
 timeline configuration, and app-level current sessions.
 
+## S-104 Entrypoint
+
+```ts
+import {
+  S104Workflow,
+  createFixtureS104Service,
+  type S104WaterLevelSampler,
+} from "@ecc/s100-viewer/products/s104";
+```
+
+Use for S-104 water-level service access, regular-grid metadata assessment, and
+workflow preparation. The first public surface is data/sampler oriented; adapter
+rendering and point-specific scene integration land in later S-104 phases.
+
 ## Route Entrypoint
 
 ```ts

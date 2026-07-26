@@ -76,7 +76,7 @@ const isPublicCoreSubpathImport = (specifier) =>
   specifier === "@ecc/s100-viewer/math" ||
   specifier === "@ecc/s100-viewer/features" ||
   specifier === "@ecc/s100-viewer/products" ||
-  /^@ecc\/s100-viewer\/products\/(?:enc|route|s102|s111|simulated-water-level|vessel)$/u.test(
+  /^@ecc\/s100-viewer\/products\/(?:enc|route|s102|s104|s111|simulated-water-level|vessel)$/u.test(
     specifier,
   );
 const isPrivatePackageSubpathImport = (specifier) =>

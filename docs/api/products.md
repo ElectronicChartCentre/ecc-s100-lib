@@ -157,14 +157,18 @@ Public product entrypoints:
 - `@ecc/s100-viewer/products`
 - `@ecc/s100-viewer/products/enc`
 - `@ecc/s100-viewer/products/s102`
+- `@ecc/s100-viewer/products/s104`
 - `@ecc/s100-viewer/products/s111`
 - `@ecc/s100-viewer/products/route`
 - `@ecc/s100-viewer/products/vessel`
 - `@ecc/s100-viewer/products/simulated-water-level`
 
-The planned real S-104 entrypoint is `@ecc/s100-viewer/products/s104`. It should
-be added only when the sampler/workflow implementation starts; until then,
-`simulated-water-level` remains a non-IHO operational helper product.
+`@ecc/s100-viewer/products/s104` is the real S-104 water-level product
+entrypoint. It currently provides service contracts, metadata assessment, and
+workflow preparation for generated fixture or future service-backed datasets.
+The point-specific sampler and rendering integration are implemented in later
+S-104 phases. `simulated-water-level` remains a separate non-IHO operational
+helper product.
 
 ## Feature Sessions
 

@@ -173,7 +173,8 @@ The next implementation phases should proceed in this order:
 1. Shared gridded time-series helpers.
 2. Generated S-104 fixture generator.
 3. Localhost fixture service served from the static files repository output.
-4. `@ecc/s100-viewer/products/s104` entrypoint and public types.
+4. `@ecc/s100-viewer/products/s104` entrypoint, public types, service helpers,
+   metadata assessment, and workflow preparation.
 5. Metadata assessment, decoder, sampler, and workflow.
 6. Scene water-level field controller.
 7. Demo and S-100 Explorer integration.
