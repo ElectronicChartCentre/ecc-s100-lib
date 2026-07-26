@@ -50,6 +50,11 @@ Optional for the `Live AIS Norway` recipe:
   AIS scene. It defaults to `false` so the demo remains terrain-first and a
   bad WMS style cannot mask the S-102 terrain as an opaque black plane.
 
+Optional for future S-104 water-level scenes:
+
+- `VITE_S104_FIXTURE_SERVICE_URL`: local generated S-104 fixture service URL,
+  for example `http://localhost:8794`.
+
 For local live AIS testing, start the proxy from the super-repo root:
 
 ```sh

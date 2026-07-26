@@ -21,6 +21,8 @@ Additional focused examples:
 - [Parametric vessel demo app](./parametric-vessel), with the
   [parametric vessel workflow guide](../docs/workflows/parametric-vessel.md)
 - [Engine adapter switcher demo app](./engine-adapter-switcher)
+- [S-104 fixture service](./s104-fixture-service), a localhost JSON endpoint for
+  generated water-level fixtures stored in the static files repository.
 
 The engine adapter switcher is a private workspace app that exercises the
 public package imports a future standalone consumer would use:
@@ -65,6 +67,15 @@ The parametric vessel demo is a focused vessel-shape tuning app:
 ```sh
 npm run demo:parametric-vessel
 npm run build:demo:parametric-vessel
+```
+
+The S-104 fixture service exposes generated S-104-shaped JSON at the planned
+service contract:
+
+```sh
+npm run fixtures:s104:generate
+npm run demo:s104-fixture-service
+curl http://127.0.0.1:8794/s104/catalog.json
 ```
 
 Until the packages are published to npm, local workspaces and release tarballs

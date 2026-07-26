@@ -23,6 +23,8 @@
     "lint": "npm run boundaries:check",
     "fixtures:s104:generate": "node tools/s104-fixtures/generate-fixtures.mjs",
     "fixtures:s104:validate": "node tools/s104-fixtures/validate-fixtures.mjs",
+    "demo:s104-fixture-service": "npm run dev -w @ecc/s100-s104-fixture-service",
+    "check:s104-fixture-service": "npm run check -w @ecc/s100-s104-fixture-service",
     "demo:getting-started": "npm run dev -w @ecc/s100-getting-started",
     "build:demo:getting-started": "npm run build -w @ecc/s100-getting-started",
     "check:demo:getting-started": "npm run check -w @ecc/s100-getting-started",

@@ -1,0 +1,11 @@
+{
+  "name": "@ecc/s100-s104-fixture-service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.mjs",
+    "start": "node src/server.mjs",
+    "check": "node --check src/server.mjs"
+  }
+}
