@@ -1,4 +1,4 @@
-import type { Coordinate } from "../coordinates/types.js";
+import type { Coordinate, ProjectedCoordinate } from "../coordinates/types.js";
 
 export type S104WaterLevelTrend =
   | "decreasing"
@@ -30,9 +30,13 @@ export type S104WaterLevelSample =
       trend: S104WaterLevelTrend;
       uncertaintyMeters?: number;
       coordinate: Coordinate;
+      requestedCoordinate: Coordinate;
+      projectedCoordinate: ProjectedCoordinate;
       sourceTime: Date;
       requestedTime: Date;
+      timeIndex: number;
       gridIndex: { i: number; j: number };
+      linearIndex: number;
       datasetId: string;
       verticalDatum?: string;
       samplingMode: S104SamplingMode;
@@ -47,6 +51,8 @@ export type S104WaterLevelSample =
         | "datum-mismatch";
       reason: string;
       datasetId?: string;
+      requestedCoordinate?: Coordinate;
+      requestedTime?: Date;
     };
 
 export interface S104WaterLevelSampler {

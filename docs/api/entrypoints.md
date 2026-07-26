@@ -93,7 +93,9 @@ timeline configuration, and app-level current sessions.
 
 ```ts
 import {
+  createS104WaterLevelSampler,
   decodeS104Dataset,
+  sampleS104WaterLevel,
   S104Workflow,
   createFixtureS104Service,
   type S104WaterLevelSampler,
@@ -101,10 +103,11 @@ import {
 ```
 
 Use for S-104 water-level service access, regular-grid metadata assessment,
-fixture/service dataset decoding, and workflow preparation. Successful
-`S104Workflow.prepare` results include normalized decoded grids and time records;
-point-specific sampling, adapter rendering, and scene integration land in later
-S-104 phases.
+fixture/service dataset decoding, deterministic point-specific sampling, and
+workflow preparation. Successful `S104Workflow.prepare` results include
+normalized decoded grids and time records and can be passed to
+`S104Workflow.createSampler` or `createS104WaterLevelSampler`. Adapter rendering
+and scene integration land in later S-104 phases.
 
 ## Route Entrypoint
 

@@ -16,6 +16,7 @@ import {
   unwrapS104DataResponse,
   type S104DataService,
 } from "./s104-service.js";
+import { createS104WaterLevelSampler } from "./s104-sampler.js";
 
 export type S104WorkflowDataset<TMetadata = unknown, TLatLonBounds = unknown> = {
   id: string;
@@ -265,6 +266,7 @@ export const prepareS104Workflow = async <
 
 export const S104Workflow = {
   prepare: prepareS104Workflow,
+  createSampler: createS104WaterLevelSampler,
 };
 
 const loadMetadata = async <
