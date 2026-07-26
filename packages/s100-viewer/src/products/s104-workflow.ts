@@ -1,9 +1,12 @@
 import type {
   S104CatalogDataset,
+  S104DatasetDecodeResult,
   S104MetadataLike,
   S104ProjectedBounds,
   PreparedS104Dataset,
+  S104WaterLevelData,
 } from "./s104.js";
+import { decodeS104Dataset } from "./s104-dataset.js";
 import {
   assessS104Metadata,
   type S104MetadataAssessment,
@@ -73,6 +76,7 @@ export type S104WorkflowStatus =
       code:
         | "metadata-error"
         | "unsupported-dcf"
+        | "unsupported-interpolation"
         | "too-large"
         | "dataset-error"
         | "canceled";
@@ -199,6 +203,15 @@ export const prepareS104Workflow = async <
         const data = options.service.unwrapData
           ? options.service.unwrapData(response, dataset.id)
           : unwrapS104DataResponse(response);
+        const decoded = decodeS104Dataset({
+          datasetId: dataset.id,
+          metadata: accepted.metadata as S104MetadataLike,
+          data: data as S104WaterLevelData,
+          ...(maxDataPoints !== undefined ? { maxDataPoints } : {}),
+        });
+        if (decoded.status === "error") {
+          return statusFromDecodeError(decoded, messages);
+        }
         const bounds = resolvedDatasetBounds(dataset, options);
         const preparedDataset: PreparedS104Dataset<unknown, TMetadata> = {
           datasetId: dataset.id,
@@ -206,6 +219,7 @@ export const prepareS104Workflow = async <
           crs: options.crs,
           metadata: accepted.metadata,
           data,
+          decoded: decoded.dataset,
           grid: accepted.assessment.grid,
           numberOfCells: accepted.assessment.numberOfCells,
           numberOfDataPoints: accepted.assessment.numberOfDataPoints,
@@ -318,6 +332,9 @@ const statusFromMetadataAssessment = (
       ...(assessment.numberOfDataPoints !== undefined
         ? { numberOfDataPoints: assessment.numberOfDataPoints }
         : {}),
+      ...(assessment.interpolationType !== undefined
+        ? { interpolationType: assessment.interpolationType }
+        : {}),
     },
   };
 };
@@ -334,6 +351,34 @@ const assessmentMessage = (
     return messages.tooLarge(maxDataPoints ?? assessment.numberOfDataPoints ?? 0);
   }
   return messages.metadataError;
+};
+
+const statusFromDecodeError = (
+  error: Extract<S104DatasetDecodeResult, { status: "error" }>,
+  messages: S104WorkflowMessages,
+): S104WorkflowStatus => ({
+  datasetId: error.datasetId,
+  status: "error",
+  code: workflowCodeFromDecodeError(error.code),
+  message: error.code === "data-error" ? messages.datasetError : error.message,
+  details: {
+    decodeCode: error.code,
+    ...(error.details ?? {}),
+  },
+});
+
+const workflowCodeFromDecodeError = (
+  code: Extract<S104DatasetDecodeResult, { status: "error" }>["code"],
+): Extract<S104WorkflowStatus, { status: "error" }>["code"] => {
+  if (
+    code === "metadata-error" ||
+    code === "unsupported-dcf" ||
+    code === "unsupported-interpolation" ||
+    code === "too-large"
+  ) {
+    return code;
+  }
+  return "dataset-error";
 };
 
 const successStatus = (

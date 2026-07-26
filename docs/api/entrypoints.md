@@ -93,15 +93,18 @@ timeline configuration, and app-level current sessions.
 
 ```ts
 import {
+  decodeS104Dataset,
   S104Workflow,
   createFixtureS104Service,
   type S104WaterLevelSampler,
 } from "@ecc/s100-viewer/products/s104";
 ```
 
-Use for S-104 water-level service access, regular-grid metadata assessment, and
-workflow preparation. The first public surface is data/sampler oriented; adapter
-rendering and point-specific scene integration land in later S-104 phases.
+Use for S-104 water-level service access, regular-grid metadata assessment,
+fixture/service dataset decoding, and workflow preparation. Successful
+`S104Workflow.prepare` results include normalized decoded grids and time records;
+point-specific sampling, adapter rendering, and scene integration land in later
+S-104 phases.
 
 ## Route Entrypoint
 

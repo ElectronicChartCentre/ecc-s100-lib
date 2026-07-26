@@ -51,6 +51,12 @@ describe("S104Workflow", () => {
       data: {
         id: "stavanger",
       },
+      decoded: {
+        datasetId: "stavanger",
+        crs: "EPSG:32631",
+        numberOfCells: 4,
+        numberOfDataPoints: 8,
+      },
       bounds: {
         projected: {
           minX: 0,
@@ -106,6 +112,42 @@ describe("S104Workflow", () => {
       { datasetId: "malformed", status: "error", code: "metadata-error", message: "metadata" },
     ]);
     expect(result.prepared).toHaveLength(0);
+  });
+
+  it("reports malformed data as a dataset error without preparing raw payloads", async () => {
+    const service = fakeS104Service({
+      malformed: {
+        ...s104Dataset("malformed"),
+        values: [
+          { timePoint: "20260726T000000Z", waterLevelHeight: [0.1] },
+          { timePoint: "20260726T001000Z", waterLevelHeight: [0.2, 0.3, 0.4, 0.5] },
+        ],
+      },
+    });
+
+    const result = await S104Workflow.prepare({
+      datasets: [{ id: "malformed" }],
+      crs: "EPSG:32631",
+      service,
+      messages: {
+        datasetError: "data failed",
+      },
+    });
+
+    expect(result.prepared).toHaveLength(0);
+    expect(result.statuses).toMatchObject([
+      {
+        datasetId: "malformed",
+        status: "error",
+        code: "dataset-error",
+        message: "data failed",
+        details: {
+          decodeCode: "data-error",
+          timeIndex: 0,
+          expected: 4,
+        },
+      },
+    ]);
   });
 
   it("propagates AbortSignal and reports structured cancellation", async () => {
