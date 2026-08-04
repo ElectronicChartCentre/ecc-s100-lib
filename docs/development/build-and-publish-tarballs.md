@@ -5,6 +5,21 @@ This is the short release operator checklist for publishing installable
 
 Run commands from the `ecc-s100-lib` repository root.
 
+## System Prerequisites
+
+- Node.js and npm compatible with the checked-in `package-lock.json`.
+- Git configured for the `ElectronicChartCentre/ecc-s100-lib` repository.
+- GitHub CLI installed and authenticated with release/write access:
+
+  ```sh
+  gh auth status
+  ```
+
+- Network access to GitHub and npm package resolution.
+- Standard shell tools available for inspection, including `tar`, `sort`, and
+  optionally `less`.
+- A clean or intentionally staged worktree before creating release artifacts.
+
 ## Essential Workflow
 
 1. Pick the next version.
