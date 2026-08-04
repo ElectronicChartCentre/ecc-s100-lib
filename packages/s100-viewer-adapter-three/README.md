@@ -14,23 +14,27 @@ adapter: `x` and `y` are horizontal projected metres and `z` is vertical metres.
 
 ## Status
 
-This adapter is experimental. It currently targets projected-local scenes and
-basic rendering for:
+This adapter is an active reference implementation for projected-local scenes.
+It is intentionally smaller than NASA-AMMOS, but it now implements the main
+canonical product surfaces used by the demos:
 
 - S-101/S-57 and map-overlay raster planes
-- S-102 3D Tiles through `3d-tiles-renderer`
+- S-102 3D Tiles through `3d-tiles-renderer`, including shared terrain styling
+  and S-104 water-level terrain shading
 - S-111 static/rest JSON arrow rendering
 - vessel model or procedural fallback rendering with vessel-local ocean surface
   and native transform controls
-- route-plan centerline, XTD boundary, corridor, waypoint, and hybrid-volume rendering
-- simulated-water-level time updates
-
-It does not yet provide full NASA-AMMOS feature parity for terrain styling,
-depth-ray visualization, or advanced S-111 portrayal.
+- route-plan centerline, XTD boundary, corridor, waypoint, and hybrid-volume
+  rendering
+- simulated-water-level and S-104 time updates
+- skybox/environment setup, picking, and camera controls
 
 The package is part of the workspace for reference-adapter development and the
 engine-switcher demo, but it is not currently included in the release-target
-package list.
+package list. Remaining parity gaps are tracked as normal adapter work, with
+fleet terrain-shadow shading and some NASA-AMMOS-specific debug/depth-ray
+visualization still treated as advanced follow-up rather than required API
+surface.
 
 ## Usage
 

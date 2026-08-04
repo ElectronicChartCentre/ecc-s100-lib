@@ -15,16 +15,16 @@ engines.
 - `prerequisites`: Node.js/npm, browser access, TypeScript familiarity, and
   local access to this workspace. Service-backed recipes also need local PRIMAR
   endpoint, licensee, API key, and dataset configuration.
-- `component_versions`: `@ecc/s100-viewer@0.1.0-alpha.10`,
-  `@ecc/s100-viewer-adapter-nasa-ammos@0.1.0-alpha.10`,
-  `@ecc/s100-viewer-adapter-cesium@0.1.0-alpha.10`,
-  `@ecc/s100-viewer-adapter-three@0.1.0-alpha.10`,
+- `component_versions`: `@ecc/s100-viewer@0.1.0-alpha.12`,
+  `@ecc/s100-viewer-adapter-nasa-ammos@0.1.0-alpha.12`,
+  `@ecc/s100-viewer-adapter-cesium@0.1.0-alpha.12`,
+  `@ecc/s100-viewer-adapter-three@0.1.0-alpha.12`,
   `@ecc/s100-engine-adapter-switcher@0.0.0`.
 - `commands`: `npm install`, `npm run check:demo:engine-switcher`,
   `npm run build:demo:engine-switcher`, `npm run demo:engine-switcher`.
 - `expected_result`: A local Vite app at `http://localhost:<port>` where the
   same scene recipes can be loaded through NASA-AMMOS, Cesium, and the
-  experimental plain Three.js reference adapter.
+  plain Three.js reference adapter.
 - `failure_modes`: Missing `.env.local` values, service credentials, dataset
   ids, browser-origin restrictions, unsupported adapter capabilities, or
   renderer-specific asset setup.
@@ -61,8 +61,8 @@ Adapter packages own rendering:
 
 - `@ecc/s100-viewer-adapter-nasa-ammos`: NASA-AMMOS/Three.js adapter
 - `@ecc/s100-viewer-adapter-cesium`: Cesium adapter
-- `@ecc/s100-viewer-adapter-three`: experimental plain Three.js reference
-  adapter used for maintainability and adapter-authoring work
+- `@ecc/s100-viewer-adapter-three`: plain Three.js reference adapter used for
+  maintainability and adapter-authoring work
 
 Application code should mostly talk to `@ecc/s100-viewer`. The app should
 import adapter packages only at a small engine-selection boundary.
@@ -104,6 +104,9 @@ The current demo uses these product concepts:
   Tiles as terrain/depth.
 - `S-111`: Surface current data. In the switcher it is fetched as JSON and
   rendered as time-aware current arrows.
+- `S-104`: Water-level data. In the switcher it is loaded from generated
+  S-104-shaped JSON fixtures, sampled by coordinate and time, and attached to
+  `scene.waterLevel`.
 - `S-57`: Legacy ENC data. The core package can represent S-57 ENC layers, but
   S-57 is not itself an S-100 product specification.
 - `vessel`: An operational viewer feature, not an IHO S-100 product. It lets
@@ -120,7 +123,7 @@ browser-consumable services and assets:
 
 - WMS/WMTS/MVT for ENC and map layers
 - 3D Tiles for S-102 bathymetry
-- REST or static JSON for S-111 and simulated water levels
+- REST or static JSON for S-104 fixtures, S-111, and simulated water levels
 - GLB/GLTF for vessel models
 
 The product type and product specification version are separate fields. Builders
@@ -729,18 +732,24 @@ const feed = await createLiveVesselFeedLayer({
     removeMissing: true,
     maxAgeSeconds: config.maxAgeSeconds,
   },
+  positionMapper: createProjectedLiveAisPositionMapper({
+    crs: context.sceneSettings.crs,
+  }),
   style: {
     style: {
       opacity: 0.92,
       showSeaLevelIndicator: true,
       showOceanSurface: false,
+      shadow: {
+        enabled: true,
+        mode: "shared-texture",
+        opacity: 0.34,
+      },
     },
     selectedStyle: {
       opacity: 1,
     },
   },
-  positionMapper: (vessel) =>
-    projectLiveAisVesselToScene(vessel, context.sceneSettings),
 });
 ```
 
@@ -755,9 +764,11 @@ Key Live AIS concepts:
 
 - Provider credentials stay in the backend proxy, not in Vite `.env.local`.
 - The frontend receives normalized `LiveAisVessel` records.
-- `positionMapper` converts incoming geodetic positions into the current
-  projected-local scene CRS.
+- `createProjectedLiveAisPositionMapper(...)` converts incoming geodetic
+  positions into the current projected-local scene CRS.
 - The feed creates, updates, selects, removes, and disposes vessel sessions.
+- AIS fleets use lightweight shared terrain shadows on adapters that support
+  fleet terrain shading.
 - The engine switcher keeps AIS status and selected-vessel UI in app code.
 
 For the standalone workflow guide, read

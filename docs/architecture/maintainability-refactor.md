@@ -1,6 +1,7 @@
 # Maintainability Refactor
 
-Status: `ecc-lib-maintainability` branch, after phases 0 through 9.
+Status: `ecc-lib-maintainability` branch, after structural phases 0 through 9
+and later feature work.
 
 This note explains the structural refactor performed on `ecc-s100-lib` to make
 the library easier to maintain while preserving the current public package shape
@@ -11,11 +12,14 @@ inside of the library match the API direction already chosen: an engine-neutral
 core package, renderer adapters, product sessions, typed controllers, and
 examples that consume the same public package surfaces as applications.
 
-The most recent completed work is Phase 9: bundle-aware public entrypoints and
-lazy adapter loading. That phase does not change the app mental model. It makes
-the package easier for maintainers and bundlers to reason about by separating
-root viewer setup, product-focused imports, adapter factory imports, scene
-runtime imports, and heavy layer-family imports.
+The most recent structural maintainability phase is Phase 9: bundle-aware public
+entrypoints and lazy adapter loading. That phase does not change the app mental
+model. It makes the package easier for maintainers and bundlers to reason about
+by separating root viewer setup, product-focused imports, adapter factory
+imports, scene runtime imports, and heavy layer-family imports. Later feature
+work added live AIS fleet support and S-104 water-level support on top of those
+boundaries; those features are summarized in
+[New features after the interoperability refactor](../../NEW_FEATURES_AFTER_INTEROPERABILITY_REFACTOR.md).
 
 ## Why This Refactor Was Needed
 
@@ -44,11 +48,12 @@ The maintained package set is still:
 - `@ecc/s100-viewer-adapter-nasa-ammos`
 - `@ecc/s100-viewer-adapter-cesium`
 
-The branch also contains `@ecc/s100-viewer-adapter-three` as an experimental
+The branch also contains `@ecc/s100-viewer-adapter-three` as a reference
 workspace package. It was merged from the local `threejs-adapter` worktree and
 adapted to the current package boundaries as a plain Three.js reference adapter.
-It is useful for adapter-authoring and engine-switcher validation, but it is not
-in `tools/release-targets.mjs` yet.
+It is useful for adapter-authoring, engine-switcher validation, and
+cross-adapter feature comparison, but it is not in `tools/release-targets.mjs`
+yet.
 
 Applications and examples import the core package plus one or more adapters.
 Adapters import the core package contracts, but the core package does not import
@@ -63,7 +68,7 @@ flowchart LR
   Examples["Examples and demos"] --> Core
   Examples --> Nasa
   Examples --> Cesium
-  Examples --> Three["experimental @ecc/s100-viewer-adapter-three"]
+  Examples --> Three["reference @ecc/s100-viewer-adapter-three"]
 
   Nasa --> Core
   Cesium --> Core
@@ -465,11 +470,16 @@ Completed on the maintainability branch:
   large scene implementation modules. NASA-AMMOS layer helpers for S-102,
   S-111, ENC/map, vessel, and route rendering are loaded through cached dynamic
   imports when those layer families are used.
-- The experimental `@ecc/s100-viewer-adapter-three` package is integrated into
-  the workspace and engine-switcher demo, with the same root, host, scene, and
-  layer lazy-loading boundaries guarded by `bundle-shape:check`.
+- The reference `@ecc/s100-viewer-adapter-three` package is integrated into the
+  workspace and engine-switcher demo, with the same root, host, scene, and layer
+  lazy-loading boundaries guarded by `bundle-shape:check`.
 - `npm run bundle-shape:check` verifies important static import-graph
   assumptions for feature entrypoints and adapter eager paths.
+- Live AIS feed support now lives behind the vessel product API and keeps
+  provider/proxy concerns outside the core package.
+- S-104 support now lives behind the S-104 product entrypoint and scene
+  `waterLevel` controller, with per-position S-102 terrain shading in
+  NASA-AMMOS and the Three.js reference adapter.
 - Local validation has covered release-target checks, demo checks, demo builds,
   and manual localhost startup for S-100 Explorer plus the main demos.
 
@@ -539,18 +549,6 @@ Recommended work:
   safety-depth styling, S-111 loading and playback, vessel controls, draught,
   heading, and any route features consumed by the app.
 - Update the super-repo submodule pointer after each successful lib batch.
-
-### Phase 10A: S-104 Water Level Foundation
-
-Real S-104 support should start from the tracked decision record in
-[S-104 water level architecture](./s104-water-level.md). The feature should be
-implemented as a product data/sampler workflow in `@ecc/s100-viewer`, with
-generated S-104-shaped fixtures and a localhost fixture service used until real
-S-104 HDF5 samples and backend service planning are available.
-
-This phase should not reuse `simulated-water-level` as fake S-104. The existing
-simulated-water-level product remains a non-IHO helper for global scene sea
-level.
 
 ### Phase 11: CI And Release Hygiene
 

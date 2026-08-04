@@ -15,11 +15,12 @@ The root workspace may include demos, local experiments, and historical
 planning artifacts, but those are not release targets unless they are added to
 `tools/release-targets.mjs`.
 
-Experimental adapter packages may live under `packages/*` when they are useful
-for reference implementation work, but they still need an explicit status in
-their README and must not be treated as release targets by accident. The
-current example is `@ecc/s100-viewer-adapter-three`, a plain Three.js reference
-adapter used to exercise the public adapter contract and engine-switcher demo.
+Reference or experimental adapter packages may live under `packages/*` when
+they are useful for adapter-authoring work, but they still need an explicit
+status in their README and must not be treated as release targets by accident.
+The current example is `@ecc/s100-viewer-adapter-three`, a plain Three.js
+reference adapter used to exercise the public adapter contract, engine-switcher
+demo, and cross-adapter feature behavior.
 
 ## Core Package Responsibilities
 
@@ -48,6 +49,7 @@ feature entrypoints:
 @ecc/s100-viewer/products
 @ecc/s100-viewer/products/enc
 @ecc/s100-viewer/products/s102
+@ecc/s100-viewer/products/s104
 @ecc/s100-viewer/products/s111
 @ecc/s100-viewer/products/route
 @ecc/s100-viewer/products/vessel
@@ -95,10 +97,10 @@ Adapter code should not define product semantics that can be shared in the core
 package, such as positive depth normalization, S-111 speed-band selection, route
 style defaults, or ENC opacity rules.
 
-Experimental adapters follow the same boundary rules as release-target
-adapters. They may be incomplete, but they should not depend on app code,
-examples, local worktrees, or package internals that would make later promotion
-to a maintained adapter harder.
+Reference and experimental adapters follow the same boundary rules as
+release-target adapters. They may be incomplete, but they should not depend on
+app code, examples, local worktrees, or package internals that would make later
+promotion to a maintained adapter harder.
 
 ## Lazy Adapter Loading
 

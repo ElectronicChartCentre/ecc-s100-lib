@@ -15,7 +15,6 @@ types from `@ecc/s100-viewer`:
 ```ts
 import {
   LayerBuilder,
-  ProjectedMap,
   SceneBuilder,
   createS100Viewer,
   type S100Scene,
@@ -65,15 +64,26 @@ default styles, and product-version policy in the package.
 
 ```ts
 const encPair = LayerBuilder.createEncWmsPair({
-  idPrefix: "selected-enc",
-  standard: "S-57",
-  url,
-  layers: ["ENC"],
-  geometry: ProjectedMap.fromCenterExtent({
-    center: { x: 331100, y: 5186420 },
-    width: 2000,
-    height: 2000,
-  }),
+  standard: LayerBuilder.EncStandard.S57,
+  center: { x: 331100, y: 5186420, crs: "EPSG:32619" },
+  widthMeters: 2000,
+  crs: "EPSG:32619",
+  minLevel: 0,
+  maxLevel: 10,
+  discardMode: LayerBuilder.ProjectedMapDiscardMode.None,
+  transparent: {
+    id: "selected-enc-overlay",
+    urlTemplate: transparentUrlTemplate,
+    layers: ["ENC"],
+    role: "overlay",
+  },
+  opaque: {
+    id: "selected-enc-basemap",
+    urlTemplate: opaqueUrlTemplate,
+    layers: ["ENC"],
+    role: "basemap",
+    scale: 4,
+  },
 });
 
 const [transparentEnc, opaqueEnc] = await scene.layers.addMany([

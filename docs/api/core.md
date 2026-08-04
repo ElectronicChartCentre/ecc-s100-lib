@@ -68,16 +68,19 @@ controller returns the current global sea level with source `static` or
 
 Adapters that consume the field advertise that through capabilities:
 
-- `waterLevelField: "sampled"` means the adapter can accept a representative
-  water-level value derived from the scene sampler.
+- `waterLevelField: "sampled"` means the adapter can accept scene-level
+  sampled water-level state derived from the scene sampler.
+- `waterLevelTerrainShading: "per-position"` means S-102 terrain shading can
+  use a projected S-104 field so unsafe/safe coloring varies across the
+  horizontal scene.
 - `waterLevelTerrainShading: "global"` means S-102 terrain shading still uses a
-  uniform sea-level value, not a per-position S-104 texture or shader lookup.
+  uniform representative sea-level value.
 
-NASA-AMMOS, Three.js, and Cesium currently use the same first-pass behavior:
-when an S-104 sampler is attached, the core scene samples near the active camera
-and forwards that representative value to the adapter. Product/session helpers
-that need a point-specific answer, such as vessel draught constraints, should
-call `scene.waterLevel.sample({ coordinate })` directly.
+NASA-AMMOS and the Three.js reference adapter currently report per-position
+terrain shading. Cesium currently reports sampled water-level support with
+global terrain shading. Product/session helpers that need a point-specific
+answer, such as vessel draught constraints, should call
+`scene.waterLevel.sample({ coordinate })` directly.
 
 ## Layers
 

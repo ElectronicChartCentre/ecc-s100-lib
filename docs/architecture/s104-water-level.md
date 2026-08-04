@@ -1,15 +1,16 @@
-# S-104 Water Level Architecture Decision
+# S-104 Water Level Architecture
 
-Status: Phase 0 decision record on `ecc-lib-maintainability`
+Status: current implementation note on `ecc-lib-maintainability`
 
-Date: 2026-07-25
+Updated: 2026-07-27
 
 ## Decision
 
-S-104 support will be implemented as product data and a water-level sampler
-first, not as a renderer-specific layer first.
+S-104 support is implemented as product data, workflow orchestration, and a
+scene-level water-level sampler first. Adapters consume the prepared field; they
+do not parse S-104 datasets themselves.
 
-The central library capability will answer:
+The central library capability answers:
 
 ```text
 scene coordinate + scene time
@@ -17,8 +18,12 @@ scene coordinate + scene time
   -> provenance for dataset, source time, grid index, datum, and sampling mode
 ```
 
-Adapters may later use that field for terrain, ocean, and vessel rendering, but
-the first correctness target is the engine-neutral sampler.
+The scene can then use that answer for:
+
+- point-specific vessel vertical behavior;
+- representative global sea-level fallback where an adapter needs a scalar;
+- adapter-owned per-position terrain shading where an adapter supports a
+  sampled water-level field.
 
 ## Product Boundary
 
@@ -32,49 +37,92 @@ the first correctness target is the engine-neutral sampler.
   building the API, sampler, workflow, and demos, but they are not conformance
   evidence and must not be presented as operational S-104 data.
 
-The current `simulated-water-level` API remains valid for demos and scenarios
-that only need a global scalar water-level signal. It must not be renamed or
-reused as the real S-104 implementation.
+The `simulated-water-level` API remains valid for demos and scenarios that only
+need a global scalar water-level signal. It must not be renamed or reused as the
+real S-104 implementation.
 
-## Initial Product Rules
+## Implemented Product Rules
 
-The initial implementation targets S-104 Edition 2.0.0 semantics established in
+The current implementation targets the S-104 Edition 2.0.0 rules established in
 the planning research:
 
-- regular grid only;
+- regular grid support first;
 - nearest-neighbor spatial lookup;
 - nearest-record temporal lookup;
 - no time or space extrapolation;
-- fill/no-data values must be honored;
-- shoreline or same-waterbody logic is not the default;
-- any shoreline-aware behavior must be an explicit extension backed by product
-  masks or preprocessed waterbody topology.
+- fill/no-data values are honored;
+- shoreline or same-waterbody logic is not inferred by default;
+- any shoreline-aware behavior must be an explicit future extension backed by
+  product masks or preprocessed waterbody topology.
 
-## Public API Direction
+When no S-104 value exists at a point, rendering integrations treat the point as
+having zero extra water-level effect above the baseline. Sampler callers still
+receive an explicit non-value status such as `outside-coverage`,
+`outside-time-range`, or `missing-value`.
 
-The planned public import surface is:
+## Public API
+
+Product-specific application code should import S-104 from the product
+entrypoint:
 
 ```ts
 import {
   S104Workflow,
   createFixtureS104Service,
+  createS104WaterLevelSampler,
+  sampleS104WaterLevel,
   type S104WaterLevelSampler,
 } from "@ecc/s100-viewer/products/s104";
 ```
 
-The root package may eventually re-export common S-104 types, but
-product-specific workflows should remain available from the product entrypoint
-to preserve the bundle-aware import model established by the maintainability
-work.
-
 The app and demos should not parse S-104 grids directly. They should configure
-dataset ids, service endpoints, and workflow options, then consume sampler
-results returned by the library.
+dataset ids, service endpoints, projection options, and workflow limits, then
+consume the sampler and statuses returned by the library.
+
+Typical workflow:
+
+```ts
+const result = await S104Workflow.prepare({
+  datasets,
+  crs: "EPSG:32631",
+  service: createFixtureS104Service({
+    endpoint: "http://127.0.0.1:8794",
+  }),
+  limits: {
+    maxDataPoints: 500000,
+    metadataFetchConcurrency: 1,
+    dataFetchConcurrency: 1,
+  },
+});
+
+scene.waterLevel.setSampler(result.sampler);
+```
+
+Successful workflow results include:
+
+- prepared decoded datasets;
+- per-dataset statuses;
+- merged timeline metadata;
+- observed grid spacing;
+- a ready `S104WaterLevelSampler`.
+
+Sampler values include:
+
+- water-level height in metres;
+- trend;
+- uncertainty when present;
+- requested and source time;
+- requested coordinate and sampled coordinate;
+- projected grid index and linear index;
+- dataset id;
+- vertical datum when present;
+- product specification version when present;
+- sampling mode.
 
 ## Generated Fixture Strategy
 
-Real S-104 HDF5 sample files are not currently available. Phase 1+ work should
-therefore start with generated, S-104-shaped JSON fixtures:
+Real S-104 HDF5 sample files were not available during the initial
+implementation, so the branch added generated, S-104-shaped JSON fixtures:
 
 - deterministic regular grids;
 - time-varying scalar water levels;
@@ -84,17 +132,31 @@ therefore start with generated, S-104-shaped JSON fixtures:
 - optional fill/no-data regions for sampler tests;
 - localhost service responses shaped like the future real endpoint.
 
-The generator should be repo-owned and deterministic. Generated JSON and other
-large fixture outputs should be stored in the static files repository, not in
+The generator is repo-owned and deterministic. Generated JSON and other large
+fixture outputs are stored in the static files repository by default, not in
 `ecc-s100-lib`. This keeps the library source repository focused on code,
 types, tests, and fixture generation logic while still making demo payloads
 available through the same static asset workflow used by the existing demos.
 
-## First Fixture Scene
+Commands:
 
-Use the existing Stavanger demo area as the first generated S-104 fixture
-anchor. It already exercises S-102 terrain, S-101 overlays, live AIS vessels,
-and local service configuration in the engine switcher demo.
+```sh
+npm run fixtures:s104:generate
+npm run fixtures:s104:validate
+npm run demo:s104-fixture-service
+```
+
+Default local service endpoint:
+
+```text
+http://127.0.0.1:8794/s104/catalog.json
+```
+
+## Fixture Scene
+
+The first generated S-104 fixture is anchored in the Stavanger demo area. It
+exercises S-102 terrain, S-101/S-57 overlays, live AIS vessels, and local
+service configuration in the engine switcher and S-100 Explorer.
 
 Initial fixture scene settings:
 
@@ -128,79 +190,62 @@ const initialS104FixtureScene = {
 };
 ```
 
-The first generated grid should be coarse enough for fast unit tests and manual
-browser testing, but large enough to show spatial differences clearly. A good
-starting point is a 9 km by 9 km grid with 150 m spacing, producing 61 by 61
-points per time record.
+The generated grid is coarse enough for fast unit tests and manual browser
+testing, but large enough to show spatial differences clearly.
 
-## Scene Integration Direction
+## Scene Integration
 
-The existing scene API exposes a global scalar:
+The existing scene API still exposes a global scalar:
 
 ```ts
 scene.setSeaLevel(value);
 scene.getSeaLevel();
 ```
 
-Real S-104 can vary horizontally, so the core scene now exposes a scene-level
-water-level field controller instead of forcing S-104 into the global scalar.
-
-Preferred direction:
+That API remains the static/simulated fallback. Real S-104 can vary
+horizontally, so the core scene exposes a water-level field controller:
 
 ```ts
 scene.waterLevel.setSampler(workflowResult.sampler);
 const sample = scene.waterLevel.sample({ coordinate, time });
 ```
 
-The global sea-level scalar should remain as a compatibility fallback for:
+The global sea-level scalar remains as fallback for:
 
 - static sea level;
 - existing simulated water-level behavior;
-- adapters or tools that cannot yet consume point-specific S-104 samples.
+- adapters or tools that cannot consume point-specific S-104 samples.
 
 The sample result includes `source`, allowing app code to distinguish `static`,
-`simulated-water-level`, and `s104` values. The S-104 source preserves the
-sampler provenance, including dataset id, source time, grid index, datum, and
-sampling mode.
+`simulated-water-level`, and `s104` values. The S-104 source preserves sampler
+provenance, including dataset id, source time, grid index, datum, and sampling
+mode.
 
-## Adapter Integration Direction
+## Adapter Integration
 
-Adapters should not own S-104 product parsing. They should consume scene-level
-water-level samples or representative values exposed by the core package.
+Adapters must not own S-104 product parsing. They consume scene-level
+water-level state supplied by the core scene.
 
-First-pass rendering behavior may use a representative sampled value near the
-vessel or camera for ocean-surface height. Per-position S-104 terrain/ocean
-shading should be a later shader/texture phase after the sampler is stable.
+Current capability matrix:
 
-## Current Adapter State
+| Adapter | `waterLevelField` | `waterLevelTerrainShading` | Notes |
+| --- | --- | --- | --- |
+| NASA-AMMOS | `sampled` | `per-position` | Uses prepared field data for S-102 safety-depth terrain shading. |
+| Three.js reference | `sampled` | `per-position` | Mirrors the NASA-AMMOS projected-local sampled terrain behavior where possible. |
+| Cesium | `sampled` | `global` | Uses representative/scalar behavior for now; globe/ECEF water-field work remains later. |
 
-NASA-AMMOS, Three.js, and Cesium now advertise sampled water-level support:
-
-```ts
-{
-  waterLevelField: "sampled",
-  waterLevelTerrainShading: "global",
-}
-```
-
-The core scene owns the S-104 sampler and forwards a representative sampled
-height to adapters through the existing sea-level path. That keeps terrain and
-ocean rendering working without engine-specific S-104 parsing, while making the
-current limitation explicit: S-102 terrain shading is still global, not
-per-position.
+The core scene still computes a representative sampled sea level for features
+that need a scalar. NASA-AMMOS and Three additionally receive projected S-104
+field grids so S-102 red safety shading can vary horizontally across terrain.
 
 Vessel feature sessions use `scene.waterLevel.sample({ coordinate })` at the
-vessel position for sea-level-relative vertical limits. This is the first
-point-specific consumer of the S-104 field and keeps draught behavior aligned
-with spatially varying water level where a sampler is available.
+vessel position for sea-level-relative vertical limits. This keeps draught and
+vertical placement aligned with spatially varying water level where a sampler
+is available.
 
-Future per-position rendering should generate a compact texture or equivalent
-adapter-native field from the prepared S-104 grid and sample it in terrain and
-ocean shaders.
+## Implemented Sequence
 
-## Implementation Handoff
-
-The next implementation phases should proceed in this order:
+The completed implementation sequence was:
 
 1. Shared gridded time-series helpers.
 2. Generated S-104 fixture generator.
@@ -212,9 +257,20 @@ The next implementation phases should proceed in this order:
 7. Workflow orchestration with partial success, merged timeline, observed grid
    spacing, and sampler construction.
 8. Scene water-level field controller.
-9. Demo and S-100 Explorer integration.
-10. Real HDF5 and production service path when sample files and backend planning
-   are available.
+9. Engine switcher and S-100 Explorer integration.
+10. Adapter water-level field forwarding.
+11. Per-position S-102 terrain shading in NASA-AMMOS and Three.
+
+## Remaining Work
+
+- Add real HDF5 ingestion or backend service conversion once real S-104 sample
+  files and production endpoint decisions are available.
+- Add conformance-oriented tests against real S-104 datasets.
+- Decide whether shoreline-aware or waterbody-aware sampling is needed, and
+  implement it only with explicit product masks or topology inputs.
+- Extend Cesium beyond global/representative water-level terrain behavior during
+  the dedicated globe/ECEF phase.
+- Add operational documentation for a future production S-104 service contract.
 
 ## Guardrails
 

@@ -7,13 +7,14 @@ package targets already-derived services:
 
 - OGC 3D Tiles for S-102 bathymetry
 - WMS/WMTS/MVT for ENC layers, including S-101 and S-57, plus map overlays
-- REST or static JSON for simulated water-level layers and S-111
+- REST or static JSON for S-104 fixtures, S-111, and simulated water-level
+  layers
 - GLB/GLTF model sources for vessels
 
-Real S-104 water-level support is planned as a product data/sampler API, not as
-an alias for the existing `simulated-water-level` helper. See
+Real S-104 water-level support is implemented as a product data/sampler API, not
+as an alias for the existing `simulated-water-level` helper. See
 [S-104 water level architecture](../architecture/s104-water-level.md) for the
-current implementation decision record.
+current implementation notes.
 
 ## Layer Builder
 
@@ -54,34 +55,44 @@ LayerBuilder.createS57Wms({ url, layers: ["enc_cells"] });
 LayerBuilder.createS57Wmts({ url, layer: "s57", tileMatrixSet: "utm" });
 ```
 
-For application-style WMS URL templates, use the package-owned projected-map
-helpers instead of carrying adapter-native map specifications in application
-code:
+For application-style transparent/opaque WMS URL templates, use
+`LayerBuilder.createEncWmsPair(...)` instead of carrying adapter-native map
+specifications in application code:
 
 ```ts
 import {
-  ProjectedMapDiscardMode,
-  ProjectedMapLayerType,
-  mapSpecificationToLayerSpec,
+  LayerBuilder,
 } from "@ecc/s100-viewer";
 
-const encLayer = mapSpecificationToLayerSpec({
-  id: "s57WMS",
-  type: ProjectedMapLayerType.Base,
-  encStandard: "S-57",
-  dataset: {
-    mapSubset: { min: [0, 0], max: [1000, 1000] },
-    extents: { minX: 0, minY: 0, maxX: 1000, maxY: 1000 },
-    minLevel: 0,
-    maxLevel: 10,
+const encPair = LayerBuilder.createEncWmsPair({
+  standard: LayerBuilder.EncStandard.S57,
+  center: { x: 331100, y: 5186420, crs: "EPSG:32619" },
+  widthMeters: 2000,
+  crs: "EPSG:32619",
+  minLevel: 0,
+  maxLevel: 10,
+  discardMode: LayerBuilder.ProjectedMapDiscardMode.None,
+  transparent: {
+    id: "s57-overlay",
+    urlTemplate: transparentUrlTemplate,
+    layers: ["ENC"],
+    role: "overlay",
   },
-  corners,
-  urlTemplate: "https://example.test/wms?bbox={xmin},{ymin},{xmax},{ymax}&SRS=EPSG:32633",
-}, ProjectedMapDiscardMode.Transparent);
+  opaque: {
+    id: "s57-basemap",
+    urlTemplate: opaqueUrlTemplate,
+    layers: ["ENC"],
+    role: "basemap",
+    scale: 4,
+  },
+});
 ```
 
-That produces a normal `EncLayerSpec` with `source.kind: "wms-template"`.
-Adapters translate that source shape internally.
+That produces normal `EncLayerSpec` values with `source.kind: "wms-template"`.
+Adapters translate that source shape internally. The lower-level
+`mapSpecificationToLayerSpec(...)` helper remains available for migration code
+that already owns projected map specifications, but new application code should
+prefer the typed pair builder.
 
 ## Product Specification Versions
 
@@ -171,8 +182,10 @@ Successful workflow results include prepared datasets, per-dataset statuses, a
 merged timeline, observed grid spacing, and a ready sampler. Prepared datasets
 include normalized grid geometry, timeline, typed water-level arrays, fill
 values, and source provenance. The sampler returns height, trend, uncertainty,
-nearest grid/time provenance, and CRS-bearing coordinates. Rendering integration
-is implemented in later S-104 phases.
+nearest grid/time provenance, and CRS-bearing coordinates. Scene integration is
+available through `scene.waterLevel.setSampler(...)`; NASA-AMMOS and the Three.js
+reference adapter consume the field for per-position S-102 terrain safety
+shading, while Cesium currently consumes a representative/global value.
 `simulated-water-level` remains a separate non-IHO operational helper product.
 
 ## Feature Sessions

@@ -33,7 +33,7 @@ flowchart LR
 | Term | Practical meaning in this library |
 | --- | --- |
 | Product specification | The S-100-family product type and version, such as an S-101 ENC or S-111 surface-current product. |
-| Product type | The layer family in the core API: `S-101`, `S-102`, `S-111`, `S-57`, `vessel`, `route-plan`, and helper products. |
+| Product type | The layer family in the core API: `S-101`, `S-102`, `S-104`, `S-111`, `S-57`, `vessel`, `route-plan`, and helper products. |
 | Product specification version | A separate field from product type. Builders default it to `latest-confirmed-supported` unless the app supplies a concrete identifier. |
 | Exchange set | A standard distribution package. Browser apps usually consume derived services/assets instead of raw exchange sets. |
 | Source | The browser-consumable input for a layer, such as WMS, WMTS, 3D Tiles, static JSON, REST JSON, URL template, or GLB. |
@@ -49,12 +49,17 @@ flowchart LR
 | --- | --- | --- |
 | S-101 | Electronic Navigational Chart data in the S-100 family. | WMS, WMTS, or WMS template ENC layers. |
 | S-102 | Bathymetric surface data. | 3D Tiles terrain/bathymetry. |
+| S-104 | Water-level data for surface navigation. | Generated S-104-shaped fixture JSON today; future real service/HDF5-derived JSON later. |
 | S-111 | Surface current data with time metadata. | REST or static JSON current vectors. |
 | S-57 | Legacy ENC data. It is supported for integration, but it is not itself an S-100 product specification. | WMS, WMTS, or WMS template ENC layers. |
 | RTZ route | Route-plan input used for route portrayal workflows. The current route portrayal is S-421-like but exposed as an operational route feature. | RTZ XML files or URLs. |
 | Vessel | Operational viewer feature, not an IHO product. | GLB/GLTF model or parametric vessel spec. |
 | Live AIS | Operational feed workflow, not an IHO product. | Backend-proxy-normalized AIS-like vessel reports. |
 | Simulated water level | Application helper data, not an IHO product. | Static or REST JSON time series. |
+
+S-104 and simulated water level are deliberately separate. S-104 is a real IHO
+product workflow with coordinate/time-aware sampling. Simulated water level is a
+non-IHO helper for global scalar sea-level behavior.
 
 ## What The App Owns
 

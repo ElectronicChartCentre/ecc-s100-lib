@@ -106,8 +106,9 @@ Use for S-104 water-level service access, regular-grid metadata assessment,
 fixture/service dataset decoding, deterministic point-specific sampling, and
 workflow preparation. Successful `S104Workflow.prepare` results include
 normalized decoded grids, time records, merged timeline metadata, observed grid
-spacing, and a ready `sampler`. Adapter rendering and scene integration land in
-later S-104 phases.
+spacing, and a ready `sampler`. Attach the sampler with
+`scene.waterLevel.setSampler(result.sampler)` so adapters and vessel sessions
+can consume the active water-level field.
 
 ## Route Entrypoint
 

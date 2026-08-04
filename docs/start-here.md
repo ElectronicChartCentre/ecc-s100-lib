@@ -20,6 +20,9 @@ interaction constraints while still exposing canonical scene/layer handles.
    [`live-vessel-feed`](./workflows/live-vessel-feed.md),
    [`parametric-vessel`](./workflows/parametric-vessel.md), and
    [`rtz-route`](./workflows/rtz-route.md).
+6. Read [`S-104 water level`](./architecture/s104-water-level.md) when a screen
+   needs coordinate/time-aware water-level sampling or S-102 safety-depth
+   shading driven by S-104 data.
 
 Use the lower-level `LayerBuilder` and `scene.layers` APIs when a feature
 session does not fit the app workflow or when you are implementing a new session.
@@ -38,8 +41,8 @@ cp examples/engine-adapter-switcher/.env.example examples/engine-adapter-switche
 npm run demo:engine-switcher
 ```
 
-The switcher currently exercises NASA-AMMOS, Cesium, and the experimental
-plain Three.js reference adapter.
+The switcher currently exercises NASA-AMMOS, Cesium, and the plain Three.js
+reference adapter.
 
 ## If You Are Writing An Adapter
 
@@ -76,5 +79,6 @@ npm run build:release-target
 | Compare engines | [`engine-switcher-practical-guide`](./learn/engine-switcher-practical-guide.md) | `npm run demo:engine-switcher` |
 | Render RTZ routes | [`rtz-route workflow`](./workflows/rtz-route.md) | `npm run demo:rtz-route` |
 | Render live AIS vessels | [`live-vessel-feed workflow`](./workflows/live-vessel-feed.md) | `npm run demo:engine-switcher` |
+| Inspect S-104 water level | [`S-104 water level`](./architecture/s104-water-level.md) | `npm run demo:engine-switcher` |
 | Tune procedural vessel geometry | [`parametric-vessel workflow`](./workflows/parametric-vessel.md) | `npm run demo:parametric-vessel` |
 | Write an engine adapter | [`adapter-authoring-guide`](./architecture/adapter-authoring-guide.md) | `npm run demo:engine-switcher` |
