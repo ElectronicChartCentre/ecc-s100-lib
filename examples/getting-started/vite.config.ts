@@ -13,6 +13,7 @@ const nasaAmmosAdapterSource = resolve(
   workspaceRoot,
   "packages/s100-viewer-adapter-nasa-ammos/src/index.ts",
 );
+const threeSource = resolve(workspaceRoot, "node_modules/three");
 
 export default defineConfig({
   resolve: {
@@ -32,7 +33,12 @@ export default defineConfig({
         find: /^@ecc\/s100-viewer-adapter-nasa-ammos$/u,
         replacement: nasaAmmosAdapterSource,
       },
+      // Source-aliased adapter workspaces must share one Three runtime.
+      { find: /^three$/u, replacement: threeSource },
+      { find: /^three\/addons\/(.+)$/u, replacement: `${threeSource}/examples/jsm/$1` },
+      { find: /^three\/examples\/jsm\/(.+)$/u, replacement: `${threeSource}/examples/jsm/$1` },
     ],
+    dedupe: ["three"],
   },
   server: {
     fs: {
