@@ -30,10 +30,7 @@ import {
   type Texture,
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import {
-  TransformControls,
-  type TransformControlsMode,
-} from "three/examples/jsm/controls/TransformControls.js";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import { Line2 } from "three/examples/jsm/lines/Line2.js";
 import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
@@ -83,6 +80,7 @@ export type { Subscription };
 
 export type Vec3Tuple = [number, number, number];
 export type QuatTuple = [number, number, number, number];
+export type TransformControlsMode = "translate" | "rotate" | "scale";
 
 export type CameraPose = {
   position: Vec3Tuple;
@@ -2223,6 +2221,9 @@ function tightenTransformControlPicker(
   }
 
   const factor = TRANSFORM_CONTROL_PICKER_SCALE[mode];
+  if (factor === undefined) {
+    return;
+  }
   picker.traverse((object) => {
     const geometry = (object as Object3D & { geometry?: BufferGeometry })
       .geometry;

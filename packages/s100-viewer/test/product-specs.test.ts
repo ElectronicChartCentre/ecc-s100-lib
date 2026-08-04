@@ -414,6 +414,26 @@ describe("@ecc/s100-viewer product specs", () => {
 
     expect(
       LayerBuilder.assessS111Metadata({
+        datasetId: "s111-gds-code",
+        metadata: {
+          dataCodingFormat: { code: S100DataCodingFormat.RegularGrid },
+          instanceAttributes: [
+            {
+              numPointsLongitudinal: 2,
+              numPointsLatitudinal: 3,
+            },
+          ],
+        },
+      }),
+    ).toMatchObject({
+      status: "accepted",
+      datasetId: "s111-gds-code",
+      numberOfCells: 6,
+      numberOfDataPoints: 6,
+    });
+
+    expect(
+      LayerBuilder.assessS111Metadata({
         datasetId: "s111-too-large",
         maxDataPoints: 399,
         metadata: {

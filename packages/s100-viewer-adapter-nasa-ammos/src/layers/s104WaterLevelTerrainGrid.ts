@@ -42,7 +42,7 @@ export const createNasaWaterLevelTerrainGrid = (
   }
 
   const texture = new DataTexture(
-    projected.values,
+    new Float32Array(projected.values),
     projected.width,
     projected.height,
     RedFormat,
