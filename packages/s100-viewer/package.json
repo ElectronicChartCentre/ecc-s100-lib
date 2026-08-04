@@ -1,6 +1,6 @@
 {
   "name": "@ecc/s100-viewer",
-  "version": "0.1.0-alpha.12",
+  "version": "0.1.0-alpha.13",
   "private": false,
   "type": "module",
   "description": "Engine-neutral S-100 viewer API with product layer specs and builders.",
