@@ -8,7 +8,7 @@ export type S111MetadataInstanceAttributes = {
 };
 
 export type S111MetadataLike = {
-  dataCodingFormat?: number | { value?: number };
+  dataCodingFormat?: number | { value?: number, code?: number };
   instanceAttributes?: readonly S111MetadataInstanceAttributes[];
 };
 
@@ -157,6 +157,9 @@ export const s111DataCodingFormatValue = (
   }
   if (typeof value?.value === "number") {
     return value.value;
+  }
+  if (typeof value?.code === "number") {
+    return value.code;
   }
   return undefined;
 };
