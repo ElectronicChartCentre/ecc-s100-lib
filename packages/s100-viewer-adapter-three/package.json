@@ -46,6 +46,10 @@
     "@ecc/s100-viewer": "0.1.0-alpha.12",
     "3d-tiles-renderer": "^0.4.27"
   },
+  "devDependencies": {
+    "@types/three": "^0.184.0",
+    "three": "^0.184.0"
+  },
   "peerDependencies": {
     "three": ">=0.184.0"
   },
