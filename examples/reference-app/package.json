@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ecc/s100-viewer": "0.1.0-alpha.12",
-    "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.12",
+    "@ecc/s100-viewer": "0.1.0-alpha.13",
+    "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.13",
     "three": "^0.184.0"
   },
   "devDependencies": {

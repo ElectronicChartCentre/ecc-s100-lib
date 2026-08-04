@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ecc/s100-viewer": "0.1.0-alpha.12",
-    "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.12",
-    "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.12",
-    "@ecc/s100-viewer-adapter-three": "0.1.0-alpha.12",
+    "@ecc/s100-viewer": "0.1.0-alpha.13",
+    "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.13",
+    "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.13",
+    "@ecc/s100-viewer-adapter-three": "0.1.0-alpha.13",
     "cesium": "^1.142.0",
     "three": "^0.184.0"
   },

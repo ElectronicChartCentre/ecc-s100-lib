@@ -15,10 +15,10 @@ engines.
 - `prerequisites`: Node.js/npm, browser access, TypeScript familiarity, and
   local access to this workspace. Service-backed recipes also need local PRIMAR
   endpoint, licensee, API key, and dataset configuration.
-- `component_versions`: `@ecc/s100-viewer@0.1.0-alpha.12`,
-  `@ecc/s100-viewer-adapter-nasa-ammos@0.1.0-alpha.12`,
-  `@ecc/s100-viewer-adapter-cesium@0.1.0-alpha.12`,
-  `@ecc/s100-viewer-adapter-three@0.1.0-alpha.12`,
+- `component_versions`: `@ecc/s100-viewer@0.1.0-alpha.13`,
+  `@ecc/s100-viewer-adapter-nasa-ammos@0.1.0-alpha.13`,
+  `@ecc/s100-viewer-adapter-cesium@0.1.0-alpha.13`,
+  `@ecc/s100-viewer-adapter-three@0.1.0-alpha.13`,
   `@ecc/s100-engine-adapter-switcher@0.0.0`.
 - `commands`: `npm install`, `npm run check:demo:engine-switcher`,
   `npm run build:demo:engine-switcher`, `npm run demo:engine-switcher`.
