@@ -8,7 +8,9 @@ docs for the current `ecc-s100-lib` package shape.
 - [Learning guides](./learn/README.md)
 - [Step-by-step engine switcher learning guide](./learn/engine-switcher-practical-guide.md)
 - [Package readiness](./package-readiness.md)
+- [Build and publish release tarballs](./development/build-and-publish-tarballs.md)
 - [Developer ergonomics review](./developer-ergonomics-review.md)
+- [New features after the interoperability refactor](../NEW_FEATURES_AFTER_INTEROPERABILITY_REFACTOR.md)
 - API docs:
   [entrypoints](./api/entrypoints.md),
   [core](./api/core.md),

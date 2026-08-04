@@ -35,6 +35,10 @@ npm run build:release-target
 npm run pack:release-target:dry-run
 ```
 
+The full developer workflow for version bumps, real `.tgz` creation, GitHub
+Release upload, and consumer URL updates is documented in
+[`docs/development/build-and-publish-tarballs.md`](./development/build-and-publish-tarballs.md).
+
 ## Consumer Dependency References
 
 During the current public alpha integration, S-100 Explorer should consume
@@ -42,9 +46,9 @@ immutable GitHub release tarballs for the maintained package set:
 
 ```json
 {
-  "@ecc/s100-viewer": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.10/ecc-s100-viewer-0.1.0-alpha.10.tgz",
-  "@ecc/s100-viewer-adapter-nasa-ammos": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.10/ecc-s100-viewer-adapter-nasa-ammos-0.1.0-alpha.10.tgz",
-  "@ecc/s100-viewer-adapter-cesium": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.10/ecc-s100-viewer-adapter-cesium-0.1.0-alpha.10.tgz"
+  "@ecc/s100-viewer": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.12/ecc-s100-viewer-0.1.0-alpha.12.tgz",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.12/ecc-s100-viewer-adapter-nasa-ammos-0.1.0-alpha.12.tgz",
+  "@ecc/s100-viewer-adapter-cesium": "https://github.com/ElectronicChartCentre/ecc-s100-lib/releases/download/ecc-s100-lib-v0.1.0-alpha.12/ecc-s100-viewer-adapter-cesium-0.1.0-alpha.12.tgz"
 }
 ```
 
@@ -76,9 +80,9 @@ After public npm publication, S-100 Explorer should consume registry versions:
 
 ```json
 {
-  "@ecc/s100-viewer": "0.1.0-alpha.10",
-  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.10",
-  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.10"
+  "@ecc/s100-viewer": "0.1.0-alpha.12",
+  "@ecc/s100-viewer-adapter-nasa-ammos": "0.1.0-alpha.12",
+  "@ecc/s100-viewer-adapter-cesium": "0.1.0-alpha.12"
 }
 ```
 
@@ -92,13 +96,20 @@ After public npm publication, S-100 Explorer should consume registry versions:
 
 ## Package Boundary
 
-Normal application code should depend on:
+Normal application code should depend on the core package plus only the adapter
+packages it actually instantiates:
 
 ```text
 @ecc/s100-viewer
 @ecc/s100-viewer-adapter-nasa-ammos
 @ecc/s100-viewer-adapter-cesium
 ```
+
+S-100 Explorer currently imports only the NASA-AMMOS adapter. The Cesium adapter
+is still a maintained release-target package and is exercised by the library's
+engine switcher demo. The Three.js reference adapter is useful for workspace
+parity and adapter-authoring checks, but it is not part of the current
+release-target list yet.
 
 Application code should not depend on NASA-AMMOS internals, Cogs classes, Three.js
 objects, or adapter-native handles unless it is explicitly using a documented
@@ -118,12 +129,24 @@ import { LayerBuilder, SceneBuilder } from "@ecc/s100-viewer";
   overlay layers.
 - `LayerBuilder.createS57Wms(...)` and `createS57Wmts(...)` build S-57 ENC
   layers with the shared ENC source shape.
+- `LayerBuilder.createEncWmsPair(...)` builds paired transparent/opaque ENC WMS
+  layers for projected-local scenes.
 - `LayerBuilder.createSimulatedWaterLevel(...)` and
   `createStaticSimulatedWaterLevel(...)` build non-IHO simulated water-level
   layers.
-- `LayerBuilder.createS111(...)` and `createStaticS111(...)` build current
-  layers.
-- `LayerBuilder.createVessel(...)` builds vessel model layers.
+- `@ecc/s100-viewer/products/s104` exposes `S104Workflow`,
+  `createS104WaterLevelSampler(...)`, and fixture-service helpers for real
+  S-104-shaped water-level data.
+- `@ecc/s100-viewer/products/s111` exposes `S111Workflow` and S-111 service
+  helpers.
+- `@ecc/s100-viewer/products/vessel` exposes vessel sessions, parametric vessel
+  helpers, live AIS feed helpers, and AIS position mappers.
+- `@ecc/s100-viewer/products/route` exposes RTZ parsing, route layout, and route
+  feature-session helpers.
+- `LayerBuilder.createS111(...)` and `createStaticS111(...)` still build lower
+  level current layers.
+- `LayerBuilder.createVessel(...)` builds single vessel model or parametric
+  vessel layers.
 - `LayerBuilder.createMapOverlayWms(...)` builds generic map-overlay layers.
 - `mapSpecificationToLayerSpec(...)` converts app-style projected WMS map
   specifications into canonical ENC/map-overlay specs using `wms-template`
@@ -136,10 +159,10 @@ and the implementation has validated the edition. Simulated water-level layers
 and S-57 ENC layers do not claim an IHO S-100 product specification version.
 
 Real S-104 water-level support is intentionally separate from
-`simulated-water-level`. The current S-104 foundation is documented in
+`simulated-water-level`. The current S-104 implementation is documented in
 [`docs/architecture/s104-water-level.md`](./architecture/s104-water-level.md);
-until that product entrypoint exists, simulated water-level layers must continue
-to be described as non-IHO helper data.
+simulated water-level layers must continue to be described as non-IHO helper
+data.
 
 The core package lists library-level support in `S100SupportedProductVersions`.
 Each adapter must list renderable product versions on

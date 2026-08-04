@@ -7,17 +7,17 @@ Release-target packages for the current phase:
 
 - `@ecc/s100-viewer`: viewer, scene, layer, product, time, picking,
   coordinate, and adapter contracts. This includes ENC builders for S-101 and
-  S-57, S-102, S-111, simulated water-level, vessel, and map-overlay layer
-  builders.
+  S-57, product sessions and workflows for S-102, S-104, S-111, vessel/live AIS,
+  RTZ route support, simulated water-level helpers, and map-overlay builders.
 - `@ecc/s100-viewer-adapter-nasa-ammos`: NASA-AMMOS/Three.js adapter.
 - `@ecc/s100-viewer-adapter-cesium`: Cesium adapter and initial globe-native
   integration target.
 
-Experimental workspace packages:
+Reference workspace packages that are not release targets yet:
 
 - `@ecc/s100-viewer-adapter-three`: plain Three.js reference adapter used by the
-  engine-switcher demo and maintainability work. It is intentionally not listed
-  in `tools/release-targets.mjs` yet.
+  engine-switcher demo, adapter-authoring work, and cross-adapter feature
+  validation. It is intentionally not listed in `tools/release-targets.mjs` yet.
 
 S-100 Explorer owns any application-specific migration bridge in the webapp.
 The public package contract is the main `@ecc/s100-viewer` entry point plus
@@ -142,7 +142,9 @@ npm run pack:release-target:dry-run
   [parametric vessel](./docs/workflows/parametric-vessel.md),
   [RTZ route](./docs/workflows/rtz-route.md)
 - [Package readiness](./docs/package-readiness.md)
+- [Build and publish release tarballs](./docs/development/build-and-publish-tarballs.md)
 - [Developer ergonomics review](./docs/developer-ergonomics-review.md)
+- [New features after the interoperability refactor](./NEW_FEATURES_AFTER_INTEROPERABILITY_REFACTOR.md)
 - [Maintainability refactor](./docs/architecture/maintainability-refactor.md)
 - [S-104 water level architecture](./docs/architecture/s104-water-level.md)
 - [Cogs adapter extraction plan](./docs/cogs-adapter-extraction-plan.md)
