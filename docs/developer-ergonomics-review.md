@@ -1,5 +1,14 @@
 # Developer Ergonomics Review
 
+Status: historical review retained for context. The maintainability branch has
+implemented the canonical root API, adapter capability reporting, product
+builders, selected Explorer migration work, live AIS orchestration, S-104
+sampling, and the Three.js reference adapter since this review was written. Use
+`docs/start-here.md`,
+`docs/architecture/maintainability-refactor.md`, and
+`NEW_FEATURES_AFTER_INTEROPERABILITY_REFACTOR.md` as the current-state entry
+points.
+
 Maintainability branch goal: make the package convenient to use before deciding
 on public npm publication.
 
@@ -12,17 +21,18 @@ on public npm publication.
   support before adding layers or enabling tools.
 - `SceneBuilder.projectedLocal(...)` removes common projected/local scene
   georeference boilerplate.
-- `LayerBuilder` removes common product-layer boilerplate for ENC standards
-  (S-101 and S-57), S-102, S-111, simulated water-level layers, vessels, and
-  map overlays.
+- `LayerBuilder` and product feature sessions remove common product-layer
+  boilerplate for ENC standards, S-102, S-104, S-111, simulated water-level
+  layers, vessels, live AIS fleets, RTZ routes, and map overlays.
 - Product specs and builders now export from `@ecc/s100-viewer`, so normal
   application code does not need a second product package.
 - Product builders default `productSpecificationVersion` to
   `latest-confirmed-supported`, with explicit edition identifiers available for
   future product-version-specific rendering.
 - `defineS100LayerSpec(...)` remains available as a low-level type helper.
-- The webapp-owned runtime bridge keeps S-100 Explorer migration incremental
-  without exposing a public compatibility package subpath.
+- S-100 Explorer now consumes the canonical viewer API through app-owned viewer
+  handlers and a NASA-AMMOS-only engine boundary. The old runtime bridge shape
+  is historical migration context, not the current integration model.
 
 ## Current Friction
 
@@ -51,17 +61,20 @@ on public npm publication.
    unsupported source, and time-range errors return actionable `S100Error`
    codes and messages.
 
-5. The NASA-AMMOS adapter still uses a vendored compatibility surface
-   internally.
+5. Adapter internals are much better split than in the original review, but
+   renderer-specific implementation files still need regular parity and bundle
+   checks as NASA-AMMOS, Three.js, and Cesium evolve.
 
-   Recommended improvement: migrate adapter internals from the compatibility
-   surface to direct NASA-AMMOS primitives before public release.
+   Recommended improvement: keep adapter internals behind package-private
+   modules, keep lazy layer loading intact, and use the engine switcher demo as
+   a parity check for S-102, S-104, S-111, vessel, route, and AIS workflows.
 
-6. The webapp-owned runtime bridge is still widely used by S-100 Explorer
-   handlers.
+6. S-100 Explorer still has meaningful app orchestration code around service
+   configuration, sidebar state, and scenario persistence.
 
-   Recommended improvement: keep it app-local while needed, then remove it
-   after Explorer handlers use the core API directly.
+   Recommended improvement: keep pushing reusable product semantics into
+   `@ecc/s100-viewer` while keeping Explorer-specific persistence and UI state
+   in the app.
 
 ## Low-Boilerplate Target
 
@@ -93,12 +106,11 @@ common product layers.
 
 1. Refine `SceneBuilder` and `LayerBuilder` against real S-100 Explorer
    migration code.
-2. Replace NASA-AMMOS adapter internals that still use the compatibility
-   surface.
-3. Migrate S-100 Explorer handlers from the app runtime bridge to direct core
-   and product specs.
+2. Keep adapter parity checks current for NASA-AMMOS, Three.js reference, and
+   Cesium.
+3. Keep S-100 Explorer handlers on direct core/product specs and avoid
+   reintroducing app-local product templates.
 4. Add standardized `S100Error` coverage for data source, CRS, capability, and
    time errors.
 5. Add real generated API docs once a docs generator is selected.
-6. Remove the app runtime bridge once Explorer handlers use direct core and
-   product specs.
+6. Add snippet/contract tests for the canonical docs and product entrypoints.

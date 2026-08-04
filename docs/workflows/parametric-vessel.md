@@ -31,6 +31,14 @@ const dimensions = {
 
 Overall length is `bow + stern`. Overall beam is `port + starboard`. The vessel
 reference point is commonly the transponder or another operational reference.
+Draught follows nautical convention: it is a positive depth downward from the
+waterline.
+
+If hull, bridge, or mast heights are not provided, the library derives sensible
+proportions from beam and draught. The default hull height is beam-based but
+never clamped below the draught requirement; bridge height is clamped to the
+hull height; mast height is clamped to twice the hull height. This keeps small
+AIS-derived vessels from getting visually impossible superstructures.
 
 ## Minimal Parametric Vessel
 
@@ -96,4 +104,3 @@ physical values, rebuilding the parametric vessel, and preserving pose.
 npm run check:demo:parametric-vessel
 npm run build:demo:parametric-vessel
 ```
-

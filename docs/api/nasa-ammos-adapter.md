@@ -18,8 +18,10 @@ const viewer = await createS100Viewer({
 ```
 
 The adapter currently supports projected-local scenes, ENC layers for S-101 and
-S-57, S-102, S-111, simulated water-level layers, vessel/model layers, map
-overlays, camera pose/look-at, time-dynamic layers, picking, and native handles.
+S-57, S-102, S-104 sampled water-level terrain shading, S-111,
+simulated-water-level layers, vessel/model layers, parametric vessels, route
+plans, map overlays, camera pose/look-at, time-dynamic layers, picking, and
+native handles.
 
 It reports supported product-specification versions through:
 
@@ -48,5 +50,4 @@ scene or viewer is destroyed.
 ## Current Limitations
 
 - Globe/ECEF mode is planned for the final major phase.
-- Adapter internals still reuse a local NASA-AMMOS compatibility surface.
 - Three.js is a peer dependency.

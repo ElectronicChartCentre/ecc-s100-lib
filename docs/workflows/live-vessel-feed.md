@@ -11,6 +11,7 @@ The current runnable example is the `Live AIS Norway` recipe in
 
 ```ts
 import {
+  createProjectedLiveAisPositionMapper,
   createLiveVesselFeedLayer,
   type LiveAisVessel,
 } from "@ecc/s100-viewer/products/vessel";
@@ -57,7 +58,9 @@ const feed = await createLiveVesselFeedLayer({
     maxAgeSeconds: 300,
     removeMissing: true,
   },
-  positionMapper: (vessel) => projectLiveAisVesselToScene(vessel),
+  positionMapper: createProjectedLiveAisPositionMapper({
+    crs: "EPSG:32631",
+  }),
 });
 
 await feed.updateVessels(vessels);
@@ -65,8 +68,51 @@ await feed.selectVessel(257000000);
 await feed.dispose();
 ```
 
-Use `positionMapper` when the scene is projected-local. It should convert the
-incoming geodetic vessel position into the scene CRS.
+Use `positionMapper` when the scene is projected-local. For supported projected
+CRS values, prefer the package helper:
+
+```ts
+const feed = await createLiveVesselFeedLayer({
+  scene,
+  id: "live-ais",
+  positionMapper: createProjectedLiveAisPositionMapper({
+    crs: "EPSG:32631",
+  }),
+});
+```
+
+Custom mappers remain useful when an app has a scene-specific projection or a
+provider-specific coordinate normalization step.
+
+## Rendering Style
+
+AIS fleets should use lightweight shared terrain shadows where the adapter
+supports them. Keep high-quality shadows for one-off GLB vessels.
+
+```ts
+const feed = await createLiveVesselFeedLayer({
+  scene,
+  id: "live-ais",
+  style: {
+    style: {
+      showSeaLevelIndicator: true,
+      showOceanSurface: false,
+      shadow: {
+        enabled: true,
+        mode: "shared-texture",
+        opacity: 0.34,
+      },
+    },
+    selectedStyle: {
+      opacity: 1,
+    },
+  },
+});
+```
+
+When AIS draught is missing, the library estimates draught from the generated
+vessel proportions and marks the parametric vessel metadata with
+`draughtEstimated: true` and `draughtSource: "estimated"`.
 
 ## Proxy Boundary
 
@@ -111,4 +157,3 @@ await feed.dispose();
 npm run check:demo:engine-switcher
 npm run build:demo:engine-switcher
 ```
-

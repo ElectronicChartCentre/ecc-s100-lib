@@ -111,11 +111,11 @@ Each adapter should have feature-level tests for:
 - S-102 terrain
 - ENC/map overlays
 - S-111 currents
-- vessel rendering
+- S-104 water-level sampling and terrain-shading behavior where supported
+- vessel rendering, including model, parametric, and live-vessel feed layers
 - route rendering where supported
 - picking
 - async teardown
 
 Avoid adding large mixed-responsibility package tests when a focused feature
 test would locate failures more clearly.
-

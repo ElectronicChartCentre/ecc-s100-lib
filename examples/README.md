@@ -69,8 +69,8 @@ npm run demo:parametric-vessel
 npm run build:demo:parametric-vessel
 ```
 
-The S-104 fixture service exposes generated S-104-shaped JSON at the planned
-service contract:
+The S-104 fixture service exposes generated S-104-shaped JSON at the current
+fixture-service contract:
 
 ```sh
 npm run fixtures:s104:generate

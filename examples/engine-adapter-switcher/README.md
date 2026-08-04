@@ -1,8 +1,7 @@
 # S-100 Engine Adapter Switcher
 
 Private workspace demo for exercising the public `@ecc/s100-viewer` package
-against NASA-AMMOS, Cesium, and the experimental plain Three.js reference
-adapter.
+against NASA-AMMOS, Cesium, and the plain Three.js reference adapter.
 
 For a zero-knowledge, step-by-step learning path through S-100 concepts, the
 public API, this demo's source structure, and first adapter-authoring steps,
