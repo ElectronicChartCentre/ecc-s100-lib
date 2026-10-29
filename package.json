@@ -30,7 +30,7 @@
   "devDependencies": {
     "@types/node": "^24.3.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.0.15"
+    "vitest": "^4.1.12"
   },
   "license": "MIT"
 }
